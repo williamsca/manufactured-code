@@ -40,7 +40,6 @@ The 2004 Florida hurricane season (Charley, Frances, Ivan, Jeanne) and 2005 seas
 | FEMA NFIP claims (OpenFEMA) | Insurance payouts; covers wind-driven water damage | Yes — occupancy type field |
 | FEMA HMGP buyout data | Total-loss proxy (post-disaster buyouts) | MH over-represented |
 | NOAA HURDAT2 / IBTrACS | Hurricane track and county-level max wind speed | n/a — storm intensity instrument |
-| American Housing Survey | Housing vintage, characteristics, self-reported damage | Yes, small sample |
 | CoreLogic / Verisk (private) | Property-level insurance claims | Yes |
 
 **Key data limitation:** NFIP covers flooding, not pure wind damage. FEMA IA better captures wind-related structural losses but grant amounts reflect means-testing, not pure damage. The paper should use both and note the measurement tradeoff. For the sharpest estimates, county-level maximum wind speed from IBTrACS is the instrument for storm exposure.
