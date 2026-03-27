@@ -24,8 +24,10 @@ v_treated_fringe <- c(
 
 # ---------------------------------------------------------------------------
 # Load & filter parquet with arrow
-#  - occupancyType 1  = single-family site-built (comparison group)
-#  - occupancyType 14 = manufactured / mobile home (treated group)
+#  - numberOfFloorsInTheInsuredBuilding 5   = manufactured/mobile home (MH group)
+#  - numberOfFloorsInTheInsuredBuilding 1-3 = site-built single-family (comparison)
+#  - occupancyType 14 used only post-2022 (RR2.0 reclassification); floors==5
+#    is the consistent MH identifier across the full claims history (back to 1978)
 #  - drop records missing yearOfLoss or state
 # ---------------------------------------------------------------------------
 pf <- open_dataset(here("data", "FimaNfipClaimsV2.parquet"))
@@ -38,9 +40,9 @@ keep_cols <- c(
     "yearOfLoss", "dateOfLoss", "eventDesignationNumber", "ficoNumber",
     # property
     "occupancyType", "originalConstructionDate",
-    "buildingDescriptionCode",           # secondary MH check
-    "numberOfFloorsInTheInsuredBuilding",
+    "numberOfFloorsInTheInsuredBuilding",   # 5 = MH; 1-3 = site-built
     "postFIRMConstructionIndicator",
+    "locationOfContents",
     # damage / payment amounts
     "netBuildingPaymentAmount", "buildingDamageAmount",
     "buildingDeductibleCode",  "buildingPropertyValue",
@@ -52,22 +54,22 @@ keep_cols <- c(
 
 dt_raw <- pf |>
     select(all_of(keep_cols)) |>
-    filter(occupancyType %in% c(1L, 14L),
+    filter(numberOfFloorsInTheInsuredBuilding %in% c(1L, 2L, 3L, 5L),
            !is.na(yearOfLoss),
            !is.na(state)) |>
     collect() |>
     as.data.table()
 
-message(sprintf("Loaded %d claims (%d MH, %d site-built)",
+message(sprintf("Loaded %d claims (%d MH [floors==5], %d site-built [floors 1-3])",
     nrow(dt_raw),
-    dt_raw[occupancyType == 14L, .N],
-    dt_raw[occupancyType ==  1L, .N]))
+    dt_raw[numberOfFloorsInTheInsuredBuilding == 5L, .N],
+    dt_raw[numberOfFloorsInTheInsuredBuilding %in% c(1L, 2L, 3L), .N]))
 
 # ---------------------------------------------------------------------------
 # Core classification variables
 # ---------------------------------------------------------------------------
-# MH indicator
-dt_raw[, mh := as.integer(occupancyType == 14L)]
+# MH indicator (floors==5 is the consistent NFIP categorical code for MH)
+dt_raw[, mh := as.integer(numberOfFloorsInTheInsuredBuilding == 5L)]
 
 dt_raw[, countyfp := as.numeric(countyCode)]
 
@@ -93,7 +95,7 @@ dt_raw[, ddd_indicator := mh * post1994 * treated]
 # ---------------------------------------------------------------------------
 # Sanity checks
 # ---------------------------------------------------------------------------
-stopifnot(dt_raw[, uniqueN(occupancyType)] == 2L)  # only 1 and 14
+stopifnot(dt_raw[, all(numberOfFloorsInTheInsuredBuilding %in% c(1L, 2L, 3L, 5L))])
 stopifnot(dt_raw[, all(mh %in% c(0L, 1L))])
 stopifnot(dt_raw[, all(post1994 %in% c(0L, 1L, NA_integer_))])
 
