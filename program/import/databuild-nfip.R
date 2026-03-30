@@ -16,26 +16,14 @@ data_path <- Sys.getenv("DATA_PATH")
 if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
 fema_dir  <- file.path(data_path, "data", "fema-nfip")
 
-# ---------------------------------------------------------------------------
-# Treatment geography
-# ---------------------------------------------------------------------------
-v_treated_primary <- c(
-    "FL", "SC", "NC", "GA", "AL", "MS", "LA", "TX"
-)
-# FIPS two-digit codes for the same states (for countyCode matching if needed)
-v_treated_fringe <- c(
-    "VA", "MD", "DE", "NJ", "CT", "RI", "MA", "NY", "ME", "NH", "HI"
-)
+# import ----
 
-# ---------------------------------------------------------------------------
-# Load & filter parquet with arrow
-#  - numberOfFloorsInTheInsuredBuilding 5   = manufactured/mobile home (MH group)
-#  - numberOfFloorsInTheInsuredBuilding 1-3 = site-built single-family (comparison)
-#  - occupancyType 14 used only post-2022 (RR2.0 reclassification); floors==5
-#    is the consistent MH identifier across the full claims history (back to 1978)
-#  - drop records missing yearOfLoss or state
-# ---------------------------------------------------------------------------
+# county wind zone designations
+dt_treat <- fread(here("derived", "ecfr-windzone.csv"))
+
+# fema claims and policies
 pf <- open_dataset(file.path(fema_dir, "FimaNfipClaimsV2.parquet"))
+pf_pol <- open_dataset(file.path(fema_dir, "FimaNfipPoliciesV2.parquet"))
 
 keep_cols <- c(
     # identifiers / geography
@@ -46,7 +34,6 @@ keep_cols <- c(
     # property
     "occupancyType", "originalConstructionDate",
     "numberOfFloorsInTheInsuredBuilding",   # 5 = MH; 1-3 = site-built
-    "postFIRMConstructionIndicator",
     "locationOfContents",
     # damage / payment amounts
     "netBuildingPaymentAmount", "buildingDamageAmount",
@@ -91,8 +78,8 @@ dt_raw[, post1994 := as.integer(
 dt_raw[, event_time := year_constr - 1994L]
 
 # Treatment geography (primary treated states)
-dt_raw[, treated       := as.integer(state %in% v_treated_primary)]
-dt_raw[, treated_broad := as.integer(state %in% c(v_treated_primary, v_treated_fringe))]
+dt_raw[, treated       := as.integer(state %in% v_treated_primary) & mh == 1L]
+dt_raw[, treated_broad := as.integer(state %in% c(v_treated_primary, v_treated_fringe)) & mh == 1L]
 
 # Triple-difference indicator: compliant MH in treated state
 dt_raw[, ddd_indicator := mh * post1994 * treated]
@@ -153,6 +140,7 @@ dt_county <- dt_raw[
         total_contents_value        = sum(contentsPropertyValue,     na.rm = TRUE),
         # per-claim averages
         avg_net_building_pmt        = mean(netBuildingPaymentAmount, na.rm = TRUE),
+        avg_building_value          = mean(buildingPropertyValue,     na.rm = TRUE),
         avg_building_damage         = mean(buildingDamageAmount,     na.rm = TRUE),
         avg_net_contents_pmt        = mean(netContentsPaymentAmount, na.rm = TRUE),
         avg_contents_damage         = mean(contentsDamageAmount,     na.rm = TRUE),

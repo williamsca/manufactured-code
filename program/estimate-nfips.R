@@ -38,17 +38,12 @@ est_pclaim <- feols(
 
 etable(est_pclaim)
 
-est_main <- feols(
-    fmla_out, data = dt
-)
-
-etable(est_main)
 
 est_pois <- fepois(
     fmla_out, data = dt[total_net_building_pmt >= 0], weights = ~n_claims
 )
 
-etable(est_pois, est_main)
+etable(est_pois)
 
 # Triple-diff: add treated interaction
 est_ddd <- feols(

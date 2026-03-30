@@ -6,7 +6,7 @@
 #   - "Princess Anne" (VA, WZ2): consolidated into Virginia Beach in 1963;
 #     no 2021 census entry. Mapped here to Virginia Beach's pid6.
 #   - Alaska "coastal regions" (WZ3): defined by the ANSI/ASCE 7-88 isotach
-#     map, not by county boundaries. Not included.
+#     map, not by county boundaries. NOT INCLUDED.
 #   - Florida WZ2: eCFR specifies "all counties except WZ3"; expanded here
 #     using the census crosswalk.
 #   - Hawaii WZ3: eCFR specifies "entire state"; expanded here using the
@@ -49,7 +49,6 @@ para_titles <- paras |> html_attr("data-title")
 
 idx_wz2  <- which(para_titles == "3280.305(c)(2)(ii)")
 idx_wz3  <- which(para_titles == "3280.305(c)(2)(iii)")
-# grepl() returns FALSE (not NA) for NA inputs, avoiding min(integer(0))
 idx_stop <- min(which(
   grepl("3280\\.305\\(c\\)\\(2\\)\\(iv\\)|3280\\.305\\(c\\)\\(3\\)", para_titles)
 ))
@@ -88,24 +87,17 @@ parse_counties <- function(text) {
 
 build_zone_dt <- function(entries, wind_zone) {
   rbindlist(lapply(entries, function(e) {
-    if (e$state == "Florida" && str_detect(e$county_text, "^All counties")) {
-      # Expanded later from the census crosswalk
-      return(data.table(state = "Florida", name_ecfr = "ALL_EXCEPT_WZ3"))
-    }
     data.table(state = e$state, name_ecfr = parse_counties(e$county_text))
   }))[, wind_zone := wind_zone]
 }
 
-dt_wz2 <- build_zone_dt(wz2_entries, "II")
-dt_wz3 <- build_zone_dt(wz3_entries, "III")
-
-# Hawaii: entire state is WZ3 (States/Territories subparagraph) — expand later
-dt_wz3 <- rbindlist(list(
-  dt_wz3,
-  data.table(state = "Hawaii", name_ecfr = "ALL", wind_zone = "III")
-))
+dt_wz2 <- build_zone_dt(wz2_entries, 2)
+dt_wz3 <- build_zone_dt(wz3_entries, 3)
 
 dt_ecfr <- rbindlist(list(dt_wz2, dt_wz3))
+
+# all Florida counties except those in WZ3 are in WZ2; assign them later
+dt_ecfr <- dt_ecfr[!(state == "Florida" & wind_zone == 2)]
 
 # =====================================================================
 # 2. Load the census Government Units crosswalk
@@ -127,49 +119,8 @@ setnames(dt_xwalk,
 dt_xwalk[, id_pid6 := as.character(id_pid6)]
 dt_xwalk <- dt_xwalk[is_active == "Y"]
 
-# County-equivalent units:
-#  (a) Standard county units
-dt_county_units <- dt_xwalk[unit_type == "1 - COUNTY"]
-
-#  (b) Virginia independent cities (listed in WZ2 as "Cities of ...")
-dt_va_cities <- dt_xwalk[
-  unit_type == "2 - MUNICIPAL" & state_abbrev == "VA" &
-    str_detect(unit_name, "^CITY OF ")
-]
-
-#  (c) Louisiana consolidated city-parishes / independent cities that have no
-#      separate UNIT_TYPE "1 - COUNTY" entry: East Baton Rouge, Terrebonne,
-#      and Orleans (City of New Orleans)
-dt_la_consol <- dt_xwalk[
-  unit_type == "2 - MUNICIPAL" & state_abbrev == "LA" &
-    (str_detect(unit_name, "CITY-PARISH OF|CONSOLIDATED GOVERNMENT OF") |
-       unit_name == "CITY OF NEW ORLEANS")
-]
-
-#  (d) Nantucket, MA: the county and the Town of Nantucket are coextensive;
-#      the census crosswalk lists it as UNIT_TYPE "3 - TOWNSHIP"
-dt_nantucket <- dt_xwalk[unit_name == "TOWN OF NANTUCKET"]
-
-#  (e) City and County of Honolulu: no separate UNIT_TYPE "1 - COUNTY" entry
-dt_honolulu <- dt_xwalk[unit_name == "CITY AND COUNTY OF HONOLULU"]
-
-dt_match_units <- rbindlist(
-  list(dt_county_units, dt_va_cities, dt_la_consol, dt_nantucket, dt_honolulu),
-  fill = TRUE
-)[, .(id_pid6, unit_name, unit_type, state_abbrev, fips_state, fips_county, county_field)
-][, countyfp := paste0(
-    str_pad(fips_state,  2, pad = "0"),
-    str_pad(fips_county, 3, pad = "0")
-  )
-][, c("fips_state", "fips_county") := NULL]
-
-# State name -> abbreviation lookup
-state_abbrev_map <- c(
-  Alabama = "AL", Alaska = "AK", Florida = "FL", Georgia = "GA",
-  Hawaii = "HI", Louisiana = "LA", Maine = "ME", Massachusetts = "MA",
-  Mississippi = "MS", "North Carolina" = "NC", "South Carolina" = "SC",
-  Texas = "TX", Virginia = "VA"
-)
+# state name <-> abbreviation crosswalk
+dt_states <- fread(file.path(data_path, "crosswalk", "states.txt"))
 
 # =====================================================================
 # 3. Normalize names for matching
@@ -197,10 +148,22 @@ ecfr_corrections <- c(
   "DADE"        = "MIAMIDADE"    # FL WZ3 (renamed Miami-Dade in 1997)
 )
 
-dt_match_units[, name_norm := norm(unit_name)]
+dt_xwalk[, countyfp := paste0(
+  str_pad(fips_state,  2, pad = "0"),
+  str_pad(fips_county, 3, pad = "0")
+)]
+dt_xwalk[, name_norm := norm(unit_name)]
+dt_xwalk <- dt_xwalk[, .(
+  id_pid6, unit_name, name_norm, state_abbrev, countyfp, unit_type)]
 
 dt_ecfr[, name_norm    := norm(name_ecfr)]
-dt_ecfr[, state_abbrev := state_abbrev_map[state]]
+dt_ecfr <- merge(
+  dt_ecfr, dt_states[, .(state_abbrev = state, state = state_name)],
+  by = "state", all.x = TRUE
+)
+
+dt_ecfr[, state := NULL]
+
 dt_ecfr[
   name_norm %in% names(ecfr_corrections),
   name_norm := ecfr_corrections[name_norm]
@@ -211,76 +174,55 @@ dt_ecfr[
 dt_ecfr <- dt_ecfr[name_ecfr != "Princess Anne"]
 
 # =====================================================================
-# 4. Expand Florida WZ2 and Hawaii WZ3 from the census crosswalk
-# =====================================================================
-
-# Florida WZ3 normalized names (to exclude from WZ2 expansion)
-fl_wz3_norms <- dt_ecfr[state == "Florida" & wind_zone == "III", name_norm]
-
-fl_wz2 <- dt_match_units[
-  state_abbrev == "FL" & unit_type == "1 - COUNTY" &
-    !name_norm %in% fl_wz3_norms,
-  .(state = "Florida", name_ecfr = county_field, wind_zone = "II", id_pid6, countyfp)
-]
-
-hi_all <- dt_match_units[
-  state_abbrev == "HI",
-  .(state = "Hawaii", name_ecfr = county_field, wind_zone = "III", id_pid6, countyfp)
-]
-
-# Remove placeholder rows before merging
-dt_ecfr_merge <- dt_ecfr[
-  !(state == "Florida" & wind_zone == "II") &
-    !(state == "Hawaii")
-]
-
-# =====================================================================
 # 5. Merge with census crosswalk to get id_pid6
 # =====================================================================
 
 dt_merged <- merge(
-  dt_ecfr_merge,
-  dt_match_units[, .(state_abbrev, name_norm, id_pid6, countyfp)],
+  dt_ecfr,
+  dt_xwalk,
   by = c("state_abbrev", "name_norm"),
-  all.x = TRUE
+  all = TRUE
 )
 
-# Report unmatched entries
+# check unmatched entries
 unmatched <- dt_merged[is.na(id_pid6)]
 if (nrow(unmatched) > 0L) {
   warning(
     "Unmatched eCFR entries (check spellings or crosswalk):\n",
-    paste(unmatched[, paste0("  ", state, ": ", name_ecfr)], collapse = "\n")
+    paste(unmatched[, paste0("  ", state_abbrev, ": ", name_ecfr)], collapse = "\n")
   )
 }
+
+stopifnot(uniqueN(dt_merged$id_pid6) == nrow(dt_merged[!is.na(id_pid6)]))
+
+dt_merged[
+  state_abbrev == "FL" & unit_type == "1 - COUNTY" & is.na(wind_zone),
+  wind_zone := 2
+]
+
+dt_merged[state_abbrev == "HI", wind_zone := 3]
+
+dt_merged[is.na(wind_zone), wind_zone := 1]
+
+# exclude AK (only coastal regions in WZ3)
+dt_merged <- dt_merged[!state_abbrev == "AK"]
+
+# collapse by county: take maximimum wind zone of all jurisdictions
+# in the county
+dt_final <- dt_merged[, .(wind_zone = max(wind_zone)),
+  by = .(countyfp)]
 
 # =====================================================================
 # 6. Assemble and validate final crosswalk
 # =====================================================================
 
-dt_final <- rbindlist(list(
-  dt_merged[, .(name_ecfr, id_pid6, countyfp, wind_zone)],
-  fl_wz2[,   .(name_ecfr, id_pid6, countyfp, wind_zone)],
-  hi_all[,   .(name_ecfr, id_pid6, countyfp, wind_zone)]
-))
-
-setorder(dt_final, wind_zone, name_ecfr)
-
-# Sanity checks
-stopifnot(
-  "Missing id_pid6 after merge" =
-    !any(is.na(dt_final$id_pid6)),
-  "Duplicate pid6 within wind zone" =
-    !anyDuplicated(dt_final[, .(id_pid6, wind_zone)]),
-  "A county appears in more than one zone" =
-    !anyDuplicated(dt_final[, .(id_pid6)])
-)
+setorder(dt_final, wind_zone, countyfp)
 
 cat(sprintf(
   "Wind zone crosswalk: %d counties total (%d WZ2, %d WZ3)\n",
   nrow(dt_final),
-  dt_final[wind_zone == "II",  .N],
-  dt_final[wind_zone == "III", .N]
+  dt_final[wind_zone == 2,  .N],
+  dt_final[wind_zone == 3, .N]
 ))
 
 # =====================================================================
