@@ -228,7 +228,4 @@ cat(sprintf(
 # =====================================================================
 # 7. Save
 # =====================================================================
-
-out_path <- file.path(data_path, "derived", "ecfr-windzone.csv")
-fwrite(dt_final, out_path)
-cat("Saved to", out_path, "\n")
+fwrite(dt_final, here("derived", "ecfr-windzone.csv"))
