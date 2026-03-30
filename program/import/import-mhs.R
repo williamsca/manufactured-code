@@ -26,8 +26,11 @@ coerce_numeric <- function(x) {
 }
 
 import_state_shipments_annual <- function() {
+    mhs_annual <- file.path(
+        data_path, "data", "census-mhs", "annual_shipmentstostates.xlsx"
+    )
     dt <- as.data.table(read_xlsx(
-        here("data", "census-mhs", "annual_shipmentstostates.xlsx"),
+        mhs_annual,
         skip = 4,
         .name_repair = "minimal"
     ))
@@ -65,11 +68,14 @@ import_state_shipments_annual <- function() {
 }
 
 import_state_shipments_monthly <- function() {
-    sheets <- excel_sheets(here("data", "census-mhs", "monthly_shipmentstostates.xlsx"))
+    mhs_monthly <- file.path(
+        data_path, "data", "census-mhs", "monthly_shipmentstostates.xlsx"
+    )
+    sheets <- excel_sheets(mhs_monthly)
 
     rbindlist(lapply(sheets, function(sheet) {
         dt <- as.data.table(read_xlsx(
-            here("data", "census-mhs", "monthly_shipmentstostates.xlsx"),
+            mhs_monthly,
             sheet = sheet,
             col_names = FALSE,
             .name_repair = "minimal"
@@ -129,7 +135,7 @@ import_state_shipments_monthly <- function() {
 
 import_shipments_national <- function() {
     dt_long <- as.data.table(read_xlsx(
-        here("data", "census-mhs", "shiphist.xlsx"),
+        file.path(data_path, "data", "census-mhs", "shiphist.xlsx"),
         skip = 2,
         col_names = FALSE,
         .name_repair = "minimal"
@@ -159,8 +165,11 @@ import_shipments_national <- function() {
 
     dt_long <- rbindlist(annual_totals[seq_len(idx)])
 
+    mhs_annual <- file.path(
+        data_path, "data", "census-mhs", "annual_shipmentstostates.xlsx"
+    )
     dt_recent <- as.data.table(read_xlsx(
-        here("data", "census-mhs", "annual_shipmentstostates.xlsx"),
+        mhs_annual,
         skip = 4,
         .name_repair = "minimal"
     ))
@@ -187,7 +196,7 @@ import_shipments_national <- function() {
 
 import_nat_status_monthly <- function() {
     dt <- as.data.table(read_xlsx(
-        here("data", "census-mhs", "mhstabsplcstat.xlsx"),
+        file.path(data_path, "data", "census-mhs", "mhstabsplcstat.xlsx"),
         sheet = "Manufactured Homes Status",
         col_names = FALSE,
         .name_repair = "minimal"
@@ -226,7 +235,7 @@ import_nat_status_monthly <- function() {
 
 import_nat_prices_monthly <- function() {
     dt <- as.data.table(read_xlsx(
-        here("data", "census-mhs", "mhstabavgsls.xlsx"),
+        file.path(data_path, "data", "census-mhs", "mhstabavgsls.xlsx"),
         sheet = "Average Sales Price",
         col_names = FALSE,
         .name_repair = "minimal"
@@ -321,7 +330,7 @@ import_hist_state_or_nat <- function(file, value_stub, scale = 1) {
     skip_n <- if (grepl("avgslsprice", file)) 3 else 2
 
     dt <- as.data.table(read_xlsx(
-        here("data", "census-mhs", file),
+        file.path(data_path, "data", "census-mhs", file),
         skip = skip_n,
         col_names = FALSE,
         .name_repair = "minimal"

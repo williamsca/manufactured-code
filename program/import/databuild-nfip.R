@@ -1,6 +1,7 @@
 # Build NFIP claims panel for HUD 1994 wind-standard DiD
 #
-# Inputs:  data/FimaNfipClaimsV2.parquet
+# Inputs:  $DATA_PATH/data/fema-nfip/FimaNfipClaimsV2.parquet
+#          $DATA_PATH/data/fema-nfip/FimaNfipPoliciesV2.parquet
 # Outputs: derived/nfip-claims.Rds   (claim-level, filtered + labelled)
 #          derived/nfip-county.Rds   (county × event × MH × vintage aggregates)
 
@@ -11,8 +12,12 @@ library(dplyr)   # arrow lazy-eval uses dplyr verbs
 library(data.table)
 library(lubridate)
 
+data_path <- Sys.getenv("DATA_PATH")
+if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
+fema_dir  <- file.path(data_path, "data", "fema-nfip")
+
 # ---------------------------------------------------------------------------
-# Treatment geography (from estimate.R)
+# Treatment geography
 # ---------------------------------------------------------------------------
 v_treated_primary <- c(
     "FL", "SC", "NC", "GA", "AL", "MS", "LA", "TX"
@@ -30,7 +35,7 @@ v_treated_fringe <- c(
 #    is the consistent MH identifier across the full claims history (back to 1978)
 #  - drop records missing yearOfLoss or state
 # ---------------------------------------------------------------------------
-pf <- open_dataset(here("data", "FimaNfipClaimsV2.parquet"))
+pf <- open_dataset(file.path(fema_dir, "FimaNfipClaimsV2.parquet"))
 
 keep_cols <- c(
     # identifiers / geography
@@ -200,13 +205,21 @@ dt_agg <- dt_raw[
 ]
 
 # County attributes (1:1 mapping from countyfp → state, treated, treated_broad)
+# Drop the handful of countyfp values that appear in multiple states (NFIP data noise)
 county_attrs <- unique(dt_agg[, .(countyfp, state, treated, treated_broad)])
+bad_counties <- county_attrs[, .N, by = countyfp][N > 1, countyfp]
+if (length(bad_counties) > 0) {
+    message(sprintf("Dropping %d countyfp(s) with conflicting state assignments: %s",
+                    length(bad_counties), paste(bad_counties, collapse = ", ")))
+    county_attrs <- county_attrs[!countyfp %in% bad_counties]
+    dt_agg       <- dt_agg[!countyfp %in% bad_counties]
+}
 stopifnot(county_attrs[, .N, by = countyfp][N > 1, .N] == 0)
 
 # Exposed county-years: any county-year with at least one claim
 exposed_cy <- unique(dt_agg[, .(countyfp, year_loss)])
 
-# Cross with all mh × post1994 cells
+# Cross with all mh × year_constr cells
 grid <- exposed_cy[
     , CJ(mh = 0:1, year_constr = 1985:2005),
     by = .(countyfp, year_loss)]
