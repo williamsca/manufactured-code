@@ -52,7 +52,7 @@ s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
 
 fmla_claim <- as.formula(paste0(
     s_claim, " ~ i(year_constr, mh, ref = 1994)",
-    " | bgfp^year_loss + mh"
+    " | tractfp^year_loss + mh"
 ))
 
 est_claim <- feols(fmla_claim, data = dt_claims, lean = TRUE)
@@ -71,7 +71,7 @@ s_pclaim <- paste0(
 
 fmla_pclaim <- as.formula(paste0(
     s_pclaim, " ~ i(year_constr, mh, ref = 1994)",
-    " | bgfp^year_loss + mh")
+    " | tractfp^year_loss + mh")
 )
 
 est_pclaim <- feols(
