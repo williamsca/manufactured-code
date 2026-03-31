@@ -9,44 +9,44 @@ library(fixest)
 # import ----
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 
-dt[, damage_building_pvalue := building_damage_tot / building_value_tot]
-dt[, damage_contents_pvalue := contents_damage_tot / contents_value_tot]
-
-dt[, net_building_pmts_pdamage := net_building_pmt_tot / building_damage_tot]
-
 dt[, treated_mh := (mh == 1) & treated == TRUE]
 
-dt_claims <- dt[claims_n > 0 & building_damage_tot > 0]
+dt_claims <- dt[
+    claims_n > 0 & building_damage_tot > 0 & !is.na(policies_n)]
+# dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 
 # estimate ----
 
-# main specification: event study with treated × year_constr effects,
-# controlling for type x year_loss x county FEs
-v_pclaim <- c(
-    "building_damage_pclaim", # "building_value_pclaim", 
-    "net_building_pmt_pclaim",
-    "contents_damage_pclaim", "net_contents_pmt_pclaim",
-    "contents_value_pclaim"
-    # "building_covg_pclaim", "contents_covg_pclaim",
-    # "damage_building_pvalue", "damage_contents_pvalue",
-    #"net_building_pmts_pdamage"
+# claim-level outcomes
+v_claim <- c(
+    "building_damage", # "building_value",
+    "net_building_pmt",
+    "contents_damage", "net_contents_pmt"
+    # "contents_value"
+    # "building_covg_pclaim", "contents_covg_pclaim"
 )
-s_pclaim <- paste0("c(", paste0(v_pclaim, collapse = ", "), ")")
-
-v_out <- c("claims_n")
-s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
+v_pclaim <- paste0(v_claim, "_pclaim")
+s_pclaim <- paste0(
+    "c(", paste0(v_pclaim, collapse = ", "), ", claim_rate", ")")
 
 fmla_pclaim <- as.formula(paste0(
-    s_pclaim, " ~ i(year_constr, treated_mh, ref = 1994) + i(year_constr, mh, ref = 1994) | countyfp^year_loss + mh"))
-fmla_out    <- as.formula(paste0(
-    s_out, " ~ i(year_constr, treated_mh, ref = 1994) | countyfp^year_loss + mh^year_loss"))
-
-est_pclaim <- feols(
-    fmla_pclaim, weights = ~claims_n,
-    data = dt_claims
+    s_pclaim, " ~ i(year_constr, mh, ref = 1994)",
+    " | countyfp^year_loss + mh")
 )
 
+est_pclaim <- feols(fmla_pclaim, data = dt_claims, weights = ~claims_n)
+
 etable(est_pclaim, fitstat = c("n", "r2", "wr2", "my"))
+
+# on count outcomes
+
+v_out <- c("claims_n", "policies_n")
+s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
+
+fmla_out <- as.formula(paste0(
+    s_out, " ~ i(year_constr, mh, ref = 1994)",
+    " | countyfp^year_loss + mh"
+))
 
 
 est_pois <- fepois(
