@@ -1,7 +1,7 @@
-# Import and aggregate NFIP policies for continental US counties
+# Import and aggregate NFIP policies for continental US census block groups
 #
 # Inputs:  $DATA_PATH/data/fema-nfip/FimaNfipPoliciesV2.parquet
-# Outputs: derived/nfip-policies.Rds  (countyfp × year × mh × year_constr panel)
+# Outputs: derived/nfip-policies.Rds  (bgfp × year × mh × year_constr panel)
 
 rm(list = ls())
 library(here)
@@ -24,7 +24,8 @@ year_max <- 2005L
 pf_pol <- open_dataset(file.path(fema_dir, "FimaNfipPoliciesV2.parquet"))
 
 v_cols_pol <- c(
-    "countyCode", "numberOfFloorsInInsuredBuilding", "originalConstructionDate",
+    "countyCode", "censusBlockGroupFips", "censusTract",
+    "numberOfFloorsInInsuredBuilding", "originalConstructionDate",
     "policyCost", "policyTerminationDate", "policyEffectiveDate",
     "buildingReplacementCost", "propertyState"
 )
@@ -35,12 +36,15 @@ dt_raw_pol <- pf_pol |>
            !is.na(originalConstructionDate),
            !is.na(propertyState),
            !propertyState %in% c("AS", "GU", "VI", "PR", "AK", "HI"),
-           !is.na(countyCode)
+           !is.na(countyCode),
+           !is.na(censusTract)
            ) |>
     collect() |>
     as.data.table()
 
-setnames(dt_raw_pol, "countyCode", "countyfp")
+setnames(dt_raw_pol, "countyCode",            "countyfp")
+setnames(dt_raw_pol, "censusBlockGroupFips", "bgfp")
+setnames(dt_raw_pol, "censusTract",         "tractfp")
 
 dt_raw_pol[, year_constr := year(originalConstructionDate)]
 dt_raw_pol[, mh := as.integer(numberOfFloorsInInsuredBuilding == 5L)]
@@ -51,56 +55,6 @@ dt_raw_pol[, date_eff  := as.Date(policyEffectiveDate)]
 dt_raw_pol[, date_term := as.Date(policyTerminationDate)]
 dt_raw_pol[, year_eff  := year(date_eff)]
 dt_raw_pol[, year_term := year(date_term)]
-
-# ---------------------------------------------------------------------------
-# sanity checks ----
-# ---------------------------------------------------------------------------
-
-# (1) missing dates
-message(sprintf(
-    "Policies: %d total | missing eff: %d (%.1f%%) | missing term: %d (%.1f%%)",
-    nrow(dt_raw_pol),
-    dt_raw_pol[is.na(date_eff),  .N],
-    100 * dt_raw_pol[is.na(date_eff),  .N] / nrow(dt_raw_pol),
-    dt_raw_pol[is.na(date_term), .N],
-    100 * dt_raw_pol[is.na(date_term), .N] / nrow(dt_raw_pol)
-))
-
-# (2) effective >= termination (invalid)
-dt_raw_pol[!is.na(date_eff) & !is.na(date_term), .(
-    n_invalid   = sum(date_eff >= date_term),
-    pct_invalid = mean(date_eff >= date_term),
-    n_total     = .N
-)] |> print()
-
-# (3) duration distribution — standard NFIP annual policy should be ~365 days
-dt_raw_pol[!is.na(date_eff) & !is.na(date_term),
-    duration_days := as.integer(date_term - date_eff)]
-
-dt_raw_pol[!is.na(duration_days), .(
-    p1       = quantile(duration_days, .01),
-    p10      = quantile(duration_days, .10),
-    p50      = quantile(duration_days, .50),
-    p90      = quantile(duration_days, .90),
-    p99      = quantile(duration_days, .99),
-    mean     = mean(duration_days),
-    n_lt30   = sum(duration_days < 30L),
-    n_gt400  = sum(duration_days > 400L)
-)] |> print()
-
-# (4) calendar-year coverage
-message(sprintf(
-    "Policy years: effective %d–%d | terminated %d–%d",
-    dt_raw_pol[, min(year_eff,  na.rm = TRUE)],
-    dt_raw_pol[, max(year_eff,  na.rm = TRUE)],
-    dt_raw_pol[, min(year_term, na.rm = TRUE)],
-    dt_raw_pol[, max(year_term, na.rm = TRUE)]
-))
-
-# (5) policies per construction decade × MH type
-dt_raw_pol[!is.na(year_constr), .(n = .N),
-    by = .(mh, decade = 10L * (year_constr %/% 10L))
-][order(mh, decade)] |> print()
 
 # ---------------------------------------------------------------------------
 # aggregate policies: countyfp × calendar year × mh × year_constr ----
@@ -135,7 +89,7 @@ message(sprintf(
 # data.table overwrites the LHS key columns with the matched i-column values,
 # so year_eff → matched spine year; rename immediately.
 years_spine <- data.table(
-    year = min(dt_pol_clean$year_eff):max(dt_pol_clean$year_term))
+    year = 1994:max(dt_pol_clean$year_term))
 
 dt_pol_exp <- dt_pol_clean[
     years_spine,
@@ -151,14 +105,14 @@ dt_pol_agg <- dt_pol_exp[, .(
     policies_n      = .N,
     repl_cost_tot   = sum(as.numeric(buildingReplacementCost), na.rm = TRUE),
     policy_cost_tot = sum(as.numeric(policyCost),              na.rm = TRUE)
-), by = .(countyfp, year, mh, year_constr)]
+), by = .(tractfp, year, mh, year_constr)]
 
-setkey(dt_pol_agg, countyfp, year, mh, year_constr)
+setkey(dt_pol_agg, tractfp, year, mh, year_constr)
 
-saveRDS(dt_pol_agg, here("derived", "nfip-policies.Rds"))
+fwrite(dt_pol_agg, here("derived", "nfip-policies.csv"))
 message(sprintf(
-    "Constructed policy panel: %d rows (%d county-years, 2 MH types, %d vintage years)",
+    "Constructed policy panel: %d rows (%d BG-years, 2 MH, %d vintages)",
     nrow(dt_pol_agg),
-    uniqueN(dt_pol_agg[, .(countyfp, year)]),
+    uniqueN(dt_pol_agg[, .(tractfp, year)]),
     uniqueN(dt_pol_agg$year_constr)
 ))

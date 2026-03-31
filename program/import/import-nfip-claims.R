@@ -27,8 +27,8 @@ pf <- open_dataset(file.path(fema_dir, "FimaNfipClaimsV2.parquet"))
 
 keep_cols <- c(
     # identifiers / geography
-    "state", "countyCode", # "censusTract", "censusBlockGroupFips",
-    # "latitude", "longitude",
+    "state", "countyCode", "censusBlockGroupFips", "censusTract",
+    # "censusTract", "latitude", "longitude",
     # storm / event
     "yearOfLoss", "dateOfLoss", # "eventDesignationNumber", "ficoNumber",
     # property
@@ -51,7 +51,8 @@ dt_raw <- pf |>
            !is.na(yearOfLoss),
            !is.na(state),
            !state %in% c("AS", "GU", "VI", "PR", "AK", "HI"),
-           !is.na(countyCode)) |>
+           !is.na(countyCode),
+           !is.na(censusTract)) |>
     collect() |>
     as.data.table()
 
@@ -64,8 +65,12 @@ message(sprintf(
 # ---------------------------------------------------------------------------
 # merge state ----
 # ---------------------------------------------------------------------------
-setnames(dt_raw, "countyCode", "countyfp")
-dt_raw[, statefp := substr(countyfp, 1, 2)]
+setnames(dt_raw, "countyCode",            "countyfp")
+setnames(dt_raw, "censusBlockGroupFips", "bgfp")
+setnames(dt_raw, "censusTract",         "tractfp")
+dt_raw[, statefp := substr(tractfp, 1, 2)]
+
+dt_raw <- dt_raw[statefp <= 56]
 
 # conflicts between 'state' and 'countyCode' in NFIP; take countyCode
 # as ground truth
