@@ -1,0 +1,126 @@
+# Summary statistics: NFIP outcomes by pre/post-1994 × MH × treated
+#
+# Inputs:  derived/nfip-balanced.Rds
+# Outputs: tables/sumstats-nfip.tex
+
+rm(list = ls())
+library(here)
+library(data.table)
+library(kableExtra)
+
+# import ----
+dt <- readRDS(here("derived", "nfip-balanced.Rds"))
+
+dt[, post1994   := year_constr > 1994L]
+dt[, mh_lbl     := fifelse(mh == 1, "MH", "Site-built")]
+dt[, treat_lbl  := fifelse(treated, "Treated", "Control")]
+dt[, period_lbl := fifelse(post1994, "Post-1994", "Pre-1994")]
+
+# aggregate to cell-level weighted means ----
+# use claims_n as weight for per-claim averages; use unit weights for rates/totals
+
+summarize_cell <- function(d) {
+    list(
+        avg_bldg_pmt   = weighted.mean(d$net_building_pmt_pclaim, d$claims_n,
+                                        na.rm = TRUE),
+        avg_cont_pmt   = weighted.mean(d$net_contents_pmt_pclaim, d$claims_n,
+                                        na.rm = TRUE),
+        claim_rate     = mean(d$claim_rate, na.rm = TRUE),
+        total_claims   = sum(d$claims_n,   na.rm = TRUE),
+        total_policies = sum(d$policies_n, na.rm = TRUE)
+    )
+}
+
+groups <- dt[, summarize_cell(.SD),
+             by = .(period_lbl, mh_lbl, treat_lbl),
+             .SDcols = c("net_building_pmt_pclaim", "net_contents_pmt_pclaim",
+                         "claim_rate", "claims_n", "policies_n")]
+
+# reshape: one row per variable, one column per group ----
+groups[, group := paste(period_lbl, mh_lbl, treat_lbl, sep = " / ")]
+
+# ordered column sequence
+col_order <- c(
+    "Pre-1994 / MH / Control",    "Pre-1994 / MH / Treated",
+    "Pre-1994 / Site-built / Control", "Pre-1994 / Site-built / Treated",
+    "Post-1994 / MH / Control",   "Post-1994 / MH / Treated",
+    "Post-1994 / Site-built / Control", "Post-1994 / Site-built / Treated"
+)
+
+groups[, group := factor(group, levels = col_order)]
+setorder(groups, group)
+
+v_vars <- c("avg_bldg_pmt", "avg_cont_pmt", "claim_rate",
+            "total_claims", "total_policies")
+v_labels <- c(
+    "Avg. building payment (\\$)",
+    "Avg. contents payment (\\$)",
+    "Claim rate",
+    "Total claims",
+    "Total policies"
+)
+
+# wide format: variables in rows, groups in columns
+dt_wide <- dcast(
+    melt(groups, id.vars = "group", measure.vars = v_vars),
+    variable ~ group,
+    value.var = "value"
+)
+dt_wide[, variable := factor(variable, levels = v_vars)]
+setorder(dt_wide, variable)
+
+# format numbers
+fmt_row <- function(x, var) {
+    if (var %in% c("avg_bldg_pmt", "avg_cont_pmt")) {
+        formatC(x, format = "f", digits = 0, big.mark = ",")
+    } else if (var == "claim_rate") {
+        formatC(x, format = "f", digits = 3)
+    } else {
+        formatC(x, format = "f", digits = 0, big.mark = ",")
+    }
+}
+
+dt_fmt <- copy(dt_wide)
+cols_to_fmt <- setdiff(names(dt_fmt), "variable")
+
+# convert to character first so row-by-row assignment doesn't coerce to NA
+dt_fmt[, (cols_to_fmt) := lapply(.SD, as.character), .SDcols = cols_to_fmt]
+
+for (j in seq_along(v_vars)) {
+    var <- v_vars[j]
+    dt_fmt[variable == var,
+           (cols_to_fmt) := lapply(.SD, function(x) fmt_row(as.numeric(x), var = var)),
+           .SDcols = cols_to_fmt]
+}
+
+dt_fmt[, variable := v_labels]
+setnames(dt_fmt, "variable", "Variable")
+
+# ensure column order matches col_order
+setcolorder(dt_fmt, c("Variable", col_order))
+
+# build kable ----
+kbl(
+    dt_fmt,
+    format    = "latex",
+    booktabs  = TRUE,
+    escape    = FALSE,
+    col.names = c(
+        "Variable",
+        rep(c("Control", "Treated"), times = 4)
+    ),
+    align = c("l", rep("r", 8))
+) |>
+add_header_above(c(
+    " "           = 1,
+    "MH"          = 2,
+    "Site-built"  = 2,
+    "MH"          = 2,
+    "Site-built"  = 2
+)) |>
+add_header_above(c(
+    " "         = 1,
+    "Pre-1994"  = 4,
+    "Post-1994" = 4
+)) |>
+(\(x) writeLines(as.character(x), here("output", "descriptives", "sumstats-nfip.tex")))()

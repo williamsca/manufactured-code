@@ -3,13 +3,16 @@
 # Inputs:  derived/nfip-claims.Rds       (from import-nfip-claims.R)
 #          derived/nfip-policies.Rds     (from import-nfip-policy.R)
 #          derived/ecfr-windzone.csv     (from import-windzone.R)
-# Outputs: derived/nfip-balanced.Rds    (tractfp × year_loss × mh × year_constr)
+# Outputs: derived/nfip-balanced.Rds    (tractfp × period_loss × mh × period_constr)
+#
+# period_loss: 5-year bins (e.g., 1994 = 1994-1998, 1999 = 1999-2003)
+# period:constr: 3-year bins
 
 rm(list = ls())
 library(here)
 library(data.table)
 
-year_min <- 1988L
+year_min <- 1985L
 year_max <- 2002L
 
 # ---------------------------------------------------------------------------
@@ -30,9 +33,12 @@ v_dmg <- c("net_building_pmt", "building_damage", "building_value",
            "contents_value",   "net_contents_pmt", "contents_damage",
            "building_covg",    "contents_covg")
 
+dt_raw[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
+dt_raw[, period_constr := ((year_constr - year_min) %/% 3L) * 3L + year_min]
+
 dt_agg <- dt_raw[,
     c(.(claims_n = .N), lapply(.SD, sum, na.rm = TRUE)),
-    by      = .(tractfp, year_loss, mh, year_constr),
+    by      = .(tractfp, period_loss, mh, period_constr),
     .SDcols = v_dmg
 ]
 setnames(dt_agg, v_dmg, paste0(v_dmg, "_tot"))
@@ -44,20 +50,22 @@ setnames(dt_agg, v_dmg, paste0(v_dmg, "_tot"))
 #   cells with no claims get zeros
 # ---------------------------------------------------------------------------
 
-exposed_cy <- unique(dt_agg[year_loss > 1994L, .(tractfp, year_loss)])
+exposed_cy <- unique(dt_agg[, .(tractfp, period_loss)])
+
+bins_constr <- unique(((year_min:year_max - year_min) %/% 3L) * 3L + year_min)
 
 grid <- exposed_cy[
-    , CJ(mh = 0:1, year_constr = year_min:year_max),
-    by = .(tractfp, year_loss)]
+    , CJ(mh = 0:1, period_constr = bins_constr),
+    by = .(tractfp, period_loss)]
 grid[, countyfp := substr(tractfp, 1, 5)]
 grid[, statefp  := substr(tractfp, 1, 2)]
 
 dt_balanced <- merge(
     grid, dt_agg,
-    by    = c("tractfp", "year_loss", "mh", "year_constr"),
+    by    = c("tractfp", "period_loss", "mh", "period_constr"),
     all.x = TRUE
 )
-dt_balanced[, post1994 := as.integer(year_constr > 1994L)]
+dt_balanced[, post1994 := as.integer(period_constr > 1994L)]
 
 # ---------------------------------------------------------------------------
 # merge treatment and policy data ----
@@ -76,17 +84,23 @@ dt_balanced[, treated    := (wind_zone >= 2)]
 dt_balanced[, treated_wz3 := (wind_zone == 3)]
 dt_balanced$wind_zone <- NULL
 
+dt_pol[, period_loss := ((year - 1994L) %/% 5L) * 5L + 1994L]
+dt_pol_period <- dt_pol[,
+    .(policies_n    = sum(policies_n,    na.rm = TRUE),
+      repl_cost_tot = sum(repl_cost_tot, na.rm = TRUE),
+      policy_cost_tot = sum(policy_cost_tot, na.rm = TRUE)),
+    by = .(tractfp, period_loss, mh, period_constr)
+]
+
 dt_balanced <- merge(
     dt_balanced,
-    dt_pol[, .(tractfp, year_loss = year, mh, year_constr,
-               policies_n, repl_cost_tot, policy_cost_tot)],
-    by    = c("tractfp", "year_loss", "mh", "year_constr"),
+    dt_pol_period,
+    by    = c("tractfp", "period_loss", "mh", "period_constr"),
     all.x = TRUE
 )
 
-# impute zero policies for cells which are covered
-# in the policy data (i.e., after 2009)
-dt_balanced[is.na(policies_n) & year_loss >= 2009L, policies_n := 0L]
+# impute zero policies for cells covered in the policy data (i.e., period >= 2009)
+dt_balanced[is.na(policies_n) & period_loss >= 2009L, policies_n := 0L]
 
 # ---------------------------------------------------------------------------
 # derived outcomes ----
@@ -118,10 +132,10 @@ message(sprintf(
     100 * dt_balanced[!is.na(policies_n), .N] / nrow(dt_balanced)
 ))
 
-setkey(dt_balanced, tractfp, year_loss, mh, year_constr)
+setkey(dt_balanced, tractfp, period_loss, mh, period_constr)
 
 saveRDS(dt_balanced, here("derived", "nfip-balanced.Rds"))
 message(sprintf(
-    "Saved balanced panel: %d rows (%d BG-years x 2 MH x %d vintage years)",
-    nrow(dt_balanced), uniqueN(dt_balanced[, .(tractfp, year_loss)]),
-    length(unique(dt_balanced$year_constr))))
+    "Saved balanced panel: %d rows (%d tract-periods x 2 MH x %d vintage years)",
+    nrow(dt_balanced), uniqueN(dt_balanced[, .(tractfp, period_loss)]),
+    length(unique(dt_balanced$period_constr))))

@@ -1,5 +1,9 @@
 data/
 derived/
+output/
+
+paper.tex
+paper.pdf
 
 # History files
 .Rhistory
