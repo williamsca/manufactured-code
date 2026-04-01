@@ -38,55 +38,13 @@ dt_claims[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 dt_claims[, period_constr := ((year_constr - 1985L) %/% 3L) * 3L + 1985L]
 dt_claims[, post1994 := as.integer(year_constr > 1994L)]
 
-# A. Insurability (extensive margin) ----
-# Post-1994 MH met structural requirements for insurance eligibility,
-# expanding coverage. Supported by NYT anecdote: "the additional anchors
-# have to be installed in order to obtain insurance."
-
-est_extensive <- fepois(
-    c(policies_n, claims_n) ~ post_mh + post1994 + mh
-        | countyfp^loss_period,
-    data = dt[between(year_constr, 1988L, 2002L)],
-    lean = TRUE
-)
-
-etable(est_extensive, fitstat = c("n", "r2", "my"))
-
-# B. Claim intensity (conditional on coverage) ----
-# Among cells with active policies, did claim rates change?
-
-dt_rate <- dt[
-    !is.na(policies_n) & policies_n > 0 &
-    between(year_constr, 1988L, 2002L)]
-
-est_rate <- feols(
-    claim_rate ~ post1994*mh | countyfp^loss_period,
-    data = dt_rate, weights = ~policies_n, lean = TRUE
-)
-
-etable(est_rate, fitstat = c("n", "r2", "wr2", "my"))
-
-# C. Damage severity (conditional on claim) ----
-# Among those who filed a claim, did post-1994 MH have lower payouts?
-
 v_claim <- c(
     "building_damage", "net_building_pmt",
-    "contents_damage", "net_contents_pmt")
+    "contents_damage", "net_contents_pmt"
+)
 s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
 
-fmla_sev <- as.formula(paste0(
-    s_claim, " ~ post_mh + post1994 + mh | countyfp^loss_period"
-))
-
-est_severity <- feols(fmla_sev, data = dt_claims, lean = TRUE)
-
-etable(est_severity, fitstat = c("n", "r2", "wr2", "my"))
-
-# superseded ----
-# Event study specifications below.
-# These spread limited MH variation across many year_constr bins;
-# underpowered at tract level and triple-diff shows bad pre-trends.
-
+# event studies ----
 # claim-level event study
 dt_claims[, treated_mh := (mh == 1) & treated]
 
@@ -134,3 +92,45 @@ est_pois_es <- fepois(
     weights = ~claims_n, lean = TRUE
 )
 etable(est_pois_es)
+
+# static ----
+# A. Insurability (extensive margin) ----
+# Post-1994 MH met structural requirements for insurance eligibility,
+# expanding coverage. Supported by NYT anecdote: "the additional anchors
+# have to be installed in order to obtain insurance."
+
+est_extensive <- fepois(
+    c(policies_n, claims_n) ~ post_mh + post1994 + mh |
+        countyfp^loss_period,
+    data = dt[between(year_constr, 1988L, 2002L)],
+    lean = TRUE
+)
+
+etable(est_extensive, fitstat = c("n", "r2", "my"))
+
+# B. Claim intensity (conditional on coverage) ----
+# Among cells with active policies, did claim rates change?
+
+dt_rate <- dt[
+    !is.na(policies_n) & policies_n > 0 &
+        between(year_constr, 1988L, 2002L)
+]
+
+est_rate <- feols(
+    claim_rate ~ post1994 * mh | countyfp^loss_period,
+    data = dt_rate, weights = ~policies_n, lean = TRUE
+)
+
+etable(est_rate, fitstat = c("n", "r2", "wr2", "my"))
+
+# C. Damage severity (conditional on claim) ----
+# Among those who filed a claim, did post-1994 MH have lower payouts?
+
+
+fmla_sev <- as.formula(paste0(
+    s_claim, " ~ post_mh + post1994 + mh | countyfp^loss_period"
+))
+
+est_severity <- feols(fmla_sev, data = dt_claims, lean = TRUE)
+
+etable(est_severity, fitstat = c("n", "r2", "wr2", "my"))
