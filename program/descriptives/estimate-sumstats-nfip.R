@@ -1,4 +1,4 @@
-# Summary statistics: NFIP outcomes by pre/post-1994 × MH × treated
+# Summary statistics: NFIP outcomes by pre/post-1994 × MH
 #
 # Inputs:  derived/nfip-balanced.Rds
 # Outputs: tables/sumstats-nfip.tex
@@ -11,10 +11,8 @@ library(kableExtra)
 # import ----
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 
-dt[, post1994   := year_constr > 1994L]
 dt[, mh_lbl     := fifelse(mh == 1, "MH", "Site-built")]
-dt[, treat_lbl  := fifelse(treated, "Treated", "Control")]
-dt[, period_lbl := fifelse(post1994, "Post-1994", "Pre-1994")]
+dt[, period_lbl := fifelse(post1994 == 1, "Post-1994", "Pre-1994")]
 
 # aggregate to cell-level weighted means ----
 # use claims_n as weight for per-claim averages; use unit weights for rates/totals
@@ -32,19 +30,17 @@ summarize_cell <- function(d) {
 }
 
 groups <- dt[, summarize_cell(.SD),
-             by = .(period_lbl, mh_lbl, treat_lbl),
+             by = .(period_lbl, mh_lbl),
              .SDcols = c("net_building_pmt_pclaim", "net_contents_pmt_pclaim",
                          "claim_rate", "claims_n", "policies_n")]
 
 # reshape: one row per variable, one column per group ----
-groups[, group := paste(period_lbl, mh_lbl, treat_lbl, sep = " / ")]
+groups[, group := paste(period_lbl, mh_lbl, sep = " / ")]
 
 # ordered column sequence
 col_order <- c(
-    "Pre-1994 / MH / Control",    "Pre-1994 / MH / Treated",
-    "Pre-1994 / Site-built / Control", "Pre-1994 / Site-built / Treated",
-    "Post-1994 / MH / Control",   "Post-1994 / MH / Treated",
-    "Post-1994 / Site-built / Control", "Post-1994 / Site-built / Treated"
+    "Pre-1994 / MH", "Pre-1994 / Site-built",
+    "Post-1994 / MH", "Post-1994 / Site-built"
 )
 
 groups[, group := factor(group, levels = col_order)]
@@ -105,22 +101,19 @@ kbl(
     format    = "latex",
     booktabs  = TRUE,
     escape    = FALSE,
-    col.names = c(
-        "Variable",
-        rep(c("Control", "Treated"), times = 4)
-    ),
-    align = c("l", rep("r", 8))
+    col.names = c("Variable", rep("", 4)),
+    align = c("l", rep("r", 4))
 ) |>
 add_header_above(c(
     " "           = 1,
-    "MH"          = 2,
-    "Site-built"  = 2,
-    "MH"          = 2,
-    "Site-built"  = 2
+    "MH"          = 1,
+    "Site-built"  = 1,
+    "MH"          = 1,
+    "Site-built"  = 1
 )) |>
 add_header_above(c(
     " "         = 1,
-    "Pre-1994"  = 4,
-    "Post-1994" = 4
+    "Pre-1994"  = 2,
+    "Post-1994" = 2
 )) |>
 (\(x) writeLines(as.character(x), here("output", "descriptives", "sumstats-nfip.tex")))()

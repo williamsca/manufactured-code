@@ -46,8 +46,6 @@ s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
 
 # event studies ----
 # claim-level event study
-dt_claims[, treated_mh := (mh == 1) & treated]
-
 fmla_claim_es <- as.formula(paste0(
     s_claim, " ~ i(period_constr, mh, ref = 1991)",
     " | tractfp^period_loss + mh"
@@ -65,11 +63,12 @@ dt_claims_cell[, treated_mh := (mh == 1) & treated == TRUE]
 
 v_pclaim <- paste0(v_claim, "_pclaim")
 s_pclaim <- paste0(
-    "c(", paste0(v_pclaim, collapse = ", "), ", claim_rate", ")")
+    "c(", paste0(v_pclaim, collapse = ", "),
+    ", claim_rate, repl_cost_ppol, policy_cost_ppol", ")")
 
 fmla_pclaim_es <- as.formula(paste0(
     s_pclaim, " ~ i(period_constr, mh, ref = 1991)",
-    " | countyfp^period_loss + mh")
+    " | tractfp^period_loss + mh")
 )
 
 est_pclaim_es <- feols(
@@ -94,43 +93,78 @@ est_pois_es <- fepois(
 etable(est_pois_es)
 
 # static ----
-# A. Insurability (extensive margin) ----
-# Post-1994 MH met structural requirements for insurance eligibility,
-# expanding coverage. Supported by NYT anecdote: "the additional anchors
-# have to be installed in order to obtain insurance."
 
-est_extensive <- fepois(
-    c(policies_n, claims_n) ~ post_mh + post1994 + mh |
-        countyfp^loss_period,
-    data = dt[between(year_constr, 1988L, 2002L)],
-    lean = TRUE
-)
+# plots ----
+v_palette <- c("#0072B2", "#D55E00", "#009E73", "#F0E442")
 
-etable(est_extensive, fitstat = c("n", "r2", "my"))
+theme_paper <- function(base_size = 14) {
+    theme_classic(base_size = base_size) +
+        theme(
+            text = element_text(family = "serif"),
+            legend.position = "right"
+        )
+}
 
-# B. Claim intensity (conditional on coverage) ----
-# Among cells with active policies, did claim rates change?
+# Plot an event study from a fixest model estimated with i(period_constr, mh, ref = 1991).
+# Extracts interaction terms (:mh), appends a zero row at the reference period,
+# and draws point estimates with 95% CI ribbon.
+plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL) {
+    # [[]] extracts a single fixest object; [lhs=] returns fixest_multi,
+    # whose coeftable() output has a different structure
+    if (!is.null(outcome)) est <- est[lhs = outcome][[1]]
+    ylab <- if (!is.null(outcome) && outcome %in% names(v_dict)) {
+        unname(v_dict[[outcome]])
+    } else {
+        outcome
+    }
 
-dt_rate <- dt[
-    !is.na(policies_n) & policies_n > 0 &
-        between(year_constr, 1988L, 2002L)
-]
+    ct <- as.data.table(coeftable(est), keep.rownames = TRUE)
+    # i(period_constr, mh) coefficients are named "period_constr::YYYY:mh"
+    # after as.data.table(), rownames live in the "rn" column
+    idx <- grepl(":mh$", ct$rn)
+    dt_es <- data.table(
+        term    = ct$rn[idx],
+        est     = ct$Estimate[idx],
+        se      = ct[["Std. Error"]][idx]
+    )
+    dt_es[, period  := as.integer(regmatches(term, regexpr("[0-9]{4}", term)))]
+    dt_es[, ci_low  := est - 1.96 * se]
+    dt_es[, ci_high := est + 1.96 * se]
 
-est_rate <- feols(
-    claim_rate ~ post1994 * mh | countyfp^loss_period,
-    data = dt_rate, weights = ~policies_n, lean = TRUE
-)
+    # append reference period normalized to zero
+    dt_es <- rbind(
+        dt_es,
+        data.table(term = NA_character_, est = 0, se = 0,
+                   ci_low = 0, ci_high = 0, period = 1991L)
+    )
+    setorder(dt_es, period)
 
-etable(est_rate, fitstat = c("n", "r2", "wr2", "my"))
+    p <- ggplot(dt_es, aes(x = period, y = est)) +
+        geom_ribbon(aes(ymin = ci_low, ymax = ci_high),
+                    alpha = 0.2, fill = v_palette[1]) +
+        geom_line(color = v_palette[1]) +
+        geom_point(color = v_palette[1], size = 2) +
+        geom_vline(xintercept = vline_x, linetype = "dotted", color = "black") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+        scale_x_continuous(breaks = dt_es$period) +
+        labs(x = "Construction period", y = ylab) +
+        theme_paper()
 
-# C. Damage severity (conditional on claim) ----
-# Among those who filed a claim, did post-1994 MH have lower payouts?
+    if (!is.null(path)) ggsave(path, p, width = 9, height = 5)
+    p
+}
 
+dir.create(
+    here("output", "event-study"), showWarnings = FALSE, recursive = TRUE)
 
-fmla_sev <- as.formula(paste0(
-    s_claim, " ~ post_mh + post1994 + mh | countyfp^loss_period"
-))
+plot_es(est_claim_es, "net_building_pmt",
+        path = here("output", "event-study", "es-net-building-pmt.pdf"))
 
-est_severity <- feols(fmla_sev, data = dt_claims, lean = TRUE)
+plot_es(est_claim_es, "net_contents_pmt",
+        path = here("output", "event-study", "es-net-contents-pmt.pdf"))
 
-etable(est_severity, fitstat = c("n", "r2", "wr2", "my"))
+plot_es(est_pclaim_es, "claim_rate",
+        path = here("output", "event-study", "es-claim-rate.pdf"))
+
+plot_es(est_pois_es, "policies_n",
+        path = here("output", "event-study", "es-policies.pdf"))

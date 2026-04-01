@@ -1,0 +1,63 @@
+% slides-model.tex: CES demand model focus
+% https://pascalmichaillat.org/d1/
+
+\documentclass[11pt,xcolor={dvipsnames},hyperref={pdftex,pdfpagemode=UseNone,hidelinks,pdfdisplaydoctitle=true},usepdftitle=false,aspectratio=169]{beamer}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+
+\usepackage{presentation}
+
+\newcommand{\gc}[1]{{\footnotesize\textcolor{gray}{#1}}}
+
+\usepackage{natbib}
+
+\usepackage{verbatim}
+
+\hypersetup{pdftitle={The Returns to Climate Adaptation in Manufactured Housing}}
+\newcommand{\pdf}{paper}
+
+\begin{document}
+
+\title{The Returns to Climate Adaptation in Manufactured Housing}
+\subtitle{}
+\information%
+{Colin Williams}%
+{University of Virginia -- \today}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+%% ============================================================
+%% MOTIVATION
+%% ============================================================
+
+%% ============================================================
+%% RESULTS
+%% ============================================================
+
+\begin{frame}
+    \frametitle{Post-1994 MH sustains lower building damage per claim}
+    \vspace{0.5em}
+    \includegraphics[width=\textwidth]{output/event-study/es-net-building-pmt.pdf}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Contents damage also declines for post-1994 MH}
+    \vspace{0.5em}
+    \includegraphics[width=\textwidth]{output/event-study/es-net-contents-pmt.pdf}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Claim rates fall for post-1994 MH}
+    \vspace{0.5em}
+    \includegraphics[width=\textwidth]{output/event-study/es-claim-rate.pdf}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Post-1994 MH expands insurance coverage}
+    \vspace{0.5em}
+    \includegraphics[width=\textwidth]{output/event-study/es-policies.pdf}
+\end{frame}
+
+\end{document}

@@ -4,6 +4,7 @@ output/
 
 paper.tex
 paper.pdf
+slides.pdf
 
 # History files
 .Rhistory

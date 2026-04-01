@@ -112,12 +112,19 @@ for (col in v_outcomes) {
     set(dt_balanced, which(is.na(dt_balanced[[col]])), col, 0)
 }
 
-# per-claim averages
-v_tot <- grep("_tot$", names(dt_balanced), value = TRUE)
-v_avg <- gsub("_tot$", "_pclaim", v_tot)
-dt_balanced[, (v_avg) := lapply(
+# per-claim averages (claims-derived fields only)
+v_pol_tot  <- c("repl_cost_tot", "policy_cost_tot")
+v_clm_tot  <- setdiff(grep("_tot$", names(dt_balanced), value = TRUE), v_pol_tot)
+v_clm_avg  <- gsub("_tot$", "_pclaim", v_clm_tot)
+dt_balanced[, (v_clm_avg) := lapply(
     .SD, function(x) fifelse(claims_n > 0, x / claims_n, NA_real_)),
-    .SDcols = v_tot]
+    .SDcols = v_clm_tot]
+
+# per-policy averages (policy-derived fields)
+v_pol_avg  <- gsub("_tot$", "_ppol", v_pol_tot)
+dt_balanced[, (v_pol_avg) := lapply(
+    .SD, function(x) fifelse(!is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
+    .SDcols = v_pol_tot]
 
 # claim rate: claims per policy in force that year
 # NA where the county × year × cell has no policy records (coverage gap)
