@@ -30,3 +30,6 @@ clean:
 	rm -f *.out
 	rm -f *.bbl
 	rm -f *.blg
+	rm -f *.nav
+	rm -f *.snm
+	rm -f *.toc

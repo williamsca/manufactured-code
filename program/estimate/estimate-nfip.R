@@ -14,13 +14,15 @@ library(ggplot2)
 v_dict <- c(
     "claims_n" = "Claims (#)",
     "policies_n" = "Policies (#)",
-    "building_damage" = "Building damage ($)",
-    "net_building_pmt" = "Net building payment ($)",
-    "contents_damage" = "Contents damage ($)",
-    "net_contents_pmt" = "Net contents payment ($)",
+    "building_damage" = "Building damage (000s)",
+    "net_building_pmt" = "Net building payment (000s)",
+    "contents_damage" = "Contents damage (000s)",
+    "net_contents_pmt" = "Net contents payment (000s)",
     "claim_rate" = "Claims per policy",
     "building_damage_share" = "Building damage share of assessed value (%)",
-    "building_pmt_share" = "Building payment share (%)"
+    "building_pmt_share" = "Building payment share (%)",
+    "mh_claim_share" = "MH share of claims",
+    "mh_policy_share" = "MH share of policies"
 )
 
 setFixest_dict(v_dict, reset = TRUE)
@@ -81,6 +83,30 @@ etable(est_pclaim_es, fitstat = c("n", "r2", "wr2", "my"))
 
 iplot(est_pclaim_es[lhs = "claim_rate"])
 
+# MH share event study
+dt_share_cell <- dt_claims_cell[, .(
+    claims_n      = sum(claims_n,               na.rm = TRUE),
+    policies_n    = sum(policies_n,             na.rm = TRUE),
+    mh_claims_n   = sum(claims_n  * (mh == 1L), na.rm = TRUE),
+    mh_policies_n = sum(policies_n * (mh == 1L), na.rm = TRUE),
+    treated       = treated[1]
+), by = .(tractfp, period_loss, period_constr)]
+
+dt_share_cell[, mh_claim_share  := mh_claims_n  / claims_n]
+dt_share_cell[, mh_policy_share := mh_policies_n / policies_n]
+
+fmla_share_es <- as.formula(
+    "c(mh_claim_share, mh_policy_share) ~ i(period_constr, ref = 1991) | tractfp^period_loss"
+)
+
+est_share_es <- feols(
+    fmla_share_es, data = dt_share_cell,
+    weights = ~claims_n, lean = TRUE
+)
+etable(est_share_es, fitstat = c("n", "r2", "wr2", "my"))
+
+iplot(est_share_es)
+
 # count event study (Poisson)
 v_out <- c("claims_n", "policies_n")
 s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
@@ -112,7 +138,8 @@ theme_paper <- function(base_size = 14) {
 # Plot an event study from a fixest model estimated with i(period_constr, mh, ref = 1991).
 # Extracts interaction terms (:mh), appends a zero row at the reference period,
 # and draws point estimates with 95% CI ribbon.
-plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL) {
+plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "mh",
+                    yscale = 1) {
     # [[]] extracts a single fixest object; [lhs=] returns fixest_multi,
     # whose coeftable() output has a different structure
     if (!is.null(outcome)) est <- est[lhs = outcome][[1]]
@@ -125,11 +152,11 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL) {
     ct <- as.data.table(coeftable(est), keep.rownames = TRUE)
     # i(period_constr, mh) coefficients are named "period_constr::YYYY:mh"
     # after as.data.table(), rownames live in the "rn" column
-    idx <- grepl(":mh$", ct$rn)
+    idx <- grepl(paste0(":", var, "$"), ct$rn)
     dt_es <- data.table(
         term    = ct$rn[idx],
-        est     = ct$Estimate[idx],
-        se      = ct[["Std. Error"]][idx]
+        est     = ct$Estimate[idx] / yscale,
+        se      = ct[["Std. Error"]][idx] / yscale
     )
     dt_es[, period  := as.integer(regmatches(term, regexpr("[0-9]{4}", term)))]
     dt_es[, ci_low  := est - 1.96 * se]
@@ -146,8 +173,8 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL) {
     p <- ggplot(dt_es, aes(x = period, y = est)) +
         geom_ribbon(aes(ymin = ci_low, ymax = ci_high),
                     alpha = 0.2, fill = v_palette[1]) +
-        geom_line(color = v_palette[1]) +
         geom_point(color = v_palette[1], size = 2) +
+        geom_line(color = v_palette[1]) +
         geom_vline(xintercept = vline_x, linetype = "dotted", color = "black") +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
         scale_x_continuous(breaks = dt_es$period) +
@@ -161,10 +188,10 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL) {
 dir.create(
     here("output", "event-study"), showWarnings = FALSE, recursive = TRUE)
 
-plot_es(est_claim_es, "net_building_pmt",
+plot_es(est_claim_es, "net_building_pmt", yscale = 1000,
         path = here("output", "event-study", "es-net-building-pmt.pdf"))
 
-plot_es(est_claim_es, "net_contents_pmt",
+plot_es(est_claim_es, "net_contents_pmt", yscale = 1000,
         path = here("output", "event-study", "es-net-contents-pmt.pdf"))
 
 plot_es(est_pclaim_es, "claim_rate",
@@ -172,3 +199,9 @@ plot_es(est_pclaim_es, "claim_rate",
 
 plot_es(est_pois_es, "policies_n",
         path = here("output", "event-study", "es-policies.pdf"))
+
+plot_es(est_share_es, "mh_claim_share",  var = "treatedTRUE",
+        path = here("output", "event-study", "es-mh-claim-share.pdf"))
+
+plot_es(est_share_es, "mh_policy_share", var = "treatedTRUE",
+        path = here("output", "event-study", "es-mh-policy-share.pdf"))

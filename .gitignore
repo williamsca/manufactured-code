@@ -5,6 +5,7 @@ output/
 paper.tex
 paper.pdf
 slides.pdf
+*.pdf
 
 # History files
 .Rhistory
