@@ -120,6 +120,16 @@ dt_balanced[, (v_clm_avg) := lapply(
     .SD, function(x) fifelse(claims_n > 0, x / claims_n, NA_real_)),
     .SDcols = v_clm_tot]
 
+# damage shares
+v_shares_value <- c(
+    "building_damage_tot", "net_building_pmt_tot")
+
+v_shares <- paste0(gsub("_tot", "_share", v_shares_value))
+dt_balanced[, (v_shares) := lapply(
+    .SD, function(x) 100 * fifelse(
+        building_value_tot > 0, x / building_value_tot, NA_real_)),
+    .SDcols = v_shares_value]
+
 # per-policy averages (policy-derived fields)
 v_pol_avg  <- gsub("_tot$", "_ppol", v_pol_tot)
 dt_balanced[, (v_pol_avg) := lapply(

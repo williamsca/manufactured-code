@@ -18,7 +18,9 @@ v_dict <- c(
     "net_building_pmt" = "Net building payment ($)",
     "contents_damage" = "Contents damage ($)",
     "net_contents_pmt" = "Net contents payment ($)",
-    "claim_rate" = "Claims per policy"
+    "claim_rate" = "Claims per policy",
+    "building_damage_share" = "Building damage share of assessed value (%)",
+    "building_pmt_share" = "Building payment share (%)"
 )
 
 setFixest_dict(v_dict, reset = TRUE)
@@ -72,9 +74,11 @@ fmla_pclaim_es <- as.formula(paste0(
 )
 
 est_pclaim_es <- feols(
-    fmla_pclaim_es, data = dt_claims_cell, weights = ~claims_n,
+    fmla_pclaim_es, data = dt_claims_cell[policies_n > 0],
+    weights = ~policies_n,
     lean = TRUE)
 etable(est_pclaim_es, fitstat = c("n", "r2", "wr2", "my"))
+
 iplot(est_pclaim_es[lhs = "claim_rate"])
 
 # count event study (Poisson)
