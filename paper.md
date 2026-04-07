@@ -7,8 +7,6 @@ author:
 date: \today
 abstract: 
 header-includes:
-- \usepackage{booktabs}
-- \usepackage{threeparttable}
 - \usepackage{lscape}
 ...
 
@@ -50,17 +48,6 @@ header-includes:
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Coefficients from a cell-level regression of claims per policy on interactions between construction period and a manufactured housing indicator, relative to the 1991 bin. Weighted by claims. Regressions include county $\times$ loss-period and MH fixed effects. 95\% confidence intervals shown.
-  \end{footnotesize}
-  \end{flushleft}
-\end{figure}
-
-\begin{figure}[htbp]
-  \centering
-  \caption{Effect of Post-1994 HUD Standards on Number of Policies}\label{fig:es-policies}
-  \includegraphics[width=\textwidth]{output/event-study/es-policies.pdf}
-  \begin{flushleft}
-  \begin{footnotesize}
-  Notes: Coefficients from a Poisson regression of policy counts on interactions between construction period and a manufactured housing indicator, relative to the 1991 bin. Regressions include tract $\times$ loss-year and MH fixed effects. 95\% confidence intervals shown.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}

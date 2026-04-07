@@ -20,7 +20,7 @@ v_dict <- c(
     "net_contents_pmt" = "Net contents payment (000s)",
     "claim_rate" = "Claims per policy",
     "building_damage_share" = "Building damage share of assessed value (%)",
-    "building_pmt_share" = "Building payment share (%)",
+    "net_building_pmt_share" = "Building payment share (%)",
     "mh_claim_share" = "MH share of claims",
     "mh_policy_share" = "MH share of policies"
 )
@@ -42,9 +42,22 @@ dt_claims[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 dt_claims[, period_constr := ((year_constr - 1985L) %/% 3L) * 3L + 1985L]
 dt_claims[, post1994 := as.integer(year_constr > 1994L)]
 
+v_shares <- c("building_damage", "net_building_pmt")
+v_shares_names <- paste0(v_shares, "_share")
+dt_claims[, (v_shares_names) := lapply(
+    .SD, function(x) 100 * x / building_value), .SDcols = v_shares]
+
+v_shares_contents <- c("contents_value", "net_contents_pmt")
+v_shares_contents_names <- paste0(v_shares_contents, "_share")
+dt_claims[, (v_shares_contents_names) := lapply(
+    .SD, function(x) 100 * x / contents_value), .SDcols = v_shares_contents
+]
+
 v_claim <- c(
     "building_damage", "net_building_pmt",
-    "contents_damage", "net_contents_pmt"
+    "contents_damage", "net_contents_pmt",
+    "building_damage_share", "net_building_pmt_share",
+    "contents_value_share", "net_contents_pmt_share"
 )
 s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
 
@@ -65,10 +78,12 @@ dt_claims_cell <- dt[
     between(period_constr, 1985L, 2002L)]
 dt_claims_cell[, treated_mh := (mh == 1) & treated == TRUE]
 
-v_pclaim <- paste0(v_claim, "_pclaim")
+v_pclaim <- grep("_share$", v_claim, invert = TRUE, value = TRUE)
+v_pclaim <- paste0(v_pclaim, "_pclaim")
 s_pclaim <- paste0(
     "c(", paste0(v_pclaim, collapse = ", "),
-    ", claim_rate, repl_cost_ppol, policy_cost_ppol", ")")
+    ", claim_rate, repl_cost_ppol, policy_cost_ppol, building_damage_share, net_building_pmt_share",
+    ")")
 
 fmla_pclaim_es <- as.formula(paste0(
     s_pclaim, " ~ i(period_constr, mh, ref = 1991)",
@@ -88,9 +103,8 @@ dt_share_cell <- dt_claims_cell[, .(
     claims_n      = sum(claims_n,               na.rm = TRUE),
     policies_n    = sum(policies_n,             na.rm = TRUE),
     mh_claims_n   = sum(claims_n  * (mh == 1L), na.rm = TRUE),
-    mh_policies_n = sum(policies_n * (mh == 1L), na.rm = TRUE),
-    treated       = treated[1]
-), by = .(tractfp, period_loss, period_constr)]
+    mh_policies_n = sum(policies_n * (mh == 1L), na.rm = TRUE))
+, by = .(tractfp, period_loss, period_constr, treated)]
 
 dt_share_cell[, mh_claim_share  := mh_claims_n  / claims_n]
 dt_share_cell[, mh_policy_share := mh_policies_n / policies_n]
@@ -113,7 +127,7 @@ s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
 
 fmla_out_es <- as.formula(paste0(
     s_out, " ~ i(period_constr, mh, ref = 1991)",
-    " | tractfp^period_loss + mh"
+    " | tractfp^period_loss + mh^period_loss + mh^tractfp"
 ))
 
 est_pois_es <- fepois(
