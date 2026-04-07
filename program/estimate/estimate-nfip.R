@@ -65,7 +65,7 @@ s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
 # claim-level event study
 fmla_claim_es <- as.formula(paste0(
     s_claim, " ~ i(period_constr, mh, ref = 1991)",
-    " | tractfp^period_loss + mh"
+    " | sw(tractfp, tractfp^period_loss) + mh"
 ))
 
 est_claim_es <- feols(fmla_claim_es, data = dt_claims, lean = TRUE)
@@ -165,8 +165,12 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "m
 
     ct <- as.data.table(coeftable(est), keep.rownames = TRUE)
     # i(period_constr, mh) coefficients are named "period_constr::YYYY:mh"
-    # after as.data.table(), rownames live in the "rn" column
-    idx <- grepl(paste0(":", var, "$"), ct$rn)
+    # i(period_constr) main effects are named "period_constr::YYYY"
+    if (is.null(var)) {
+        idx <- grepl("^period_constr::\\d{4}$", ct$rn)
+    } else {
+        idx <- grepl(paste0(":", var, "$"), ct$rn)
+    }
     dt_es <- data.table(
         term    = ct$rn[idx],
         est     = ct$Estimate[idx] / yscale,
@@ -214,8 +218,8 @@ plot_es(est_pclaim_es, "claim_rate",
 plot_es(est_pois_es, "policies_n",
         path = here("output", "event-study", "es-policies.pdf"))
 
-plot_es(est_share_es, "mh_claim_share",  var = "treatedTRUE",
+plot_es(est_share_es, "mh_claim_share",  var = NULL,
         path = here("output", "event-study", "es-mh-claim-share.pdf"))
 
-plot_es(est_share_es, "mh_policy_share", var = "treatedTRUE",
+plot_es(est_share_es, "mh_policy_share", var = NULL,
         path = here("output", "event-study", "es-mh-policy-share.pdf"))
