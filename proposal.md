@@ -40,7 +40,7 @@ Defenses:
 
 **2. Secular improvement in MH construction.** If MH quality was trending upward independent of the regulation, the post-1994 estimates capture both the rule change and the trend. The pre-trend in the event study is the primary diagnostic. The 3-year-binned pre-trends look flat for building and contents payments; the claims-per-policy plot shows a slight (insignificant) dip at 1988 that merits discussion.
 
-**3. Selection into flood insurance.** Post-1994 MH owners may differ from pre-1994 owners in unobserved ways (income, risk aversion, information). This could affect both the probability of holding NFIP coverage and the composition of claims. No changes in average cost per policy or replacement cost per policy across vintages is reassuring — it suggests the insured population isn't shifting.
+**3. Selection into flood insurance.** Post-1994 MH owners may differ from pre-1994 owners in unobserved ways (income, risk aversion, information). This could affect both the probability of holding NFIP coverage and the composition of claims. The new policy-composition checks suggest this is not a simple "safer insureds" story. Relative to pre-1994 MH, post-1994 MH policies have higher replacement cost and higher building/contents coverage, a higher share in FEMA Special Flood Hazard Areas (SFHAs), and a higher mandatory-purchase share. Those shifts would tend to increase expected NFIP payments, not lower them. Post-1994 MH are also more likely to be classified as elevated buildings, which goes in the opposite direction and is consistent with genuine mitigation. Primary-residence share is essentially unchanged across vintages.
 
 **4. Assessed value denominator.** Damage shares (damage / building value) show little within-tract × loss-year variation in assessed values, making the share results nearly mechanical given the level results. The level results are more informative.
 
@@ -66,7 +66,7 @@ Defenses:
 - Building/contents damage amounts and NFIP payments (levels)
 - Damage as share of assessed building value (%)
 - Claims per policy (extensive margin)
-- Replacement cost and policy cost per policy (composition checks)
+- Replacement cost, building/contents coverage, elevated-building share, SFHA share, primary-residence share, and mandatory-purchase share (composition checks)
 
 **Auxiliary data (available but not yet used):**
 
@@ -136,7 +136,7 @@ where:
 - `Post94_i = 1[year_built ≥ 1994]`; γ captures any common break at 1994 (placebo — small and insignificant in practice)
 - **β is the treatment effect**: the MH-specific discontinuity at 1994, net of smooth vintage trends and any common break
 
-Uses annual construction year (not binned). The RD estimate is likely attenuated: since the HUD standard took effect mid-1994, the 1994–1995 vintages are partially treated (pipeline inventory), and the forced sharp-break assumption averages over these transition years. This makes β a conservative lower bound relative to the full-treatment effect visible in later event-study coefficients.
+Uses annual construction year (not binned). The RD estimate is likely attenuated: since the HUD standard took effect mid-1994, the 1994–1995 vintages are partially treated (pipeline inventory), and the forced sharp-break assumption averages over these transition years. This makes β a conservative lower bound relative to the full-treatment effect visible in later event-study coefficients. TBD which specification to lead with — the diff-in-disc is more rigorous on the age confound but less intuitive and likely attenuated; the event study is more transparent about treatment dynamics but relies on the site-built comparison to rule out age.
 
 ### Stage 3: Cost-benefit (to be done)
 
@@ -152,13 +152,13 @@ Uses annual construction year (not binned). The RD estimate is likely attenuated
 
 ## Additional questions
 
-1. **Did insurance markets price in the safety improvement?** If MH insurance premiums fell in Zone II/III after 1994, that's revealed-preference evidence the market recognized the benefit. No evidence of premium changes in cost-per-policy so far.
+1. **Did insurance markets price in the safety improvement?** If MH insurance premiums fell in Zone II/III after 1994, that's revealed-preference evidence the market recognized the benefit. In the current NFIP panel, policy cost per policy does not fall after 1994 even though elevated-building share rises, perhaps because post-1994 MH also have higher coverage levels and are more concentrated in SFHAs.
 
 2. **Why did the price premium persist (or did it decay)?** The proposal initially hypothesized manufacturer standardization by ~2002, but the price event study shows a persistent premium through 2003. Extending the sample window would help resolve this.
 
 3. **Distributional effects.** MH residents are disproportionately lower-income and more likely to lack insurance. A regulation that protects them from catastrophic disaster loss at ~10% price premium has progressive welfare implications. Low NFIP take-up among MH may reflect that MH often don't qualify for conventional mortgages (which require flood insurance as a lending condition), so the take-up channel that drives site-built coverage doesn't operate.
 
-4. **Quantity effects.** The placement event studies based on the Manufactured Housing Survey data shows imprecise null effects. This would be a direct test of the private cost-benefit: if prices rose but placements didn't fall, then regulation's benefits likely exceed its cost. But can't reject null of fairly large declines (or increases) given large standard errors. Perhaps motivates a quantification of the benefits using NFIP data. Separately, looks like policies and claims increased for post-1994 MH vintages in the NFIP data, perhaps due to new eligibility for flood insurance. Pre-1994 MH appear to have been ineligible unless they made structural improvements to meet the new standard. This is interesting but somewhat complicates the interpretation since there may be compositional differences between pre- and post-1994 MH in the NFIP data unrelated to the physical structural changes. Tract FEs mitigate this concern but maybe worth investigating further.
+4. **Quantity effects.** The placement event studies based on the Manufactured Housing Survey data shows imprecise null effects. This would be a direct test of the private cost-benefit: if prices rose but placements didn't fall, then regulation's benefits likely exceed its cost. But can't reject null of fairly large declines (or increases) given large standard errors. Perhaps motivates a quantification of the benefits using NFIP data. Separately, policies and claims increase for post-1994 MH vintages in the NFIP data, perhaps due to new eligibility for flood insurance. That still raises a selection concern, but the direction of the observed composition shifts is informative: post-1994 MH policyholders are not simply a lower-risk insured group. They insure more expensive structures, carry more coverage, are more likely to be in SFHAs, and are more likely to face mandatory purchase requirements. The main offsetting change is that they are also more likely to be elevated buildings, which is plausibly part of the treatment channel rather than a confound.
 
 ---
 
