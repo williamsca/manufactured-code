@@ -13,6 +13,7 @@ data_path <- Sys.getenv("DATA_PATH")
 # import ----
 
 dt <- readRDS(here("derived", "sample-mhs.Rds"))
+dt <- dt[between(year, 1988, 2000)]
 
 # estimate ----
 # prices in logs and levels
@@ -34,8 +35,8 @@ fmla_q <- as.formula(paste0(
 est_p <- feols(fmla_p, data = dt, cluster = ~statefp)
 est_q <- feols(fmla_q, data = dt, cluster = ~statefp)
 
-etable(est_p, est_q, digits = 3)
-etable(est_p, est_q, digits = 3)
+etable(est_p, digits = 3)
+etable(est_q, digits = 3)
 
 # plots ----
 v_palette <- c("#0072B2", "#D55E00", "#009E73", "#F0E442")

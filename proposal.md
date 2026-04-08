@@ -90,16 +90,21 @@ State and year FEs, clustered by state. Sample: 1985–2003, excluding AK/HI.
 
 ### Stage 2: Benefit estimation (done, being refined)
 
-**Claim-level specification (main):**
+#### Event study (main figure)
+
+The event study is the primary visual. It imposes no functional form on the vintage profile, which matters because treatment onset is gradual: the HUD standard took effect mid-1994, so 1994–1995 vintages are partially treated (pipeline inventory built to old specs). The event study captures these treatment dynamics naturally — flat pre-trend, gradual onset, and growing effect — in a way that an RD plot with a forced sharp break cannot.
+
+The event study also serves as the nonparametric complement to the diff-in-disc estimate below: it shows the full shape of the vintage profile without parametric assumptions.
+
+**Claim-level specification:**
 ```
 Y_it = α_{c(i),t} + δ_m + Σ_k β_k (1[constr_period = k] × MH_i) + ε_it
 ```
 where:
-- `i` = claim, `t` = loss period, `c(i)` = census tract
 - `Y` = net building payment, net contents payment, damage amounts
 - `α_{c(i),t}` = tract × loss-period FE (absorbs location and storm severity)
 - `δ_m` = MH indicator FE (absorbs time-invariant MH/site-built differences)
-- `β_k` = MH-specific vintage effects relative to 1991; post-1994 coefficients are the treatment effect
+- `β_k` = MH-specific vintage effects relative to 1993; post-1994 coefficients are the treatment effect
 
 **Cell-level specification (rates):**
 ```
@@ -114,6 +119,24 @@ ShareMH_ct = α_{c,t} + Σ_k γ_k 1[constr_period = k] + ε_ct
 ```
 - `ShareMH` = MH claims / total claims (or MH policies / total policies)
 - Weighted by total claims; tests whether MH's share of claims falls for post-1994 vintages
+
+#### Difference-in-discontinuities (baseline estimate)
+
+The diff-in-disc specification addresses the age-vintage confound directly by controlling for smooth vintage effects via polynomials in construction year. It estimates the MH-specific jump at 1994 net of these trends:
+
+```
+Y_it = α_{c(i),t} + δ MH_i
+     + f_SB(v_i) + f_MH(v_i) × MH_i
+     + γ Post94_i + β (Post94_i × MH_i) + ε_it
+```
+where:
+- `v_i = year_built_i − 1994` is the running variable (centered at the cutoff)
+- `f_SB(v)`, `f_MH(v)` are linear polynomials estimated **separately on each side** of the cutoff. Type-specific polynomials allow MH and site-built to have different depreciation profiles.
+- `α_{c(i),t}` = county × loss-year FE (absorbs location and storm severity)
+- `Post94_i = 1[year_built ≥ 1994]`; γ captures any common break at 1994 (placebo — small and insignificant in practice)
+- **β is the treatment effect**: the MH-specific discontinuity at 1994, net of smooth vintage trends and any common break
+
+Uses annual construction year (not binned). The RD estimate is likely attenuated: since the HUD standard took effect mid-1994, the 1994–1995 vintages are partially treated (pipeline inventory), and the forced sharp-break assumption averages over these transition years. This makes β a conservative lower bound relative to the full-treatment effect visible in later event-study coefficients.
 
 ### Stage 3: Cost-benefit (to be done)
 
@@ -135,6 +158,8 @@ ShareMH_ct = α_{c,t} + Σ_k γ_k 1[constr_period = k] + ε_ct
 
 3. **Distributional effects.** MH residents are disproportionately lower-income and more likely to lack insurance. A regulation that protects them from catastrophic disaster loss at ~10% price premium has progressive welfare implications. Low NFIP take-up among MH may reflect that MH often don't qualify for conventional mortgages (which require flood insurance as a lending condition), so the take-up channel that drives site-built coverage doesn't operate.
 
+4. **Quantity effects.** The placement event studies based on the Manufactured Housing Survey data shows imprecise null effects. This would be a direct test of the private cost-benefit: if prices rose but placements didn't fall, then regulation's benefits likely exceed its cost. But can't reject null of fairly large declines (or increases) given large standard errors. Perhaps motivates a quantification of the benefits using NFIP data. Separately, looks like policies and claims increased for post-1994 MH vintages in the NFIP data, perhaps due to new eligibility for flood insurance. Pre-1994 MH appear to have been ineligible unless they made structural improvements to meet the new standard. This is interesting but somewhat complicates the interpretation since there may be compositional differences between pre- and post-1994 MH in the NFIP data unrelated to the physical structural changes. Tract FEs mitigate this concern but maybe worth investigating further.
+
 ---
 
 ## Related literature
@@ -153,14 +178,15 @@ ShareMH_ct = α_{c,t} + Σ_k γ_k 1[constr_period = k] + ε_ct
 ## TODO
 
 ### Data and measurement
-- [ ] Test 2-year construction vintage bins: do results hold with tract × loss-period FEs? If yes, this is the preferred aggregation (more pre-periods for trend assessment while maintaining geographic precision). If not, lead with annual + county × loss-year FEs and show 3-year + tract FEs as robustness.
+- [X] Test 2-year construction vintage bins: do results hold with tract × loss-period FEs? If yes, this is the preferred aggregation (more pre-periods for trend assessment while maintaining geographic precision). If not, lead with annual + county × loss-year FEs and show 3-year + tract FEs as robustness.
 - [ ] Plot site-built vintage coefficients separately (not just the MH interaction) to demonstrate no break at 1994 for the comparison group.
-- [ ] Show annual-vintage event study (with county × loss-year FEs) to demonstrate sharpness of the break at 1994.
+- [X] Show annual-vintage event study (with county × loss-year FEs) to demonstrate sharpness of the break at 1994.
 - [ ] Run unweighted regressions as robustness check (current cell-level specs weight by policies or claims).
 
 ### Identification and robustness
+- [ ] Bandwidth sensitivity for diff-in-disc: narrow from 1985–2002 to 1990–1998, 1988–2000.
+- [ ] Quadratic polynomial robustness for diff-in-disc.
 - [ ] Donut test: restrict to 1990–1998 vintages to minimize the age gap.
-- [ ] Parametric age control: add flexible function of home age and test whether the 1994 break survives.
 - [ ] Pre-trend test: estimate linear vintage slope on pre-1994 data and test whether the post-1994 break exceeds the extrapolated trend.
 - [ ] Investigate the 1988 dip in claims-per-policy pre-trend — is it driven by specific storms or tracts?
 

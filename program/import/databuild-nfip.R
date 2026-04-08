@@ -90,7 +90,17 @@ WITH filtered AS (
         YEAR(policyEffectiveDate)                                         AS year_eff,
         YEAR(policyTerminationDate)                                       AS year_term,
         CAST(buildingReplacementCost AS DOUBLE)                           AS repl_cost,
-        CAST(policyCost              AS DOUBLE)                           AS policy_cost
+        CAST(policyCost              AS DOUBLE)                           AS policy_cost,
+        CAST(totalBuildingInsuranceCoverage AS DOUBLE)                    AS building_policy_covg,
+        CAST(totalContentsInsuranceCoverage AS DOUBLE)                    AS contents_policy_covg,
+        CASE WHEN elevatedBuildingIndicator THEN 1 ELSE 0 END             AS elevated_policy,
+        CASE WHEN primaryResidenceIndicator THEN 1 ELSE 0 END             AS primary_res_policy,
+        CASE WHEN mandatoryPurchaseFlag THEN 1 ELSE 0 END                 AS mandatory_purchase_policy,
+        CASE
+            WHEN ratedFloodZone IS NOT NULL
+                AND regexp_matches(ratedFloodZone, '^(A|V|AR)')
+            THEN 1 ELSE 0
+        END                                                               AS sfha_policy
     FROM nfip_policies
     WHERE numberOfFloorsInInsuredBuilding IN (1, 2, 3, 5)
         AND originalConstructionDate IS NOT NULL
@@ -108,9 +118,15 @@ SELECT
     s.year,
     p.mh,
     p.year_constr,
-    COUNT(*)           AS policies_n,
-    SUM(p.repl_cost)   AS repl_cost_tot,
-    SUM(p.policy_cost) AS policy_cost_tot
+    COUNT(*)                              AS policies_n,
+    SUM(p.repl_cost)                      AS repl_cost_tot,
+    SUM(p.policy_cost)                    AS policy_cost_tot,
+    SUM(p.building_policy_covg)           AS building_policy_covg_tot,
+    SUM(p.contents_policy_covg)           AS contents_policy_covg_tot,
+    SUM(p.elevated_policy)                AS elevated_policy_n,
+    SUM(p.primary_res_policy)             AS primary_res_policy_n,
+    SUM(p.mandatory_purchase_policy)      AS mandatory_purchase_policy_n,
+    SUM(p.sfha_policy)                    AS sfha_policy_n
 FROM filtered p
 JOIN generate_series(1994, 2025) AS s(year)
     ON p.year_eff <= s.year AND p.year_term >= s.year
@@ -187,9 +203,15 @@ dt_balanced$wind_zone <- NULL
 
 dt_pol[, period_loss := ((year - 1994L) %/% 5L) * 5L + 1994L]
 dt_pol_period <- dt_pol[, .(
-    policies_n      = sum(policies_n,      na.rm = TRUE),
-    repl_cost_tot   = sum(repl_cost_tot,   na.rm = TRUE),
-    policy_cost_tot = sum(policy_cost_tot, na.rm = TRUE)
+    policies_n                    = sum(policies_n,                    na.rm = TRUE),
+    repl_cost_tot                 = sum(repl_cost_tot,                 na.rm = TRUE),
+    policy_cost_tot               = sum(policy_cost_tot,               na.rm = TRUE),
+    building_policy_covg_tot      = sum(building_policy_covg_tot,      na.rm = TRUE),
+    contents_policy_covg_tot      = sum(contents_policy_covg_tot,      na.rm = TRUE),
+    elevated_policy_n             = sum(elevated_policy_n,             na.rm = TRUE),
+    primary_res_policy_n          = sum(primary_res_policy_n,          na.rm = TRUE),
+    mandatory_purchase_policy_n   = sum(mandatory_purchase_policy_n,   na.rm = TRUE),
+    sfha_policy_n                 = sum(sfha_policy_n,                 na.rm = TRUE)
 ), by = .(tractfp, period_loss, mh, year_constr)]
 
 dt_balanced <- merge(
@@ -212,7 +234,12 @@ for (col in v_outcomes) {
 }
 
 # per-claim averages
-v_pol_tot <- c("repl_cost_tot", "policy_cost_tot")
+v_pol_tot <- c(
+    "repl_cost_tot",
+    "policy_cost_tot",
+    "building_policy_covg_tot",
+    "contents_policy_covg_tot"
+)
 v_clm_tot <- setdiff(grep("_tot$", names(dt_balanced), value = TRUE), v_pol_tot)
 v_clm_avg <- gsub("_tot$", "_pclaim", v_clm_tot)
 dt_balanced[, (v_clm_avg) := lapply(
@@ -233,6 +260,19 @@ dt_balanced[, (v_pol_avg) := lapply(
     .SD, function(x) fifelse(
         !is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
     .SDcols = v_pol_tot]
+
+# policy composition shares
+v_pol_share_n <- c(
+    "elevated_policy_n",
+    "primary_res_policy_n",
+    "mandatory_purchase_policy_n",
+    "sfha_policy_n"
+)
+v_pol_share <- sub("_policy_n$", "_share", v_pol_share_n)
+dt_balanced[, (v_pol_share) := lapply(
+    .SD, function(x) fifelse(
+        !is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
+    .SDcols = v_pol_share_n]
 
 # claim rate: claims per policy in force
 dt_balanced[, claim_rate := fifelse(
