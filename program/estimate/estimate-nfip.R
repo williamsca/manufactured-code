@@ -11,6 +11,30 @@ library(data.table)
 library(fixest)
 library(ggplot2)
 
+# ---------------------------------------------------------------------------
+# parameters ----
+# ---------------------------------------------------------------------------
+# BIN_CONSTR_YEAR: width of construction-year bins.
+#   1993 is always the right-end of the last pre-treatment bin, so that the
+#   HUD 1994 cutoff falls cleanly at a bin boundary.
+#     N=1 → annual (no binning); ref period = 1993
+#     N=2 → 1992-1993, 1994-1995, ...;  ref period = 1992
+#     N=3 → 1991-1993, 1994-1996, ...;  ref period = 1991
+# Pass as first positional argument: Rscript estimate-nfip.R 3
+args <- commandArgs(trailingOnly = TRUE)
+BIN_CONSTR_YEAR <- if (length(args) >= 1L) as.integer(args[1L]) else 2L
+
+# bin construction years: bins are anchored so 1993 is always the right-end
+# of the last pre-treatment bin; each bin is labeled by its left-end year.
+bin_constr <- function(y, N) {
+    ifelse(
+        y <= 1993L,
+        1994L - N  - ((1993L - y) %/% N) * N,
+        1994L      + ((y - 1994L) %/% N) * N
+    )
+}
+ref_period <- 1994L - BIN_CONSTR_YEAR
+
 v_dict <- c(
     "claims_n" = "Claims (#)",
     "policies_n" = "Policies (#)",
@@ -30,17 +54,16 @@ setFixest_dict(v_dict, reset = TRUE)
 # import ----
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 
+dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 dt[, treated_mh := (mh == 1) & treated == TRUE]
 dt[, post_mh := post1994 * mh]
-
-dt_treated <- unique(dt[, .(countyfp, treated)])
 
 # claim-level data
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- dt_claims[between(year_constr, 1985, 2002) & year_loss >= 1994]
-dt_claims[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
-dt_claims[, period_constr := ((year_constr - 1985L) %/% 3L) * 3L + 1985L]
-dt_claims[, post1994 := as.integer(year_constr > 1994L)]
+dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
+dt_claims[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
+dt_claims[, post1994      := as.integer(year_constr >= 1994L)]
 
 v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
@@ -64,7 +87,7 @@ s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
 # event studies ----
 # claim-level event study
 fmla_claim_es <- as.formula(paste0(
-    s_claim, " ~ i(period_constr, mh, ref = 1991)",
+    s_claim, " ~ i(period_constr, mh, ref = ref_period)",
     " | sw(tractfp, tractfp^period_loss) + mh"
 ))
 
@@ -74,8 +97,8 @@ iplot(est_claim_es[lhs = "building_pmt$"])
 
 # cell-level event study
 dt_claims_cell <- dt[
-    claims_n > 0 & building_damage_tot > 0 & !is.na(policies_n) &
-    between(period_constr, 1985L, 2002L)]
+    !is.na(policies_n) & policies_n > 0L &
+    between(year_constr, 1985L, 2002L)]
 dt_claims_cell[, treated_mh := (mh == 1) & treated == TRUE]
 
 v_pclaim <- grep("_share$", v_claim, invert = TRUE, value = TRUE)
@@ -86,12 +109,12 @@ s_pclaim <- paste0(
     ")")
 
 fmla_pclaim_es <- as.formula(paste0(
-    s_pclaim, " ~ i(period_constr, mh, ref = 1991)",
+    s_pclaim, " ~ i(period_constr, mh, ref = ref_period)",
     " | tractfp^period_loss + mh")
 )
 
 est_pclaim_es <- feols(
-    fmla_pclaim_es, data = dt_claims_cell[policies_n > 0],
+    fmla_pclaim_es, data = dt_claims_cell,
     weights = ~policies_n,
     lean = TRUE)
 etable(est_pclaim_es, fitstat = c("n", "r2", "wr2", "my"))
@@ -110,7 +133,7 @@ dt_share_cell[, mh_claim_share  := mh_claims_n  / claims_n]
 dt_share_cell[, mh_policy_share := mh_policies_n / policies_n]
 
 fmla_share_es <- as.formula(
-    "c(mh_claim_share, mh_policy_share) ~ i(period_constr, ref = 1991) | tractfp^period_loss"
+    "c(mh_claim_share, mh_policy_share) ~ i(period_constr, ref = ref_period) | tractfp^period_loss"
 )
 
 est_share_es <- feols(
@@ -126,13 +149,13 @@ v_out <- c("claims_n", "policies_n")
 s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
 
 fmla_out_es <- as.formula(paste0(
-    s_out, " ~ i(period_constr, mh, ref = 1991)",
+    s_out, " ~ i(period_constr, mh, ref = ref_period)",
     " | tractfp^period_loss + mh^period_loss + mh^tractfp"
 ))
 
 est_pois_es <- fepois(
     fmla_out_es, data = dt,
-    weights = ~claims_n, lean = TRUE
+    lean = TRUE
 )
 etable(est_pois_es)
 
@@ -149,7 +172,7 @@ theme_paper <- function(base_size = 14) {
         )
 }
 
-# Plot an event study from a fixest model estimated with i(period_constr, mh, ref = 1991).
+# Plot an event study from a fixest model estimated with i(period_constr, mh, ref = ref_period).
 # Extracts interaction terms (:mh), appends a zero row at the reference period,
 # and draws point estimates with 95% CI ribbon.
 plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "mh",

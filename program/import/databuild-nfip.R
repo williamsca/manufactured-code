@@ -1,143 +1,240 @@
-# Build balanced NFIP panel for continental US census block groups
+# Build NFIP claim-level data and balanced panel, querying directly from DuckDB
 #
-# Inputs:  derived/nfip-claims.Rds       (from import-nfip-claims.R)
-#          derived/nfip-policies.Rds     (from import-nfip-policy.R)
-#          derived/ecfr-windzone.csv     (from import-windzone.R)
-# Outputs: derived/nfip-balanced.Rds    (tractfp × period_loss × mh × period_constr)
+# Inputs:  $DATA_PATH/derived/fema.duckdb
+#          derived/ecfr-windzone.csv
+# Outputs: derived/nfip-claims.Rds   (claim-level, filtered + renamed)
+#          derived/nfip-balanced.Rds (tractfp × period_loss × mh × year_constr)
 #
-# period_loss: 5-year bins (e.g., 1994 = 1994-1998, 1999 = 1999-2003)
-# period:constr: 3-year bins
+# period_loss: 5-year bins (1994 = 1994-1998, 1999 = 1999-2003, ...)
+# year_constr: individual construction year (binning done at estimation)
 
 rm(list = ls())
 library(here)
+library(DBI)
+library(duckdb)
 library(data.table)
+
+data_path <- Sys.getenv("DATA_PATH")
+if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
 
 year_min <- 1985L
 year_max <- 2002L
 
-# ---------------------------------------------------------------------------
-# import ----
-# ---------------------------------------------------------------------------
-
-dt_raw    <- readRDS(here("derived", "nfip-claims.Rds"))
-dt_pol    <- fread(
-    here("derived", "nfip-policies.csv"), keepLeadingZeros = TRUE)
-dt_treat  <- fread(
-    here("derived", "ecfr-windzone.csv"), keepLeadingZeros = TRUE)
+con <- dbConnect(duckdb(), file.path(data_path, "derived", "fema.duckdb"),
+                 read_only = TRUE)
+on.exit(dbDisconnect(con), add = TRUE)
 
 # ---------------------------------------------------------------------------
-# aggregate claims to panel key ----
+# 1. Claims ----
 # ---------------------------------------------------------------------------
+
+sql_claims <- "
+SELECT
+    countyCode                         AS countyfp,
+    censusTract                        AS tractfp,
+    censusBlockGroupFips               AS bgfp,
+    yearOfLoss                         AS year_loss,
+    YEAR(originalConstructionDate)     AS year_constr,
+    CASE WHEN numberOfFloorsInTheInsuredBuilding = 5 THEN 1 ELSE 0 END AS mh,
+    CAST(netBuildingPaymentAmount      AS DOUBLE) AS net_building_pmt,
+    CAST(buildingDamageAmount          AS DOUBLE) AS building_damage,
+    CAST(buildingPropertyValue         AS DOUBLE) AS building_value,
+    CAST(contentsDamageAmount          AS DOUBLE) AS contents_damage,
+    CAST(netContentsPaymentAmount      AS DOUBLE) AS net_contents_pmt,
+    CAST(contentsPropertyValue         AS DOUBLE) AS contents_value,
+    CAST(totalBuildingInsuranceCoverage AS DOUBLE) AS building_covg,
+    CAST(totalContentsInsuranceCoverage AS DOUBLE) AS contents_covg
+FROM nfip_claims
+WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
+    AND yearOfLoss               IS NOT NULL
+    AND originalConstructionDate IS NOT NULL
+    AND countyCode               IS NOT NULL
+    AND censusTract              IS NOT NULL
+    AND state IS NOT NULL
+    AND state NOT IN ('AS', 'GU', 'VI', 'PR', 'AK', 'HI')
+    AND TRY_CAST(LEFT(censusTract, 2) AS INT) <= 56
+"
+
+dt_claims <- as.data.table(dbGetQuery(con, sql_claims))
+
+message(sprintf(
+    "Loaded %d claims (%d MH [floors=5], %d site-built [floors 1-3])",
+    nrow(dt_claims),
+    dt_claims[mh == 1L, .N],
+    dt_claims[mh == 0L, .N]
+))
+
+# post-1994 shares by MH status
+dt_claims[, .(
+    n_claims     = .N,
+    pct_post1994 = mean(year_constr >= 1994L, na.rm = TRUE)
+), by = .(mh)] |> print()
+
+saveRDS(dt_claims, here("derived", "nfip-claims.Rds"))
+message(sprintf("Saved %d claims to derived/nfip-claims.Rds", nrow(dt_claims)))
+
+# ---------------------------------------------------------------------------
+# 2. Policies: expand to calendar years via DuckDB range join ----
+#
+#   A policy covers calendar year Y if year_eff <= Y <= year_term.
+#   DuckDB's range join handles this efficiently without a Cartesian
+#   intermediate in R.
+# ---------------------------------------------------------------------------
+
+sql_policies <- sprintf("
+WITH filtered AS (
+    SELECT
+        censusTract                                                       AS tractfp,
+        YEAR(originalConstructionDate)                                    AS year_constr,
+        CASE WHEN numberOfFloorsInInsuredBuilding = 5 THEN 1 ELSE 0 END  AS mh,
+        YEAR(policyEffectiveDate)                                         AS year_eff,
+        YEAR(policyTerminationDate)                                       AS year_term,
+        CAST(buildingReplacementCost AS DOUBLE)                           AS repl_cost,
+        CAST(policyCost              AS DOUBLE)                           AS policy_cost
+    FROM nfip_policies
+    WHERE numberOfFloorsInInsuredBuilding IN (1, 2, 3, 5)
+        AND originalConstructionDate IS NOT NULL
+        AND policyEffectiveDate      IS NOT NULL
+        AND policyTerminationDate    IS NOT NULL
+        AND policyEffectiveDate      <  policyTerminationDate
+        AND propertyState IS NOT NULL
+        AND propertyState NOT IN ('AS', 'GU', 'VI', 'PR', 'AK', 'HI')
+        AND countyCode  IS NOT NULL
+        AND censusTract IS NOT NULL
+        AND YEAR(originalConstructionDate) BETWEEN %d AND %d
+)
+SELECT
+    p.tractfp,
+    s.year,
+    p.mh,
+    p.year_constr,
+    COUNT(*)           AS policies_n,
+    SUM(p.repl_cost)   AS repl_cost_tot,
+    SUM(p.policy_cost) AS policy_cost_tot
+FROM filtered p
+JOIN generate_series(1994, 2025) AS s(year)
+    ON p.year_eff <= s.year AND p.year_term >= s.year
+GROUP BY p.tractfp, s.year, p.mh, p.year_constr
+", year_min, year_max)
+
+dt_pol <- as.data.table(dbGetQuery(con, sql_policies))
+
+message(sprintf(
+    "Policy panel: %d rows (%d tracts, %d calendar years, 2 MH, %d construction years)",
+    nrow(dt_pol),
+    uniqueN(dt_pol$tractfp),
+    uniqueN(dt_pol$year),
+    uniqueN(dt_pol$year_constr)
+))
+
+# ---------------------------------------------------------------------------
+# 3. Aggregate claims to panel key ----
+# ---------------------------------------------------------------------------
+
+dt_treat <- fread(here("derived", "ecfr-windzone.csv"), keepLeadingZeros = TRUE)
 
 v_dmg <- c("net_building_pmt", "building_damage", "building_value",
            "contents_value",   "net_contents_pmt", "contents_damage",
            "building_covg",    "contents_covg")
 
-dt_raw[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
-dt_raw[, period_constr := ((year_constr - year_min) %/% 3L) * 3L + year_min]
+dt_claims[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 
-dt_agg <- dt_raw[,
+dt_agg <- dt_claims[
+    year_loss >= 1994L,
     c(.(claims_n = .N), lapply(.SD, sum, na.rm = TRUE)),
-    by      = .(tractfp, period_loss, mh, period_constr),
+    by      = .(tractfp, period_loss, mh, year_constr),
     .SDcols = v_dmg
 ]
 setnames(dt_agg, v_dmg, paste0(v_dmg, "_tot"))
 
 # ---------------------------------------------------------------------------
-# balance panel: ----
-#   start with all exposed county-years (> 0 claims) after 1994
-#   then balance over mh × construction vintage \in (year_min, year_max)
-#   cells with no claims get zeros
+# 4. Balance panel: exposed tract-periods × mh × year_constr grid ----
+#    Cells with no claims get zeros.
 # ---------------------------------------------------------------------------
 
 exposed_cy <- unique(dt_agg[, .(tractfp, period_loss)])
 
-bins_constr <- unique(((year_min:year_max - year_min) %/% 3L) * 3L + year_min)
-
 grid <- exposed_cy[
-    , CJ(mh = 0:1, period_constr = bins_constr),
+    , CJ(mh = 0:1, year_constr = year_min:year_max),
     by = .(tractfp, period_loss)]
 grid[, countyfp := substr(tractfp, 1, 5)]
 grid[, statefp  := substr(tractfp, 1, 2)]
 
 dt_balanced <- merge(
     grid, dt_agg,
-    by    = c("tractfp", "period_loss", "mh", "period_constr"),
+    by    = c("tractfp", "period_loss", "mh", "year_constr"),
     all.x = TRUE
 )
-dt_balanced[, post1994 := as.integer(period_constr > 1994L)]
+dt_balanced[, post1994 := as.integer(year_constr >= 1994L)]
 
 # ---------------------------------------------------------------------------
-# merge treatment and policy data ----
+# 5. Merge treatment ----
 # ---------------------------------------------------------------------------
 
-# treatment is county-level; merge on countyfp derived from tractfp
 dt_balanced <- merge(dt_balanced, dt_treat, by = "countyfp", all.x = TRUE)
 
-# the NYC boroughs have a consolidated city-county government, so
-# they do *not* appear in the COG crosswalk
-dt_balanced[is.na(wind_zone) & statefp == "36", wind_zone := 1]
-
+# NYC boroughs: consolidated city-county government not in COG crosswalk
+dt_balanced[is.na(wind_zone) & statefp == "36", wind_zone := 1L]
 stopifnot(nrow(dt_balanced[is.na(wind_zone)]) == 0L)
 
-dt_balanced[, treated    := (wind_zone >= 2)]
-dt_balanced[, treated_wz3 := (wind_zone == 3)]
+dt_balanced[, treated     := (wind_zone >= 2L)]
+dt_balanced[, treated_wz3 := (wind_zone == 3L)]
 dt_balanced$wind_zone <- NULL
 
+# ---------------------------------------------------------------------------
+# 6. Merge policy counts (annual → period) ----
+# ---------------------------------------------------------------------------
+
 dt_pol[, period_loss := ((year - 1994L) %/% 5L) * 5L + 1994L]
-dt_pol_period <- dt_pol[,
-    .(policies_n    = sum(policies_n,    na.rm = TRUE),
-      repl_cost_tot = sum(repl_cost_tot, na.rm = TRUE),
-      policy_cost_tot = sum(policy_cost_tot, na.rm = TRUE)),
-    by = .(tractfp, period_loss, mh, period_constr)
-]
+dt_pol_period <- dt_pol[, .(
+    policies_n      = sum(policies_n,      na.rm = TRUE),
+    repl_cost_tot   = sum(repl_cost_tot,   na.rm = TRUE),
+    policy_cost_tot = sum(policy_cost_tot, na.rm = TRUE)
+), by = .(tractfp, period_loss, mh, year_constr)]
 
 dt_balanced <- merge(
-    dt_balanced,
-    dt_pol_period,
-    by    = c("tractfp", "period_loss", "mh", "period_constr"),
+    dt_balanced, dt_pol_period,
+    by    = c("tractfp", "period_loss", "mh", "year_constr"),
     all.x = TRUE
 )
 
-# impute zero policies for cells covered in the policy data (i.e., period >= 2009)
+# impute zero policies for cells in periods covered by policy data (>= 2009)
 dt_balanced[is.na(policies_n) & period_loss >= 2009L, policies_n := 0L]
 
 # ---------------------------------------------------------------------------
-# derived outcomes ----
+# 7. Derived outcomes ----
 # ---------------------------------------------------------------------------
 
-# impute missing claim outcomes with zeros
+# impute zero for missing claim outcomes
 v_outcomes <- grep("_tot$|claims_n$", names(dt_balanced), value = TRUE)
 for (col in v_outcomes) {
     set(dt_balanced, which(is.na(dt_balanced[[col]])), col, 0)
 }
 
-# per-claim averages (claims-derived fields only)
-v_pol_tot  <- c("repl_cost_tot", "policy_cost_tot")
-v_clm_tot  <- setdiff(grep("_tot$", names(dt_balanced), value = TRUE), v_pol_tot)
-v_clm_avg  <- gsub("_tot$", "_pclaim", v_clm_tot)
+# per-claim averages
+v_pol_tot <- c("repl_cost_tot", "policy_cost_tot")
+v_clm_tot <- setdiff(grep("_tot$", names(dt_balanced), value = TRUE), v_pol_tot)
+v_clm_avg <- gsub("_tot$", "_pclaim", v_clm_tot)
 dt_balanced[, (v_clm_avg) := lapply(
-    .SD, function(x) fifelse(claims_n > 0, x / claims_n, NA_real_)),
+    .SD, function(x) fifelse(claims_n > 0L, x / claims_n, NA_real_)),
     .SDcols = v_clm_tot]
 
-# damage shares
-v_shares_value <- c(
-    "building_damage_tot", "net_building_pmt_tot")
-
-v_shares <- paste0(gsub("_tot", "_share", v_shares_value))
+# damage shares (relative to assessed building value)
+v_shares_value <- c("building_damage_tot", "net_building_pmt_tot")
+v_shares <- gsub("_tot", "_share", v_shares_value)
 dt_balanced[, (v_shares) := lapply(
     .SD, function(x) 100 * fifelse(
         building_value_tot > 0, x / building_value_tot, NA_real_)),
     .SDcols = v_shares_value]
 
-# per-policy averages (policy-derived fields)
-v_pol_avg  <- gsub("_tot$", "_ppol", v_pol_tot)
+# per-policy averages
+v_pol_avg <- gsub("_tot$", "_ppol", v_pol_tot)
 dt_balanced[, (v_pol_avg) := lapply(
-    .SD, function(x) fifelse(!is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
+    .SD, function(x) fifelse(
+        !is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
     .SDcols = v_pol_tot]
 
-# claim rate: claims per policy in force that year
-# NA where the county × year × cell has no policy records (coverage gap)
+# claim rate: claims per policy in force
 dt_balanced[, claim_rate := fifelse(
     !is.na(policies_n) & policies_n > 0L,
     claims_n / policies_n,
@@ -149,10 +246,12 @@ message(sprintf(
     100 * dt_balanced[!is.na(policies_n), .N] / nrow(dt_balanced)
 ))
 
-setkey(dt_balanced, tractfp, period_loss, mh, period_constr)
+setkey(dt_balanced, tractfp, period_loss, mh, year_constr)
 
 saveRDS(dt_balanced, here("derived", "nfip-balanced.Rds"))
 message(sprintf(
-    "Saved balanced panel: %d rows (%d tract-periods x 2 MH x %d vintage years)",
-    nrow(dt_balanced), uniqueN(dt_balanced[, .(tractfp, period_loss)]),
-    length(unique(dt_balanced$period_constr))))
+    "Saved balanced panel: %d rows (%d tract-periods × 2 MH × %d construction years)",
+    nrow(dt_balanced),
+    uniqueN(dt_balanced[, .(tractfp, period_loss)]),
+    length(unique(dt_balanced$year_constr))
+))

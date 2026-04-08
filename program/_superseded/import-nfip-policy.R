@@ -1,7 +1,7 @@
 # Import and aggregate NFIP policies for continental US census block groups
 #
 # Inputs:  $DATA_PATH/data/fema-nfip/FimaNfipPoliciesV2.parquet
-# Outputs: derived/nfip-policies.Rds  (bgfp × year × mh × year_constr panel)
+# Outputs: derived/nfip-policies.csv  (tractfp × year × mh × year_constr panel)
 
 rm(list = ls())
 library(here)
@@ -48,10 +48,6 @@ setnames(dt_raw_pol, "censusTract",         "tractfp")
 
 dt_raw_pol[, year_constr := year(originalConstructionDate)]
 dt_raw_pol[, mh := as.integer(numberOfFloorsInInsuredBuilding == 5L)]
-
-# 3-year construction vintage bins — must match databuild-nfip.R formula
-bin_base <- 1988L
-dt_raw_pol[, period_constr := ((year_constr - bin_base) %/% 3L) * 3L + bin_base]
 
 # policyEffectiveDate is already the actual coverage start (application date
 # + 30-day waiting period per FEMA data dictionary); no adjustment needed.
@@ -109,14 +105,14 @@ dt_pol_agg <- dt_pol_exp[, .(
     policies_n      = .N,
     repl_cost_tot   = sum(as.numeric(buildingReplacementCost), na.rm = TRUE),
     policy_cost_tot = sum(as.numeric(policyCost),              na.rm = TRUE)
-), by = .(tractfp, year, mh, period_constr)]
+), by = .(tractfp, year, mh, year_constr)]
 
-setkey(dt_pol_agg, tractfp, year, mh, period_constr)
+setkey(dt_pol_agg, tractfp, year, mh, year_constr)
 
 fwrite(dt_pol_agg, here("derived", "nfip-policies.csv"))
 message(sprintf(
-    "Constructed policy panel: %d rows (%d BG-years, 2 MH, %d vintage bins)",
+    "Constructed policy panel: %d rows (%d tract-years, 2 MH, %d construction years)",
     nrow(dt_pol_agg),
     uniqueN(dt_pol_agg[, .(tractfp, year)]),
-    uniqueN(dt_pol_agg$period_constr)
+    uniqueN(dt_pol_agg$year_constr)
 ))
