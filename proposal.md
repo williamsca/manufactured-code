@@ -148,6 +148,73 @@ Uses annual construction year (not binned). The RD estimate is likely attenuated
 
 **MVPF framing:** Since this is a regulatory mandate (not a government transfer), the net fiscal cost is approximately zero. Any positive WTP implies MVPF → ∞, meaning the mandate dominates subsidy-based alternatives on a per-dollar-of-government-cost basis. This is a one-line result, not a framework — but worth noting.
 
+### Stage 4: Insurance access and the value of NFIP take-up
+
+The HUD code reform did not just make manufactured homes more resilient — it made them insurable. Prior to 1994, manufactured homes that did not meet HUD anchoring and tie-down standards were generally ineligible for NFIP coverage. The 1994 reform brought MH into compliance with the structural and installation requirements that NFIP underwriting demanded, opening the flood insurance market to a population that had been effectively excluded. This section develops a framework for valuing the resulting increase in NFIP take-up.
+
+#### Evidence on the insurance access channel
+
+The Poisson event study on policy counts shows that post-1994 MH vintages have dramatically more NFIP policies than pre-1994 vintages, relative to site-built homes: coefficients of 0.34 (1994 bin), 0.51 (1996), and 0.80 (1998) in log points, implying 40–120% increases. The MH share of all policies also rises sharply at 1994, with annual coefficients growing from near zero to +0.5–0.9 percentage points by the late 1990s. Both series show flat pre-trends. These results are consistent with the code reform unlocking insurance access for a previously excluded housing type.
+
+The composition of the new policies reinforces this interpretation. Post-1994 MH policies are more concentrated in SFHAs (+4–5 pp), more likely to face mandatory purchase requirements (+1 pp), and carry higher building and contents coverage. These are not low-risk households selecting into cheap coverage — they are flood-exposed households gaining access to a market they were previously locked out of.
+
+#### Framework: welfare value of insurance access
+
+The welfare value of moving a household from uninsured to insured can be analyzed using the Baily (1978)–Chetty (2006) sufficient-statistics approach. Two formulations are available:
+
+**Consumption-drop formulation.** The value of insurance is proportional to the consumption drop $\Delta c / c$ that households experience in the bad state (disaster loss) absent coverage, scaled by risk aversion $r$. For MH households with median income ~$30K and housing wealth ~$50K, an uninsured total loss implies $\Delta c / c$ on the order of 0.5–1.0. At $r = 2$–3, the certainty-equivalent cost of bearing this risk is large relative to actuarially fair premiums.
+
+Calibration sources for $\Delta c / c$:
+- Deryugina, Kawano, and Levitt (2017) track post-hurricane income trajectories using tax data; their estimates for low-income households provide a credible lower bound.
+- FEMA Individual Assistance records document the gap between total losses and compensated amounts (NFIP payout + FEMA grant + SBA loan) — the uncompensated residual is the consumption hit.
+- Back-of-envelope: for an uninsured MH household, the full home value (~$50K) is at risk. Even partial damage of $10K implies $\Delta c / c \approx 0.33$ for a $30K-income household with no savings buffer.
+
+**Demand elasticity formulation (Chetty and Finkelstein 2013).** Instead of measuring the consumption drop directly, the welfare value of coverage can be recovered from the elasticity of insurance demand with respect to price. If demand is inelastic — households do not drop coverage in response to premium increases — then willingness-to-pay for coverage substantially exceeds the premium, implying large consumer surplus.
+
+Potential sources of identifying variation for the demand elasticity:
+- Cross-sectional premium variation from flood zone designation (SFHA boundary), CRS community discounts, and coverage-level choices within post-1994 MH.
+- NFIP premium reforms under HFIAA 2014, which changed subsidy structures and could trace out a demand curve for MH policies — though this is largely a post-sample exercise.
+- The mandatory purchase requirement at the SFHA boundary creates a sharp discontinuity in effective price (infinite price of non-compliance inside, market price outside) that reveals the take-up margin.
+
+The consumption-drop approach is more feasible with current data. The demand-elasticity approach requires premium variation that is exogenous to risk, which is harder to isolate within the existing NFIP sample.
+
+#### Moral hazard considerations
+
+The standard concern with expanding insurance access is moral hazard: coverage may induce riskier behavior, either through location choice (extensive margin) or housing type composition (intensive margin).
+
+**Extensive margin (location choice).** Flood insurance makes risky locations cheaper to occupy, potentially drawing more settlement into floodplains. This channel is well-studied in the NFIP literature (Kousky et al.) and estimates of the elasticity of development to NFIP subsidies are available for calibration. Importantly, this channel is generic to all housing types, not MH-specific.
+
+**Intensive margin (housing type composition).** If MH is fundamentally riskier conditional on location, NFIP access could tilt the stock toward the riskier type. However, the direction of moral hazard likely runs *against* MH. The NFIP subsidy scales with insured value: a $250K site-built home benefits far more from underpriced flood insurance than a $50K singlewide. The premium-to-value ratio is much less favorable for MH (~2.4% of home value vs. ~0.8% for site-built at typical premiums), so the distortion to location and type choice from NFIP subsidies is overwhelmingly a site-built phenomenon. Furthermore, the MHS placements null (no quantity response in treated states) bounds the total placement margin: if total MH shipments didn't change, the reallocation across locations is limited.
+
+**Code-as-moral-hazard-solution.** In the Baily-Chetty framework, the optimal benefit level trades off consumption smoothing against moral hazard ($\varepsilon$). The HUD code effectively sets $\varepsilon \approx 0$ for the construction-quality margin: compliance is mandatory, verified at the factory, and embedded in the home before the insurance decision is made. The household cannot "un-build" the structural improvements in response to coverage. By eliminating the main moral hazard channel that prevented insurers from serving MH, the code makes actuarially fair pricing feasible and the welfare case for coverage unambiguous.
+
+#### Building codes and insurance as complements
+
+The standard result from Ehrlich and Becker (1972) is that self-protection and market insurance are substitutes: investing in precaution reduces the value of insurance. The MH setting inverts this relationship. Pre-1994, manufactured homes were simultaneously the riskiest housing stock and the least insurable — too vulnerable for NFIP to underwrite at any affordable price, and too cheap for the NFIP subsidy to meaningfully offset location risk. The code reform made homes both more resilient (reducing expected losses to insurable levels) and more insurable (satisfying NFIP underwriting requirements). The two channels are complements, not substitutes: resilience is a *prerequisite* for market participation.
+
+The welfare gain from the reform therefore has two multiplicative components:
+1. **Direct resilience benefit:** $\Delta L \approx$ $4–7K per flood event (estimated from claims data).
+2. **Market-creation benefit:** Moves households from zero coverage to positive coverage, eliminating the uninsured consumption drop for covered events.
+
+For a household with $c = $30K and $r = 2$–3, moving from "uninsured $10K loss" to "insured $5K loss with $250 deductible" generates a welfare gain that far exceeds the $5K difference in expected damage. The certainty-equivalent value of that transition scales with $r \cdot (\Delta c / c)^2$, not linearly in the expected damage reduction.
+
+#### The counterfactual cost of compliance for pre-1994 homes
+
+Any welfare calculation comparing insured post-1994 MH to uninsured pre-1994 MH must confront the question: what would it cost to bring a pre-1994 manufactured home into compliance with the HUD standard (and thus NFIP eligibility)? If retrofit costs are low, then the insurance access channel reflects a bureaucratic/informational barrier rather than a genuine economic constraint, and the welfare gain from the code is smaller (the homes could have been cheaply upgraded and insured). If retrofit costs are high — approaching or exceeding the home's value — then pre-1994 homes were genuinely uninsurable, and the code reform created value by embedding compliance in new construction at much lower marginal cost than retrofit.
+
+Relevant considerations:
+- **Anchoring and tie-down systems.** The primary NFIP-relevant upgrade is proper anchoring to resist wind uplift and lateral forces. Retrofit anchoring for an existing MH is feasible but costly: industry estimates range from $3–8K depending on soil conditions, home size, and local requirements. For a $20–30K pre-1994 singlewide, this represents 10–40% of home value.
+- **Structural upgrades.** The HUD code required reinforced roof-to-wall connections, upgraded sheathing fastening, and (in Zone III) impact-rated windows. These are integrated into the manufacturing process at modest marginal cost but are difficult and expensive to retrofit on an existing structure. Full structural retrofit is likely uneconomic for most pre-1994 MH.
+- **Verification and certification.** Even if physical upgrades were performed, there is no standard certification pathway for bringing a pre-1994 MH into HUD Code compliance after manufacture. The code applies at the point of production, not as a retrofit standard. This creates a permanent institutional barrier: pre-1994 homes cannot be reclassified regardless of actual condition.
+
+This last point is important. The insurance access barrier is not purely about physical risk — it is also about *verifiability*. The HUD label certifying code compliance is affixed at the factory. There is no equivalent post-hoc certification for retrofitted homes. This means the code reform's insurance-access benefit is *exclusively* available through new construction: it cannot be replicated by retrofitting the existing stock. The welfare value of the code therefore includes the option value of a credible, low-cost compliance signal that private retrofit markets cannot provide.
+
+Data on retrofit costs:
+- HUD Manufactured Housing Consensus Committee (MHCC) reports on installation standards.
+- FEMA P-85 and the Manufactured Housing Institute (MHI) guidance on anchoring and tie-down systems.
+- State-level retrofit mandate programs (e.g., Florida's post-Andrew requirements for MH in mobile home parks) may provide revealed-cost estimates.
+- The NFIP claims data themselves: comparing damage outcomes for pre-1994 MH that were vs. were not elevated (the `elevated_share` variable) provides indirect evidence on the value of partial compliance through siting improvements, though elevation is not the same as full structural retrofit.
+
 ---
 
 ## Additional questions
@@ -159,19 +226,6 @@ Uses annual construction year (not binned). The RD estimate is likely attenuated
 3. **Distributional effects.** MH residents are disproportionately lower-income and more likely to lack insurance. A regulation that protects them from catastrophic disaster loss at ~10% price premium has progressive welfare implications. Low NFIP take-up among MH may reflect that MH often don't qualify for conventional mortgages (which require flood insurance as a lending condition), so the take-up channel that drives site-built coverage doesn't operate.
 
 4. **Quantity effects.** The placement event studies based on the Manufactured Housing Survey data shows imprecise null effects. This would be a direct test of the private cost-benefit: if prices rose but placements didn't fall, then regulation's benefits likely exceed its cost. But can't reject null of fairly large declines (or increases) given large standard errors. Perhaps motivates a quantification of the benefits using NFIP data. Separately, policies and claims increase for post-1994 MH vintages in the NFIP data, perhaps due to new eligibility for flood insurance. That still raises a selection concern, but the direction of the observed composition shifts is informative: post-1994 MH policyholders are not simply a lower-risk insured group. They insure more expensive structures, carry more coverage, are more likely to be in SFHAs, and are more likely to face mandatory purchase requirements. The main offsetting change is that they are also more likely to be elevated buildings, which is plausibly part of the treatment channel rather than a confound.
-
----
-
-## Related literature
-
-- Boustan et al. (2020, AEJ:AE) — flood insurance and disaster costs
-- Meltzer & Grunberg (various) — HUD Code effects on MH markets
-- Kahn (2005, JUE) — building codes and earthquake losses (direct precursor)
-- Hornbeck (2012, AER) — adaptation to natural disasters
-- Gallagher (2014, AEJ:AE) — learning from natural disasters and flood insurance takeup
-- Hendren & Sprung-Keyser (2020, QJE) — MVPF framework for policy evaluation
-- Deryugina (2017, AEJ:EP) — fiscal costs of hurricanes
-- Currie & Walker (2011, QJE) — environmental regulation and health (mandate cost-benefit template)
 
 ---
 

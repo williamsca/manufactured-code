@@ -138,6 +138,8 @@ dt_cell[, claim_rate := fifelse(
     policies_n > 0L, claims_n / policies_n, NA_real_)]
 dt_cell[, post_mh := as.integer(period_constr >= 1994L) * mh]
 
+dt_cell[, net_building_pmt_tot_ln := log(net_building_pmt_tot)]
+
 # Poisson panel: aggregate all cells (including zero-policy) to period_constr
 dt_pois <- dt[, .(claims_n   = sum(claims_n,   na.rm = TRUE),
                   policies_n = sum(policies_n, na.rm = TRUE)),
@@ -174,7 +176,7 @@ v_pclaim <- grep("_share$", v_claim, invert = TRUE, value = TRUE)
 v_pclaim <- paste0(v_pclaim, "_pclaim")
 s_pclaim <- paste0(
     "c(", paste0(v_pclaim, collapse = ", "),
-    ", claim_rate",
+    ", claim_rate, net_building_pmt_tot_ln",
     ", repl_cost_ppol, policy_cost_ppol",
     ", building_policy_covg_ppol, contents_policy_covg_ppol",
     ", elevated_share, sfha_share, primary_res_share, mandatory_purchase_share",
@@ -309,8 +311,6 @@ est_share_es <- feols(
 
 etable(est_share_es, fitstat = c("n", "r2", "wr2", "my"))
 
-iplot(est_share_es)
-
 # count event study (Poisson)
 v_out <- c("claims_n", "policies_n")
 s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
@@ -321,10 +321,12 @@ fmla_out_es <- as.formula(paste0(
 ))
 
 est_pois_es <- fepois(
-    fmla_out_es, data = dt_pois,
+    fmla_out_es, data = dt_pois[between(period_constr, 1986, 1998)],
     lean = TRUE
 )
 etable(est_pois_es)
+
+iplot(est_pois_es)
 
 # static ----
 
@@ -343,7 +345,7 @@ theme_paper <- function(base_size = 14) {
 # Extracts interaction terms (:mh), appends a zero row at the reference period,
 # and draws point estimates with 95% CI ribbon.
 plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "mh",
-                    yscale = 1) {
+                    yscale = 1, ref = ref_period) {
     # [[]] extracts a single fixest object; [lhs=] returns fixest_multi,
     # whose coeftable() output has a different structure
     if (!is.null(outcome)) est <- est[lhs = outcome][[1]]
@@ -355,9 +357,9 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "m
 
     ct <- as.data.table(coeftable(est), keep.rownames = TRUE)
     # i(period_constr, mh) coefficients are named "period_constr::YYYY:mh"
-    # i(period_constr) main effects are named "period_constr::YYYY"
+    # i(year_constr) main effects are named "year_constr::YYYY"
     if (is.null(var)) {
-        idx <- grepl("^period_constr::\\d{4}$", ct$rn)
+        idx <- grepl("^[a-z_]+::\\d{4}$", ct$rn)
     } else {
         idx <- grepl(paste0(":", var, "$"), ct$rn)
     }
@@ -374,7 +376,7 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "m
     dt_es <- rbind(
         dt_es,
         data.table(term = NA_character_, est = 0, se = 0,
-                   ci_low = 0, ci_high = 0, period = ref_period)
+                   ci_low = 0, ci_high = 0, period = ref)
     )
     setorder(dt_es, period)
 
@@ -404,3 +406,11 @@ plot_es(est_pclaim_es, "claim_rate",
 
 plot_es(est_pois_es, "policies_n",
         path = here("output", "event-study", "es-policies.pdf"))
+
+plot_es(est_share_es, "mh_claim_share", var = NULL, ref = 1993L,
+        vline_x = 1993.5,
+        path = here("output", "event-study", "es-mh-claim-share.pdf"))
+
+plot_es(est_share_es, "mh_policy_share", var = NULL, ref = 1993L,
+        vline_x = 1993.5,
+        path = here("output", "event-study", "es-mh-policy-share.pdf"))
