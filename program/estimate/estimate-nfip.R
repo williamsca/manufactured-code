@@ -22,7 +22,7 @@ library(ggplot2)
 #     N=3 → 1991-1993, 1994-1996, ...;  ref period = 1991
 # Pass as first positional argument: Rscript estimate-nfip.R 3
 args <- commandArgs(trailingOnly = TRUE)
-BIN_CONSTR_YEAR <- if (length(args) >= 1L) as.integer(args[1L]) else 2L
+BIN_CONSTR_YEAR <- if (length(args) >= 1L) as.integer(args[1L]) else 1L
 
 # bin construction years: bins are anchored so 1993 is always the right-end
 # of the last pre-treatment bin; each bin is labeled by its left-end year.
@@ -71,7 +71,7 @@ dir.create(
 
 # --- balanced panel ---
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
-dt <- dt[between(year_constr, 1985L, 2000L)]
+dt <- dt[between(year_constr, 1986L, 1999L)]
 dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
 # MH-share panel: annual year_constr resolution (for RDD / annual ES)
@@ -100,6 +100,8 @@ dt_cell <- dt[
     lapply(.SD, sum, na.rm = TRUE),
     by = .(tractfp, period_loss, mh, period_constr),
     .SDcols = v_raw]
+
+dt_cell[, post1994 := as.integer(period_constr >= 1994L)]
 
 # per-claim averages
 v_clm_tot <- c("net_building_pmt_tot", "building_damage_tot",
@@ -268,7 +270,7 @@ v_comp <- c(
 s_comp <- paste0("c(", paste(v_comp, collapse = ", "), ")")
 
 fmla_comp_post <- as.formula(paste0(
-    s_comp, " ~ i(period_constr, mh, ref = ref_period)",
+    s_comp, " ~ poly(period_constr, 1)*post1994*mh",
     " | tractfp^period_loss + mh"
 ))
 
