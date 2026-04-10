@@ -6,9 +6,10 @@ author:
   affiliation: University of Virginia
   email: chv7bg@virginia.edu
 date: \today
-abstract: "Does mandated climate adaptation pay for itself? I study the 1994 HUD wind standard reform, which required structural upgrades to manufactured homes in hurricane-prone areas. Using claim and policy data from the National Flood Insurance Program (NFIP), I compare flood damage to manufactured and site-built homes of different construction vintages exposed to floods in the same Census tract and over the same period. Post-1994 manufactured homes experience roughly \\$5,000 lower building damage payments per claim relative to site-built homes. These reductions represent a spillover benefit: the regulation targeted wind resilience, not flooding. Contrary to economic theory, which suggests that prevention and insurance are substitutes, I also find substantial increases in flood insurance take-up, suggesting that the HUD code reform made it less costly for homeowners to comply with NFIP eligibility rules, including anchoring and elevation standards. On the cost side, the reform raised manufactured home prices by about 14\\% (\\$4,000) in treated states. A back-of-envelope calculation suggests the flood channel alone recovers a substantial share of the upfront cost, and the total return---including wind damage, displacement, and eligibility for federal flood insurance---is likely higher. For the 22 million Americans living in manufactured homes, many of whom are low-income and lack disaster insurance, the HUD standard lower risk and unlocks access to insurance markets that would otherwise be unavailable."
+abstract: "Does mandated climate adaptation pay for itself? I study the 1994 HUD wind standard reform, which required structural upgrades to manufactured homes in hurricane-prone areas. Using claim and policy data from the National Flood Insurance Program (NFIP), I compare flood damage to manufactured and site-built homes of different construction vintages exposed to floods in the same Census tract and over the same period. Post-1994 manufactured homes experience roughly \\$5,000 lower building damage payments per claim relative to site-built homes. These reductions represent a spillover benefit: the regulation targeted wind resilience, not flooding. Contrary to economic theory, which suggests that prevention and insurance are substitutes, I also find substantial increases in flood insurance take-up, suggesting that the HUD code reform made it less costly for homeowners to comply with NFIP eligibility rules, such as anchoring and elevation standards. On the cost side, the reform raised manufactured home prices by about 14\\% (\\$4,000) in treated states. A back-of-envelope calculation suggests the flood channel alone recovers a substantial share of the upfront cost, and the total return---including wind damage, displacement, and the value of eligibility for federal flood insurance---is likely higher. For the 22 million Americans living in manufactured homes, many of whom are low-income and lack disaster insurance, the HUD standard lower risk and unlocks access to insurance markets that would otherwise be unavailable."
 header-includes:
 - \usepackage{lscape}
+- \usepackage{threeparttable}
 ...
 
 # Introduction
@@ -79,7 +80,7 @@ The benefit-side analysis uses two datasets from FEMA's OpenFEMA platform: indiv
 
 I restrict the sample to homes with construction years between 1985 and 2000 and loss dates from 1994 onward. Construction years are binned into two-year periods anchored so that 1992--1993 is the last pre-treatment bin. Loss years are binned into five-year periods. For the cell-level analysis (claim rates, policy composition), I construct a balanced panel at the tract $\times$ loss-period $\times$ housing-type $\times$ construction-period level, including cells with zero claims.
 
-Key outcome variables include net building payment per claim, net contents payment per claim, and claims per policy. Composition variables include replacement cost per policy, building and contents coverage per policy, elevated-building share, SFHA share, primary-residence share, and mandatory-purchase share.
+Table \ref{tab:sumstats-nfip} reports summary statistics by construction vintage and housing type. Key outcome variables include net building payment per claim, net contents payment per claim, and claims per policy. Composition variables include replacement cost per policy, building and contents coverage per policy, elevated-building share, SFHA share, primary-residence share, and mandatory-purchase share.
 
 
 # Empirical Strategy
@@ -196,6 +197,18 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \clearpage
 
 # Tables and Figures
+
+\begin{table}[htbp]
+  \centering
+  \caption{NFIP Outcomes by Construction Vintage and Housing Type}\label{tab:sumstats-nfip}
+  \begin{threeparttable}
+    \input{output/descriptives/sumstats-nfip.tex}
+    \begin{tablenotes}
+      \footnotesize
+      \item Notes: Cell-level weighted means from the NFIP balanced panel. Average building and contents payments are weighted by the number of claims; share variables (elevated building, SFHA, primary residence, mandatory purchase) are weighted by the number of policies. Construction vintage is classified as pre- or post-1994 relative to the HUD wind standard reform effective date. Sample restricted to homes with construction years 1986--1999 and loss years from 1994 onward. Source: FEMA OpenFEMA claims and policy data.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
 
 \begin{figure}[htbp]
   \centering

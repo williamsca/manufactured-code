@@ -19,20 +19,30 @@ dt[, period_lbl := fifelse(post1994 == 1, "Post-1994", "Pre-1994")]
 
 summarize_cell <- function(d) {
     list(
-        avg_bldg_pmt   = weighted.mean(d$net_building_pmt_pclaim, d$claims_n,
-                                        na.rm = TRUE),
-        avg_cont_pmt   = weighted.mean(d$net_contents_pmt_pclaim, d$claims_n,
-                                        na.rm = TRUE),
-        claim_rate     = mean(d$claim_rate, na.rm = TRUE),
-        total_claims   = sum(d$claims_n,   na.rm = TRUE),
-        total_policies = sum(d$policies_n, na.rm = TRUE)
+        avg_bldg_pmt         = weighted.mean(d$net_building_pmt_pclaim, d$claims_n,
+                                              na.rm = TRUE),
+        avg_cont_pmt         = weighted.mean(d$net_contents_pmt_pclaim, d$claims_n,
+                                              na.rm = TRUE),
+        claim_rate           = mean(d$claim_rate, na.rm = TRUE),
+        total_claims         = sum(d$claims_n,   na.rm = TRUE),
+        total_policies       = sum(d$policies_n, na.rm = TRUE),
+        elevated_share       = weighted.mean(d$elevated_share,           d$policies_n,
+                                              na.rm = TRUE),
+        sfha_share           = weighted.mean(d$sfha_share,               d$policies_n,
+                                              na.rm = TRUE),
+        primary_res_share    = weighted.mean(d$primary_res_share,        d$policies_n,
+                                              na.rm = TRUE),
+        mandatory_purch_share = weighted.mean(d$mandatory_purchase_share, d$policies_n,
+                                              na.rm = TRUE)
     )
 }
 
 groups <- dt[, summarize_cell(.SD),
              by = .(period_lbl, mh_lbl),
              .SDcols = c("net_building_pmt_pclaim", "net_contents_pmt_pclaim",
-                         "claim_rate", "claims_n", "policies_n")]
+                         "claim_rate", "claims_n", "policies_n",
+                         "elevated_share", "sfha_share",
+                         "primary_res_share", "mandatory_purchase_share")]
 
 # reshape: one row per variable, one column per group ----
 groups[, group := paste(period_lbl, mh_lbl, sep = " / ")]
@@ -47,13 +57,19 @@ groups[, group := factor(group, levels = col_order)]
 setorder(groups, group)
 
 v_vars <- c("avg_bldg_pmt", "avg_cont_pmt", "claim_rate",
-            "total_claims", "total_policies")
+            "total_claims", "total_policies",
+            "elevated_share", "sfha_share",
+            "primary_res_share", "mandatory_purch_share")
 v_labels <- c(
     "Avg. building payment (\\$)",
     "Avg. contents payment (\\$)",
     "Claim rate",
     "Total claims",
-    "Total policies"
+    "Total policies",
+    "Elevated building (\\%)",
+    "SFHA (\\%)",
+    "Primary residence (\\%)",
+    "Mandatory purchase (\\%)"
 )
 
 # wide format: variables in rows, groups in columns
@@ -71,6 +87,9 @@ fmt_row <- function(x, var) {
         formatC(x, format = "f", digits = 0, big.mark = ",")
     } else if (var == "claim_rate") {
         formatC(x, format = "f", digits = 3)
+    } else if (var %in% c("elevated_share", "sfha_share",
+                           "primary_res_share", "mandatory_purch_share")) {
+        formatC(x * 100, format = "f", digits = 1)
     } else {
         formatC(x, format = "f", digits = 0, big.mark = ",")
     }
