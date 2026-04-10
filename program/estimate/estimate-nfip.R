@@ -43,10 +43,10 @@ v_dict <- c(
     "contents_damage" = "Contents damage (000s)",
     "net_contents_pmt" = "Net contents payment (000s)",
     "claim_rate" = "Claims per policy",
-    "repl_cost_ppol" = "Replacement cost per policy",
+    "repl_cost_ppol" = "Replacement cost",
     "policy_cost_ppol" = "Policy cost per policy",
-    "building_policy_covg_ppol" = "Building coverage per policy",
-    "contents_policy_covg_ppol" = "Contents coverage per policy",
+    "building_policy_covg_ppol" = "Building coverage",
+    "contents_policy_covg_ppol" = "Contents coverage",
     "elevated_share" = "Elevated building share",
     "sfha_share" = "SFHA share",
     "primary_res_share" = "Primary residence share",
@@ -54,7 +54,11 @@ v_dict <- c(
     "building_damage_share" = "Building damage share of assessed value (%)",
     "net_building_pmt_share" = "Building payment share (%)",
     "mh_claim_share" = "MH share of claims",
-    "mh_policy_share" = "MH share of policies"
+    "mh_policy_share" = "MH share of policies",
+    "tractfp" = "Census tract",
+    "period_loss" = "Loss period",
+    "mh" = "Mobile home",
+    "period_constr" = "Vintage"
 )
 
 setFixest_dict(v_dict, reset = TRUE)

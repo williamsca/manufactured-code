@@ -8,7 +8,7 @@
 # period_loss: 5-year bins (1994 = 1994-1998, 1999 = 1999-2003, ...)
 # year_constr: individual construction year (binning done at estimation)
 
-rm(list = ls())
+rm(list = ls()); gc()
 library(here)
 library(DBI)
 library(duckdb)
@@ -17,12 +17,13 @@ library(data.table)
 data_path <- Sys.getenv("DATA_PATH")
 if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
 
-year_min <- 1985L
-year_max <- 2002L
+# vintage filtering
+year_min <- 1986L
+year_max <- 1999L
 
-con <- dbConnect(duckdb(), file.path(data_path, "derived", "fema.duckdb"),
-                 read_only = TRUE)
-on.exit(dbDisconnect(con), add = TRUE)
+drv <- duckdb(file.path(data_path, "derived", "fema.duckdb"), read_only = TRUE)
+con <- dbConnect(drv)
+on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
 # ---------------------------------------------------------------------------
 # 1. Claims ----
@@ -259,6 +260,13 @@ v_pol_avg <- gsub("_tot$", "_ppol", v_pol_tot)
 dt_balanced[, (v_pol_avg) := lapply(
     .SD, function(x) fifelse(
         !is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
+    .SDcols = v_pol_tot]
+
+v_pol_ln <- gsub("_tot$", "_ln", v_pol_tot)
+dt_balanced[, (v_pol_ln) := lapply(
+    .SD, function(x) fifelse(
+        !is.na(policies_n) & policies_n > 0L & x > 0,
+        log(x / policies_n), NA_real_)),
     .SDcols = v_pol_tot]
 
 # policy composition shares
