@@ -18,7 +18,7 @@ Manufactured housing is the largest source of unsubsidized affordable housing in
 
 [^mh-stats]: Census Bureau, American Housing Survey. Manufactured homes are built in a factory and transported to a site, as distinct from site-built (stick-built) homes constructed on location.
 
-The vulnerability of manufactured homes to extreme weather prompted a major regulatory response. In 1994, HUD revised the Manufactured Home Construction and Safety Standards---the federal building code governing all factory-built housing---to impose wind resistance requirements. The reform created a three-zone wind classification system (70, 100, and 110 mph design wind loads) and required structural upgrades including steel strapping, upgraded sheathing fastening, and impact-rated windows for homes sited in high-wind zones. Unlike local building codes for site-built homes, the HUD Code is a federal standard that preempts state and local regulation, making the 1994 reform a clean, nationally uniform policy change.
+The vulnerability of manufactured homes to extreme weather prompted a major regulatory response. In 1994, HUD revised the Manufactured Home Construction and Safety Standards---the federal building code governing all factory-built housing---to impose wind resistance requirements. The reform created a three-zone wind classification system (70, 100, and 110 mph design wind loads) and required structural upgrades including steel strapping, upgraded sheathing fastening, and impact-rated windows for homes sited in high-wind zones. Unlike local building codes for site-built homes, the HUD Code is a federal minimum standard that preempts state and local regulation.
 
 This paper asks whether this mandated adaptation investment paid for itself. The answer depends on two quantities: the cost of compliance, reflected in higher manufactured home prices, and the benefit, reflected in reduced disaster damage. I estimate both.
 
@@ -105,17 +105,6 @@ For cell-level outcomes (claims per policy, policy composition variables), the s
 
 The event study is the primary visual and diagnostic tool. Flat pre-trends validate the parallel-trends assumption. A sharp break at 1994 with growing effects for later cohorts is consistent with the regulation driving the change, as later cohorts had more time for full compliance and refinement of construction techniques. The gradual onset also reflects the pipeline: homes manufactured in 1994--1995 include units built to the old standard before the July 1994 effective date.
 
-## Benefit Estimation: Difference-in-Discontinuities
-
-The difference-in-discontinuities specification directly addresses the age-vintage confound---the concern that older homes perform worse due to depreciation rather than construction standards---by controlling for smooth vintage effects:
-
-$$Y_{it} = \alpha_{c(i),t} + \delta \text{MH}_i + f_{SB}(v_i) + f_{MH}(v_i) \times \text{MH}_i + \gamma \text{Post94}_i + \beta (\text{Post94}_i \times \text{MH}_i) + \varepsilon_{it}$$
-
-where $v_i = \text{year\_built}_i - 1994$ is the running variable centered at the cutoff, $f_{SB}(v)$ and $f_{MH}(v)$ are linear polynomials estimated separately on each side of the cutoff (allowing different depreciation profiles by housing type), and $\text{Post94}_i = \mathbf{1}[\text{year\_built} \geq 1994]$. The coefficient $\gamma$ captures any common break at 1994 (a placebo---small and insignificant in practice), and $\beta$ is the treatment effect: the manufactured-home-specific discontinuity at 1994, net of smooth vintage trends.
-
-This specification uses annual construction year (not binned) and is likely attenuated: the forced sharp-break assumption averages over the 1994--1995 transition vintages, making $\beta$ a conservative estimate relative to the full-treatment effect visible in later event-study cohorts.
-
-
 # Results
 
 ## Cost Side: Manufactured Home Prices
@@ -133,8 +122,6 @@ Figure \ref{fig:es-placements} shows the corresponding event study for log place
 Figure \ref{fig:es-net-building-pmt} presents the main result: the event study for net building payment per claim. Pre-1994 construction-period coefficients are flat and close to zero, confirming parallel vintage trends between manufactured and site-built homes before the HUD standard took effect. Beginning with the 1994 construction cohort, manufactured homes experience sharply lower building payments relative to site-built homes. The effect grows with later construction cohorts, reaching approximately \$9,000 per claim for the 2000 vintage bin.
 
 The growing magnitude across post-treatment cohorts is consistent with several mechanisms: increasing compliance as pipeline inventory cleared, refinement of construction techniques by manufacturers, and additional HUD Code updates that further strengthened standards in subsequent years. The pattern is not consistent with a simple age-depreciation story, which would predict a smooth gradient rather than a discrete break at 1994.
-
-Figure \ref{fig:rd-building-damage} provides a complementary visualization using the difference-in-discontinuities framework. The plot shows residualized building damage (net of county $\times$ loss-year fixed effects) by annual construction year for both manufactured and site-built homes, with separate linear fits on each side of the 1994 cutoff. Site-built homes show no discontinuity at 1994---their vintage profile is essentially flat---while manufactured homes exhibit a clear downward break. The MH-specific discontinuity in net building payments is approximately \$4--5,000, attenuated relative to the event-study estimates as expected given the pipeline-vintage averaging.
 
 ### Contents Damage and Claim Rates
 
@@ -239,17 +226,6 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Coefficients from a claim-level regression of net building payment on interactions between construction period and a manufactured housing indicator, relative to the 1992 bin. Dotted vertical line marks 1994, the year HUD wind standards took effect. Regressions include tract $\times$ loss-period and MH fixed effects. 95\% confidence intervals shown.
-  \end{footnotesize}
-  \end{flushleft}
-\end{figure}
-
-\begin{figure}[htbp]
-  \centering
-  \caption{Difference-in-Discontinuities: Building Damage by Construction Year}\label{fig:rd-building-damage}
-  \includegraphics[width=\textwidth]{output/rd/rd-building_damage.pdf}
-  \begin{flushleft}
-  \begin{footnotesize}
-  Notes: Building damage (\$000s) residualized against county $\times$ loss-year fixed effects, plotted by annual construction year centered at the 1994 cutoff. Separate linear fits on each side of the cutoff for manufactured (blue circles) and site-built (orange triangles) homes. The manufactured home series shows a discrete downward break at 1994; the site-built series is flat. Bandwidth: $\pm$6 years around the cutoff.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
