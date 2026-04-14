@@ -15,15 +15,16 @@ dt[, mh_lbl     := fifelse(mh == 1, "MH", "Site-built")]
 dt[, period_lbl := fifelse(post1994 == 1, "Post-1994", "Pre-1994")]
 
 # aggregate to cell-level weighted means ----
-# use claims_n as weight for per-claim averages; use unit weights for rates/totals
+# use claims_n as weight for per-claim averages and policies_n for per-policy averages
 
 summarize_cell <- function(d) {
     list(
-        avg_bldg_pmt         = weighted.mean(d$net_building_pmt_pclaim, d$claims_n,
+        avg_bldg_damage      = weighted.mean(d$building_damage_pclaim, d$claims_n,
                                               na.rm = TRUE),
-        avg_cont_pmt         = weighted.mean(d$net_contents_pmt_pclaim, d$claims_n,
+        avg_cont_damage      = weighted.mean(d$contents_damage_pclaim, d$claims_n,
                                               na.rm = TRUE),
-        claim_rate           = mean(d$claim_rate, na.rm = TRUE),
+        avg_bldg_coverage    = weighted.mean(d$building_policy_covg_ppol, d$policies_n,
+                                              na.rm = TRUE),
         total_claims         = sum(d$claims_n,   na.rm = TRUE),
         total_policies       = sum(d$policies_n, na.rm = TRUE),
         elevated_share       = weighted.mean(d$elevated_share,           d$policies_n,
@@ -39,8 +40,8 @@ summarize_cell <- function(d) {
 
 groups <- dt[, summarize_cell(.SD),
              by = .(period_lbl, mh_lbl),
-             .SDcols = c("net_building_pmt_pclaim", "net_contents_pmt_pclaim",
-                         "claim_rate", "claims_n", "policies_n",
+             .SDcols = c("building_damage_pclaim", "contents_damage_pclaim",
+                         "building_policy_covg_ppol", "claims_n", "policies_n",
                          "elevated_share", "sfha_share",
                          "primary_res_share", "mandatory_purchase_share")]
 
@@ -56,14 +57,14 @@ col_order <- c(
 groups[, group := factor(group, levels = col_order)]
 setorder(groups, group)
 
-v_vars <- c("avg_bldg_pmt", "avg_cont_pmt", "claim_rate",
+v_vars <- c("avg_bldg_damage", "avg_cont_damage", "avg_bldg_coverage",
             "total_claims", "total_policies",
             "elevated_share", "sfha_share",
             "primary_res_share", "mandatory_purch_share")
 v_labels <- c(
-    "Avg. building payment (\\$)",
-    "Avg. contents payment (\\$)",
-    "Claim rate",
+    "Avg. building damage (\\$)",
+    "Avg. contents damage (\\$)",
+    "Avg. building coverage (\\$)",
     "Total claims",
     "Total policies",
     "Elevated building (\\%)",
@@ -83,10 +84,8 @@ setorder(dt_wide, variable)
 
 # format numbers
 fmt_row <- function(x, var) {
-    if (var %in% c("avg_bldg_pmt", "avg_cont_pmt")) {
+    if (var %in% c("avg_bldg_damage", "avg_cont_damage", "avg_bldg_coverage")) {
         formatC(x, format = "f", digits = 0, big.mark = ",")
-    } else if (var == "claim_rate") {
-        formatC(x, format = "f", digits = 3)
     } else if (var %in% c("elevated_share", "sfha_share",
                            "primary_res_share", "mandatory_purch_share")) {
         formatC(x * 100, format = "f", digits = 1)

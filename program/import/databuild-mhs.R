@@ -6,6 +6,8 @@ library(here)
 library(data.table)
 library(stringr)
 
+source(here("program", "import", "project-params.R"))
+
 data_path <- Sys.getenv("DATA_PATH")
 
 year_min <- 1985L
@@ -33,7 +35,7 @@ dt_state <- fread(
 dt_cpi <- fread(here("derived", "cpi-bls.csv"))
 dt_cpi <- dt_cpi[, .(cpi = mean(cpi)), by = year]
 
-dt_cpi[, cpi := cpi / cpi[year == year_max]]
+dt_cpi[, cpi := cpi / cpi[year == DISCOUNT_YEAR]]
 
 # MHS sample
 dt <- readRDS(here("derived", "mhs-state-year.Rds"))

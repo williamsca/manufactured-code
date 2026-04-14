@@ -14,12 +14,18 @@ library(DBI)
 library(duckdb)
 library(data.table)
 
+source(here("program", "import", "project-params.R"))
+
 data_path <- Sys.getenv("DATA_PATH")
 if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
 
 # vintage filtering
-year_min <- 1986L
+year_min <- 1984L
 year_max <- 1999L
+
+dt_cpi <- fread(here("derived", "cpi-bls.csv"))
+dt_cpi <- dt_cpi[, .(cpi = mean(cpi)), by = year]
+dt_cpi[, cpi := cpi / cpi[year == DISCOUNT_YEAR]]
 
 drv <- duckdb(file.path(data_path, "derived", "fema.duckdb"), read_only = TRUE)
 con <- dbConnect(drv)
@@ -44,7 +50,17 @@ SELECT
     CAST(netContentsPaymentAmount      AS DOUBLE) AS net_contents_pmt,
     CAST(contentsPropertyValue         AS DOUBLE) AS contents_value,
     CAST(totalBuildingInsuranceCoverage AS DOUBLE) AS building_covg,
-    CAST(totalContentsInsuranceCoverage AS DOUBLE) AS contents_covg
+    CAST(totalContentsInsuranceCoverage AS DOUBLE) AS contents_covg,
+    CAST(waterDepth AS DOUBLE)                     AS water_depth,
+    CASE WHEN elevatedBuildingIndicator THEN 1 ELSE 0 END AS elevated,
+    CAST(buildingReplacementCost AS DOUBLE)        AS building_repl_cost,
+    CASE
+        WHEN ratedFloodZone IS NOT NULL
+            AND regexp_matches(ratedFloodZone, '^(A|V|AR)')
+        THEN 1 ELSE 0
+    END                                            AS sfha,
+    CASE WHEN primaryResidenceIndicator THEN 1 ELSE 0 END AS primary_res,
+    occupancyType                                  AS occupancy_type
 FROM nfip_claims
 WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
     AND yearOfLoss               IS NOT NULL
@@ -57,6 +73,28 @@ WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
 "
 
 dt_claims <- as.data.table(dbGetQuery(con, sql_claims))
+
+dt_claims <- merge(
+    dt_claims,
+    dt_cpi[, .(year_loss = year, cpi)],
+    by = "year_loss",
+    all.x = TRUE
+)
+
+stopifnot(!anyNA(dt_claims$cpi))
+
+v_nom_claims <- c(
+    "net_building_pmt",
+    "building_damage",
+    "building_value",
+    "contents_damage",
+    "net_contents_pmt",
+    "contents_value",
+    "building_covg",
+    "contents_covg",
+    "building_repl_cost"
+)
+dt_claims[, (v_nom_claims) := lapply(.SD, function(x) x / cpi), .SDcols = v_nom_claims]
 
 message(sprintf(
     "Loaded %d claims (%d MH [floors=5], %d site-built [floors 1-3])",
@@ -135,6 +173,23 @@ GROUP BY p.tractfp, s.year, p.mh, p.year_constr
 ", year_min, year_max)
 
 dt_pol <- as.data.table(dbGetQuery(con, sql_policies))
+
+dt_pol <- merge(
+    dt_pol,
+    dt_cpi[, .(year, cpi)],
+    by = "year",
+    all.x = TRUE
+)
+
+stopifnot(!anyNA(dt_pol$cpi))
+
+v_nom_policy <- c(
+    "repl_cost_tot",
+    "policy_cost_tot",
+    "building_policy_covg_tot",
+    "contents_policy_covg_tot"
+)
+dt_pol[, (v_nom_policy) := lapply(.SD, function(x) x / cpi), .SDcols = v_nom_policy]
 
 message(sprintf(
     "Policy panel: %d rows (%d tracts, %d calendar years, 2 MH, %d construction years)",

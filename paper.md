@@ -13,9 +13,9 @@ header-includes:
 
 # Introduction
 
-The U.S. experienced over 100 billion-dollar climate disasters over the period 2022-2026, incurring damages of over \$600 billion dollars in all[^billion-dollar]. 
+The U.S. experienced over 100 billion-dollar climate disasters over the five years before 2026, incurring damages of over \$600 billion dollars[^billion-dollar]. 
 
-[^billion-dollar]: Climate Central. “U.S. Billion-Dollar Weather and Climate Disasters.” ClimateCentral.Org, 2026. https://www.climatecentral.org/climate-services/billion-dollar-disasters/summary-stats.
+[^billion-dollar]: Climate Central. “U.S. Billion-Dollar Weather and Climate Disasters.” ClimateCentral.Org, 2026. \href{https://www.climatecentral.org/climate-services/billion-dollar-disasters/summary-stats}{https://www.climatecentral.org/climate-services/billion-dollar-disasters/summary-stats}.
 
 This paper asks whether mandated adaptation investment pays for itself. The answer depends on the cost of compliance, in the form of additional construction costs; and the benefits, both directly in reduced disaster damage and indirectly through the self-insurance value of adaptation and eligibility for federal insurance. I estimate both.
 
@@ -40,9 +40,9 @@ A back-of-envelope cost-benefit calculation illustrates the magnitudes. At a bas
 
 The welfare case for the HUD standard does not require the cost-benefit ratio to exceed one in expectation. Manufactured home residents are disproportionately low-income and credit-constrained. For these households, the certainty-equivalent value of avoiding catastrophic loss exceeds the expected value of damage reduction. The HUD standard functions as built-in catastrophe insurance: an upfront premium (higher purchase price) that pays out automatically (the home survives the storm) without annual premiums, take-up friction, or moral hazard. Low NFIP take-up among manufactured homeowners---who often hold chattel loans exempt from mandatory flood insurance purchase requirements---means that private insurance markets provide limited protection to this population. The regulation substitutes for a market that largely does not reach them.
 
-This paper contributes to several literatures. First, it provides direct evidence on the returns to building code regulation for disaster resilience. @baylis_mandated_2021 study wildfire building codes in California and find similarly large benefits to mandatory adaptation, with fiscal spillovers and insurance value potentially justifying the building codes even in areas with moderate wildfire risk. This paper improves on their empirical strategy by exploiting the fact that manufactured homes are regulated federally, allowing me to disentangle building code reforms from general vintage effects. Specifically, I compare site-built and manufactured homes in the same area, exposed to the same floods, and built in the same year. My design builds on the across-vintage methodology used in the economics literature to study building codes more broadly [@jacobsen_are_2013; levinson_how_2016] and can be applied to any context where different housing types are subject to different regulatory bodies.
+This paper contributes to several literatures. First, it provides direct evidence on the returns to building code regulation for disaster resilience. @simmons_economic_2018 and @dehring_coastal_2013 study whether building code reforms in Florida for site-built homes improved resilience to hurricanes and find conflicting results... For manufactured housing, my result support a body of descriptive work examining the 1994 HUD code reform [@simmons_manufactured_2008; @kevin_r_grosskopf_manufactured_2005].
 
-Unlike most studies of building codes, the federal HUD standard for MH offers a clean natural experiment: uniform national implementation, a sharp adoption date, and a natural comparison group (site-built homes) unaffected by the policy. My result support a body of descriptive work examining the 1994 HUD code reform [@simmons_manufactured_2008; @kevin_r_grosskopf_manufactured_2005] and wind standards more generally [@simmons_economic_2018]. Second, it contributes to the literature on climate adaptation by quantifying both costs and benefits of a specific adaptation investment, complementing work on adaptation to natural disasters [TODO] and the fiscal costs of hurricanes [TODO]. Third, it speaks to the design of policies for low-income disaster protection...
+Methodologically, @baylis_mandated_2021 implement a similar study of wildfire building codes in California and find large benefits to mandatory adaptation, with fiscal spillovers and insurance value potentially justifying tighter building codes even in areas with moderate wildfire risk. This paper improves on their empirical strategy by exploiting the fact that manufactured homes are regulated federally, allowing me to disentangle building code reforms from general vintage effects. Specifically, I compare site-built and manufactured homes in the same area, exposed to the same floods, and built in the same year. My design builds on the across-vintage methodology used in the economics literature to study building codes more broadly [@jacobsen_are_2013; levinson_how_2016] and can be applied to any context where different housing types are subject to different regulatory bodies.
 
 The remainder of the paper is organized as follows. Section 2 describes the institutional background and the 1994 HUD Code reform. Section 3 describes the data. Section 4 presents the empirical strategy. Section 5 reports the results. Section 6 discusses the cost-benefit implications and welfare interpretation. Section 7 concludes.
 
@@ -57,13 +57,9 @@ The preemption of local codes is a distinctive feature of the manufactured housi
 
 ## Hurricane Andrew and the 1994 Wind Standard Reform
 
-Hurricane Andrew struck southern Florida on August 24, 1992, causing over \$27 billion in damage (1992 dollars). The storm exposed the extreme vulnerability of manufactured homes: 97% of manufactured homes in its direct path were destroyed, compared to 11% of site-built homes. The disparity prompted congressional hearings and an accelerated regulatory response from HUD.
+Hurricane Andrew struck southern Florida on August 24, 1992, causing over \$27 billion in damage (1992 dollars). The storm exposed the extreme vulnerability of manufactured homes: 97% of manufactured homes in its direct path were destroyed, compared to 11% of site-built homes. The disparity prompted congressional hearings and an accelerated regulatory response from HUD [CITE FLORIDA CASE].
 
-In 1994, HUD revised the wind resistance provisions of the HUD Code, effective for all homes manufactured after July 13, 1994. The reform established a three-zone wind map:
-
-- **Wind Zone I:** 70 mph design wind speed (interior states, low hurricane risk)
-- **Wind Zone II:** 100 mph design wind speed (coastal states with moderate hurricane exposure)
-- **Wind Zone III:** 110 mph design wind speed (southern Florida, coastal Gulf states with highest hurricane exposure)
+In 1994, HUD revised the wind resistance provisions of the HUD Code, effective for all homes manufactured after July 13, 1994. The reform established a three-zone wind map. Wind Zone I, with 70 mph design wind speed, is composed of interior states with low hurricane risk. Zones II and II, with 100 and 110 mph design wind speeds, respectively, cover coastal states with moderate to high hurricane exposure, including much of Florida and the Gulf Coast. 
 
 The new standards required structural upgrades for homes destined for Zones II and III, including steel tie-down strapping, reinforced roof-to-wall connections, upgraded sheathing fastening schedules, and impact-resistant windows and doors in Zone III. These requirements added material and engineering costs to the production process. Manufacturers were required to label each home with its designated wind zone, and homes could not be sited in a zone exceeding their rated capacity.
 
@@ -80,7 +76,7 @@ The NFIP data used in this paper record claims and policy information at the ind
 
 ## Cost Side: Manufactured Housing Survey
 
-I estimate the price effect using state-by-year panel data from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state for 1985--2003. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states. I exclude Alaska and Hawaii. Prices are deflated to constant (2000) dollars using the CPI-U.
+I estimate the price and quantity effects using a state-by-year panel from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state. I focus on the period immediately around the HUD code change, 1988 - 1999. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states (see Figure \ref{map:treated-states}). I exclude Alaska and Hawaii.
 
 ## Benefit Side: NFIP Claims and Policies
 
@@ -88,7 +84,11 @@ The benefit-side analysis uses two datasets from FEMA's OpenFEMA platform: indiv
 
 I restrict the sample to homes with construction years between 1985 and 2000 and loss dates from 1994 onward. Construction years are binned into two-year periods anchored so that 1992--1993 is the last pre-treatment bin. Loss years are binned into five-year periods. For the cell-level analysis (claim rates, policy composition), I construct a balanced panel at the tract $\times$ loss-period $\times$ housing-type $\times$ construction-period level, including cells with zero claims.
 
-Table \ref{tab:sumstats-nfip} reports summary statistics by construction vintage and housing type. Key outcome variables include net building payment per claim, net contents payment per claim, and claims per policy. Composition variables include replacement cost per policy, building and contents coverage per policy, elevated-building share, SFHA share, primary-residence share, and mandatory-purchase share.
+### Final Sample
+
+All nominal values are deflated to constant (2000) dollars using the CPI-U.
+
+Table \ref{tab:sumstats-nfip} reports summary statistics for the NFIP data by construction vintage and housing type.
 
 
 # Empirical Strategy
@@ -97,21 +97,27 @@ Table \ref{tab:sumstats-nfip} reports summary statistics by construction vintage
 
 I estimate the effect of the 1994 HUD standard on manufactured home prices using a two-way fixed effects event study:
 
-$$\log(P_{st}) = \alpha_s + \gamma_t + \sum_k \beta_k (\mathbf{1}[\text{year} = k] \times \text{Treated}_s) + \varepsilon_{st}$$
+\begin{equation}
+\log(P_{st}) = \alpha_s + \gamma_t + \sum_k \beta_k (\mathbf{1}[\text{year} = k] \times \text{Treated}_s) + \varepsilon_{st}
+\label{eq:event-study-cost}
+\end{equation}
 
 where $P_{st}$ is the average real sales price of manufactured homes in state $s$ in year $t$, $\alpha_s$ and $\gamma_t$ are state and year fixed effects, and $\text{Treated}_s$ indicates states containing wind zones II or III. The coefficients $\beta_k$ trace out the price difference between treated and control states relative to the reference year 1993. Standard errors are clustered by state.
 
 ## Benefit Estimation: Event Study
 
-The primary benefit-side specification is a claim-level event study that imposes no functional form on the vintage profile:
+The primary benefit-side specification is an event study that imposes no functional form on the vintage profile:
 
-$$Y_{it} = \alpha_{c(i),t} + \delta_m + \sum_k \beta_k (\mathbf{1}[\text{constr\_period} = k] \times \text{MH}_i) + \varepsilon_{it}$$
+\begin{equation}
+Y_{it} = \alpha_{c(i),t} + \delta_m + \sum_k \beta_k (\mathbf{1}[\nu_i = k] \times \text{MH}_i) + \varepsilon_{it}
+\label{eq:event-study-benefit}
+\end{equation}
 
-where $Y_{it}$ is the outcome for claim $i$ (e.g., net building payment), $\alpha_{c(i),t}$ is a tract $\times$ loss-period fixed effect absorbing location-specific storm severity, $\delta_m$ is a manufactured housing indicator absorbing time-invariant differences between housing types, and $\text{MH}_i$ is an indicator for manufactured homes. The coefficients $\beta_k$ capture the manufactured-home-specific vintage profile relative to the 1992 reference bin. Post-1994 coefficients are the treatment effects.
+where $Y_{it}$ is the outcome for claim $i$ (e.g., building damage), $\alpha_{c(i),t}$ is a tract $\times$ loss-period fixed effect absorbing location-specific storm severity, $\delta_m$ is a manufactured housing indicator absorbing time-invariant differences between housing types, $\text{MH}_i$ is an indicator for manufactured homes, and $\nu_i$ is the construction vintage bin of home $i$. The coefficients $\beta_k$ capture the manufactured-home-specific vintage profile relative to the 1992 reference bin. Post-1994 coefficients are the treatment effects.
 
-For cell-level outcomes (claims per policy, policy composition variables), the specification replaces the claim-level observation with the tract $\times$ loss-period $\times$ housing-type $\times$ construction-period cell, and regressions are weighted by the number of policies in the cell.
+For cell-level outcomes (claims per policy, policy composition variables), regressions are weighted by the number of policies in the cell.
 
-The event study is the primary visual and diagnostic tool. Flat pre-trends validate the parallel-trends assumption. A sharp break at 1994 with growing effects for later cohorts is consistent with the regulation driving the change, as later cohorts had more time for full compliance and refinement of construction techniques. The gradual onset also reflects the pipeline: homes manufactured in 1994--1995 include units built to the old standard before the July 1994 effective date.
+A break at 1994 with slightly larger effects for later cohorts is consistent with delayed compliance, as some units produced prior to the change may have waited at dealers before being installed on a site., as later cohorts had more time for full compliance and refinement of construction techniques.
 
 # Results
 
@@ -127,7 +133,7 @@ Figure \ref{fig:es-placements} shows the corresponding event study for log place
 
 ### Building Damage
 
-Figure \ref{fig:es-net-building-pmt} presents the main result: the event study for net building payment per claim. Pre-1994 construction-period coefficients are flat and close to zero, confirming parallel vintage trends between manufactured and site-built homes before the HUD standard took effect. Beginning with the 1994 construction cohort, manufactured homes experience sharply lower building payments relative to site-built homes. The effect grows with later construction cohorts, reaching approximately \$9,000 per claim for the 2000 vintage bin.
+Figure \ref{fig:es-building-damage} presents the main result: the event study for net building payment per claim. Pre-1994 construction-period coefficients are flat and close to zero, confirming parallel vintage trends between manufactured and site-built homes before the HUD standard took effect. Beginning with the 1994 construction cohort, manufactured homes experience sharply lower building payments relative to site-built homes. The effect grows with later construction cohorts, reaching approximately \$9,000 per claim for the 2000 vintage bin.
 
 The growing magnitude across post-treatment cohorts is consistent with several mechanisms: increasing compliance as pipeline inventory cleared, refinement of construction techniques by manufacturers, and additional HUD Code updates that further strengthened standards in subsequent years. The pattern is not consistent with a simple age-depreciation story, which would predict a smooth gradient rather than a discrete break at 1994.
 
@@ -156,13 +162,13 @@ The expected benefit depends on the probability of experiencing a flood. Among m
 
 This calculation implies the flood channel alone recovers roughly 25--75% of the upfront compliance cost. Several factors make this a lower bound on the total return:
 
-1. **Wind damage.** The HUD standard targeted wind resilience, not flood protection. The flood damage reductions estimated here are a spillover benefit. The targeted wind damage channel---reduced structural failure during hurricanes---likely generates larger savings, but I cannot estimate it with NFIP data alone.
+The HUD standard targeted wind resilience, not flood protection. The flood damage reductions estimated here are a spillover benefit. The targeted wind damage channel---reduced structural failure during hurricanes---likely generates larger savings, but I cannot estimate it with NFIP data alone.
 
-2. **Uninsured losses.** NFIP payments are capped by coverage limits and subject to deductibles. Total economic losses from flood events exceed insured losses, particularly for manufactured homeowners with low coverage or no coverage at all.
+NFIP payments are capped by coverage limits and subject to deductibles. Total economic losses from flood events exceed insured losses, particularly for manufactured homeowners with low coverage or no coverage at all.
 
-3. **Displacement and indirect costs.** Manufactured homes that sustain severe damage often become uninhabitable, forcing residents into temporary housing or permanent displacement. Reduced damage from improved construction standards avoids these costs, which are borne primarily by residents and FEMA disaster assistance programs.
+Manufactured homes that sustain severe damage often become uninhabitable, forcing residents into temporary housing or permanent displacement. Reduced damage from improved construction standards avoids these costs, which are borne primarily by residents and FEMA disaster assistance programs.
 
-4. **FEMA disaster assistance.** When manufactured homes are destroyed in presidentially declared disasters, FEMA's Individual Assistance program provides grants for temporary housing and home repair. Reduced damage to post-1994 manufactured homes likely reduces these federal outlays, though I do not estimate this channel directly.
+When manufactured homes are destroyed in presidentially declared disasters, FEMA's Individual Assistance program provides grants for temporary housing and home repair. Reduced damage to post-1994 manufactured homes likely reduces these federal outlays, though I do not estimate this channel directly.
 
 ## Welfare Interpretation
 
@@ -195,11 +201,11 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 
 \begin{figure}[htbp]
   \centering
-  \caption{States Treated by the 1994 HUD Wind Standard}\label{fig:mhs-treated-states-map}
+  \caption{States Treated by the 1994 HUD Wind Standard}\label{fig:map-treated-states}
   \includegraphics[width=\textwidth]{output/descriptives/map-mhs-treated-states.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Treated states are those with any overlap with HUD wind zones II or III. Control states are wind zone I states. Alaska and Hawaii are excluded. Source: Census Bureau Manufactured Housing Survey and Census TIGER/Line state shapefiles via the \texttt{tigris} package.
+  Notes: Treated states are those with any overlap with HUD wind zones II or III. Control states are wind zone I states. Alaska and Hawaii are excluded. Source: Census Bureau Manufactured Housing Survey and Census TIGER/Line state shapefiles.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -215,13 +221,14 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \end{threeparttable}
 \end{table}
 
+
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Wind Standard on Manufactured Home Prices}\label{fig:es-price}
-  \includegraphics[width=\textwidth]{output/event-study/es-mhs-avg_sales_price_ln.pdf}
+  \includegraphics[width=\textwidth]{output/event-study/es-mhs-avg_sales_price.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Coefficients from a state-level regression of log real average manufactured home sales price on interactions between year and a treated-state indicator (HUD wind zones II/III), relative to 1993. State and year fixed effects included. 95\% confidence intervals shown, with standard errors clustered by state. Source: Census Bureau Manufactured Housing Survey, 1988--2000.
+  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. Source: Census Bureau Manufactured Housing Survey.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -232,18 +239,18 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \includegraphics[width=\textwidth]{output/event-study/es-mhs-placements_ln.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: See Figure \ref{fig:es-price}. Outcome is log placements (number of manufactured homes shipped to state). 
+  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. Outcome is log placements (number of manufactured homes shipped to state).
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
-  \caption{Effect of 1994 HUD Standards on Net Building Payment per Claim}\label{fig:es-net-building-pmt}
-  \includegraphics[width=\textwidth]{output/event-study/es-net-building-pmt.pdf}
+  \caption{Effect of 1994 HUD Standards on Net Building Payment per Claim}\label{fig:es-building-damage}
+  \includegraphics[width=\textwidth]{output/event-study/countyfp/es-building-damage.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Coefficients from a claim-level regression of net building payment on interactions between construction period and a manufactured housing indicator, relative to the 1992 bin. Dotted vertical line marks 1994, the year HUD wind standards took effect. Regressions include tract $\times$ loss-period and MH fixed effects. 95\% confidence intervals shown.
+  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-benefit}.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -251,13 +258,26 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Standards on Policies}\label{fig:es-policies}
-  \includegraphics[width=\textwidth]{output/event-study/es-policies.pdf}
+  \includegraphics[width=\textwidth]{output/event-study/countyfp/es-policies.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Coefficients from a PPML regression of total policies on interactions between construction period and a manufactured housing indicator, relative to the 1992 bin. Dotted vertical line marks 1994, the year HUD wind standards took effect. Regressions include tract $\times$ loss-period and MH fixed effects. 95\% confidence intervals shown.
+  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-benefit}.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
+
+\begin{landscape}
+\begin{table}[htbp]
+  \centering
+  \caption{Policy Composition Event Studies}\label{tab:composition}
+  \begin{threeparttable}
+    \input{output/event-study/countyfp/policy-composition.tex}
+    \begin{tablenotes}
+      \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on the cell-level panel, with observations weighted by number of policies. \emph{Repl. cost}, \emph{Bldg covg.}, and \emph{Contents covg.} refer to the estimated replacement cost, building coverage amount, and contents coverage amount, respectively, and are reported in thousands of 2000 dollars. All other outcomes are fractions. \emph{Elevated} indicates that the building satisfies the NFIP definition of an elevated building; \emph{SFHA} indicates that the property is located in a Special Flood Hazard Area; \emph{Primary res.} indicates that the home is a primary residence; and \emph{Mandatory} indicates that flood insurance was required by the mortgage lender.  Source: FEMA OpenFEMA policy data.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+\end{landscape}
 
 \clearpage
 

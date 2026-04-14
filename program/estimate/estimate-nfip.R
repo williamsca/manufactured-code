@@ -20,9 +20,26 @@ library(ggplot2)
 #     N=1 → annual (no binning); ref period = 1993
 #     N=2 → 1992-1993, 1994-1995, ...;  ref period = 1992
 #     N=3 → 1991-1993, 1994-1996, ...;  ref period = 1991
-# Pass as first positional argument: Rscript estimate-nfip.R 3
+# Pass as positional arguments: Rscript estimate-nfip.R 3 countyfp
+# You can also omit the bin width and pass only the geography:
+#   Rscript estimate-nfip.R tractfp
 args <- commandArgs(trailingOnly = TRUE)
-BIN_CONSTR_YEAR <- if (length(args) >= 1L) as.integer(args[1L]) else 1L
+bin_arg <- args[grepl("^[0-9]+$", args)][1L]
+geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
+BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
+agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
+
+MIN_YEAR <- 1986L
+MAX_YEAR <- 1999L
+
+if (!agg_geo %in% c("countyfp", "tractfp")) {
+    stop("agg_geo must be one of 'countyfp' or 'tractfp'.")
+}
+geo_label <- c(
+    "countyfp" = "County",
+    "tractfp" = "Census tract"
+)[[agg_geo]]
+out_dir <- here("output", "event-study", agg_geo)
 
 # bin construction years: bins are anchored so 1993 is always the right-end
 # of the last pre-treatment bin; each bin is labeled by its left-end year.
@@ -43,27 +60,28 @@ v_dict <- c(
     "contents_damage" = "Contents damage (000s)",
     "net_contents_pmt" = "Net contents payment (000s)",
     "claim_rate" = "Claims per policy",
-    "repl_cost_ppol" = "Replacement cost",
+    "repl_cost_ppol" = "Repl. cost",
     "policy_cost_ppol" = "Policy cost per policy",
-    "building_policy_covg_ppol" = "Building coverage",
-    "contents_policy_covg_ppol" = "Contents coverage",
-    "elevated_share" = "Elevated building share",
-    "sfha_share" = "SFHA share",
-    "primary_res_share" = "Primary residence share",
-    "mandatory_purchase_share" = "Mandatory purchase share",
+    "building_policy_covg_ppol" = "Bldg covg.",
+    "contents_policy_covg_ppol" = "Contents covg.",
+    "elevated_share" = "Elevated",
+    "sfha_share" = "SFHA",
+    "primary_res_share" = "Primary res.",
+    "mandatory_purchase_share" = "Mandatory",
     "building_damage_share" = "Building damage share of assessed value (%)",
     "net_building_pmt_share" = "Building payment share (%)",
     "mh_claim_share" = "MH share of claims",
     "mh_policy_share" = "MH share of policies",
+    "geo" = geo_label,
+    "countyfp" = "County",
     "tractfp" = "Census tract",
     "period_loss" = "Loss period",
-    "mh" = "Mobile home",
-    "period_constr" = "Vintage"
+    "mh" = "MH",
+    "period_constr" = "$\\nu_i$"
 )
 
 setFixest_dict(v_dict, reset = TRUE)
-dir.create(
-    here("output", "event-study"), showWarnings = FALSE, recursive = TRUE)
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ---------------------------------------------------------------------------
 # data construction ----
@@ -71,17 +89,18 @@ dir.create(
 
 # --- balanced panel ---
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
-dt <- dt[between(year_constr, 1986L, 1999L)]
+dt <- dt[between(year_constr, MIN_YEAR, MAX_YEAR)]
+dt[, geo := get(agg_geo)]
 dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
-# MH-share panel: annual year_constr resolution (for RDD / annual ES)
+# MH-share panel at the requested aggregation geography
 dt_share_cell <- dt[
     !is.na(policies_n) & policies_n > 0L,
     .(claims_n      = sum(claims_n,               na.rm = TRUE),
       policies_n    = sum(policies_n,             na.rm = TRUE),
       mh_claims_n   = sum(claims_n  * (mh == 1L), na.rm = TRUE),
       mh_policies_n = sum(policies_n * (mh == 1L), na.rm = TRUE)),
-    by = .(tractfp, period_loss, year_constr, treated, post1994)]
+    by = .(geo, period_loss, period_constr, treated, post1994)]
 dt_share_cell[, mh_claim_share  := mh_claims_n  / claims_n]
 dt_share_cell[, mh_policy_share := mh_policies_n / policies_n]
 
@@ -98,7 +117,7 @@ v_raw <- c("claims_n", "policies_n",
 dt_cell <- dt[
     !is.na(policies_n) & policies_n > 0L,
     lapply(.SD, sum, na.rm = TRUE),
-    by = .(tractfp, period_loss, mh, period_constr),
+    by = .(geo, period_loss, mh, period_constr),
     .SDcols = v_raw]
 
 dt_cell[, post1994 := as.integer(period_constr >= 1994L)]
@@ -122,22 +141,21 @@ dt_cell[, net_building_pmt_share := fifelse(
     NA_real_)]
 
 # per-policy averages
-dt_cell[, repl_cost_ppol := fifelse(
-    policies_n > 0L, repl_cost_tot / policies_n, NA_real_)]
-dt_cell[, policy_cost_ppol := fifelse(
-    policies_n > 0L, policy_cost_tot / policies_n, NA_real_)]
-dt_cell[, building_policy_covg_ppol := fifelse(
-    policies_n > 0L, building_policy_covg_tot / policies_n, NA_real_)]
-dt_cell[, contents_policy_covg_ppol := fifelse(
-    policies_n > 0L, contents_policy_covg_tot / policies_n, NA_real_)]
-dt_cell[, elevated_share := fifelse(
-    policies_n > 0L, elevated_policy_n / policies_n, NA_real_)]
-dt_cell[, sfha_share := fifelse(
-    policies_n > 0L, sfha_policy_n / policies_n, NA_real_)]
-dt_cell[, primary_res_share := fifelse(
-    policies_n > 0L, primary_res_policy_n / policies_n, NA_real_)]
-dt_cell[, mandatory_purchase_share := fifelse(
-    policies_n > 0L, mandatory_purchase_policy_n / policies_n, NA_real_)]
+v_ppol_tot <- c(
+    "repl_cost_tot", "policy_cost_tot",
+    "building_policy_covg_tot", "contents_policy_covg_tot",
+    "elevated_policy_n", "sfha_policy_n", "primary_res_policy_n",
+    "mandatory_purchase_policy_n", "net_building_pmt_tot",
+    "net_contents_pmt_tot")
+v_ppol <- gsub("_tot$", "_ppol", v_ppol_tot)
+v_ppol <- gsub("_policy_n$", "_share", v_ppol)
+dt_cell[, (v_ppol) := lapply(
+    .SD, function(x) fifelse(policies_n > 0L, x / policies_n, NA_real_)),
+    .SDcols = v_ppol_tot]
+
+# rescale dollar-value per-policy outcomes to $1,000s
+v_cost_ppol <- c("repl_cost_ppol", "building_policy_covg_ppol", "contents_policy_covg_ppol")
+dt_cell[, (v_cost_ppol) := lapply(.SD, `/`, 1000), .SDcols = v_cost_ppol]
 
 # claim rate
 dt_cell[, claim_rate := fifelse(
@@ -149,11 +167,13 @@ dt_cell[, net_building_pmt_tot_ln := log(net_building_pmt_tot)]
 # Poisson panel: aggregate all cells (including zero-policy) to period_constr
 dt_pois <- dt[, .(claims_n   = sum(claims_n,   na.rm = TRUE),
                   policies_n = sum(policies_n, na.rm = TRUE)),
-    by = .(tractfp, period_loss, mh, period_constr)]
+    by = .(geo, period_loss, mh, period_constr)]
 
 # --- claim-level data ---
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
-dt_claims <- dt_claims[between(year_constr, 1985, 2000) & year_loss >= 1994]
+dt_claims <- dt_claims[
+    between(year_constr, MIN_YEAR, MAX_YEAR) & year_loss >= 1994]
+dt_claims[, geo := get(agg_geo)]
 dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 dt_claims[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 dt_claims[, post1994      := as.integer(year_constr >= 1994L)]
@@ -162,6 +182,12 @@ v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
 dt_claims[, (v_shares_names) := lapply(
     .SD, function(x) 100 * x / building_value), .SDcols = v_shares]
+
+# covariate prep for robustness specs
+dt_claims[, log_repl_cost := fifelse(
+    !is.na(building_repl_cost) & building_repl_cost > 0,
+    log(building_repl_cost), NA_real_)]
+dt_claims[, occupancy_type := factor(occupancy_type)]
 
 v_shares_contents <- c("contents_damage", "net_contents_pmt")
 v_shares_contents_names <- paste0(v_shares_contents, "_share")
@@ -182,61 +208,15 @@ v_pclaim <- grep("_share$", v_claim, invert = TRUE, value = TRUE)
 v_pclaim <- paste0(v_pclaim, "_pclaim")
 s_pclaim <- paste0(
     "c(", paste0(v_pclaim, collapse = ", "),
-    ", claim_rate, net_building_pmt_tot_ln",
-    ", repl_cost_ppol, policy_cost_ppol",
-    ", building_policy_covg_ppol, contents_policy_covg_ppol",
-    ", elevated_share, sfha_share, primary_res_share, mandatory_purchase_share",
-    ", building_damage_share, net_building_pmt_share",
+    ", claim_rate",
+    ", ", paste0(v_ppol, collapse = ", "),
     ")")
-
-v_poly <- c("poly(year_constr, 1)*post1994")
-s_poly <- paste(v_poly, collapse = " + ")
-
-# ---------------------------------------------------------------------------
-# difference-in-discontinuities ----
-# ---------------------------------------------------------------------------
-# Running variable: construction year centered at 1994 cutoff
-dt_claims[, v := year_constr - 1994L]
-dt_claims[, post94 := as.integer(year_constr >= 1994L)]
-
-# Piecewise-linear slopes: separate on each side of cutoff
-dt_claims[, v_pre  := v * (1L - post94)]
-dt_claims[, v_post := v * post94]
-
-# Diff-in-disc: claim-level, county × loss-year FEs
-# Linear polynomial, type-specific, separate on each side
-fmla_dd <- as.formula(paste0(
-    s_claim,
-    " ~ post94 + post94:mh",
-    " + v_pre + v_post + v_pre:mh + v_post:mh",
-    " | tractfp^period_loss + mh"
-))
-
-est_dd <- feols(fmla_dd, data = dt_claims, lean = TRUE)
-etable(est_dd, fitstat = c("n", "r2", "wr2", "my"),
-       keep = "post94")
-
-# Quadratic robustness
-dt_claims[, v2_pre  := v^2 * (1L - post94)]
-dt_claims[, v2_post := v^2 * post94]
-
-fmla_dd_q <- as.formula(paste0(
-    s_claim,
-    " ~ post94 + post94:mh",
-    " + v_pre + v_post + v_pre:mh + v_post:mh",
-    " + v2_pre + v2_post + v2_pre:mh + v2_post:mh",
-    " | tractfp^period_loss + mh"
-))
-
-est_dd_q <- feols(fmla_dd_q, data = dt_claims, lean = TRUE)
-etable(est_dd_q, fitstat = c("n", "r2", "wr2", "my"),
-       keep = "post94")
 
 # event studies ----
 # claim-level event study
 fmla_claim_es <- as.formula(paste0(
     s_claim, " ~ i(period_constr, mh, ref = ref_period)",
-    " | sw(tractfp^year_loss) + mh"
+    " | geo^period_loss + mh"
 ))
 
 est_claim_es <- feols(fmla_claim_es, data = dt_claims, lean = TRUE)
@@ -246,7 +226,7 @@ iplot(est_claim_es[lhs = "building_pmt$"])
 # cell-level event study (aggregated to period_constr bins)
 fmla_pclaim_es <- as.formula(paste0(
     s_pclaim, " ~ i(period_constr, mh, ref = ref_period)",
-    " | tractfp^period_loss + mh")
+    " | geo^period_loss + mh")
 )
 
 est_pclaim_es <- feols(
@@ -270,8 +250,8 @@ v_comp <- c(
 s_comp <- paste0("c(", paste(v_comp, collapse = ", "), ")")
 
 fmla_comp_post <- as.formula(paste0(
-    s_comp, " ~ poly(period_constr, 1)*post1994*mh",
-    " | tractfp^period_loss + mh"
+    s_comp, " ~ i(period_constr, mh, ref = ref_period)",
+    " | geo^period_loss + mh"
 ))
 
 est_comp_post <- feols(
@@ -280,34 +260,25 @@ est_comp_post <- feols(
     lean = TRUE
 )
 etable(est_comp_post, fitstat = c("n", "r2", "wr2", "my"))
+
+
 etable(
     est_comp_post,
     tex = TRUE,
-    file = here("output", "event-study", "policy-composition.tex"),
-    fitstat = c("n", "r2", "wr2", "my"),
+    file = file.path(out_dir, "policy-composition.tex"),
+    fitstat = c("n", "r2", "my"),
     # keep = "post_mh",
-    digits = 3, replace = TRUE
+    digits = 1, digits.stats = 2, replace = TRUE
 )
 
 # MH share event study
-# RDD
-fmla_share_rd <- as.formula(paste0(
-    "c(mh_claim_share, mh_policy_share)", " ~ ",
-    s_poly, " | ", "tractfp^period_loss"
-))
-
-est_share_rd <- feols(
-    fmla_share_rd, data = dt_share_cell,
-    weights = ~policies_n, lean = TRUE
-)
-etable(est_share_rd, fitstat = c("n", "r2", "wr2", "my"))
 
 # event study
 
 fmla_share_es <- as.formula(paste0(
     "c(mh_claim_share, mh_policy_share)", " ~ ",
-    "i(year_constr, ref = 1993)",
-    " | ", "tractfp^period_loss"
+    "i(period_constr, ref = ref_period)",
+    " | ", "geo^period_loss"
 ))
 
 est_share_es <- feols(
@@ -317,22 +288,59 @@ est_share_es <- feols(
 
 etable(est_share_es, fitstat = c("n", "r2", "wr2", "my"))
 
+iplot(est_share_es)
+
 # count event study (Poisson)
 v_out <- c("claims_n", "policies_n")
 s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
 
 fmla_out_es <- as.formula(paste0(
     s_out, " ~ i(period_constr, mh, ref = ref_period)",
-    " | tractfp^period_loss + mh"
+    " | geo^period_loss + mh"
 ))
 
 est_pois_es <- fepois(
-    fmla_out_es, data = dt_pois[between(period_constr, 1986, 1998)],
+    fmla_out_es, data = dt_pois,
     lean = TRUE
 )
 etable(est_pois_es)
 
 iplot(est_pois_es)
+
+# ---------------------------------------------------------------------------
+# covariate-controlled robustness: building damage ----
+# ---------------------------------------------------------------------------
+# Progressively add covariates to assess whether composition changes in the
+# insured pool drive the main result. Using building_damage (not net payment)
+# to avoid any confounding from deductible changes across vintages.
+# FEs vary with agg_geo so the full script runs at a consistent geography.
+
+fmla_rob_a <- building_damage ~
+    i(period_constr, mh, ref = ref_period) |
+    geo^period_loss + mh
+
+fmla_rob_b <- building_damage ~
+    i(period_constr, mh, ref = ref_period) + water_depth |
+    geo^period_loss + mh
+
+fmla_rob_c <- building_damage ~
+    i(period_constr, mh, ref = ref_period) +
+    water_depth + elevated + sfha |
+    geo^period_loss + mh
+
+fmla_rob_d <- building_damage ~
+    i(period_constr, mh, ref = ref_period) +
+    water_depth + elevated + sfha + primary_res |
+    geo^period_loss + mh + occupancy_type
+
+est_rob_list <- list(
+    "Baseline"          = feols(fmla_rob_a, data = dt_claims, lean = TRUE),
+    "+ Water depth"     = feols(fmla_rob_b, data = dt_claims, lean = TRUE),
+    "+ Flood controls"  = feols(fmla_rob_c, data = dt_claims, lean = TRUE),
+    "+ Demographics"    = feols(fmla_rob_d, data = dt_claims, lean = TRUE)
+)
+
+etable(est_rob_list)
 
 # static ----
 
@@ -343,7 +351,9 @@ theme_paper <- function(base_size = 14) {
     theme_classic(base_size = base_size) +
         theme(
             text = element_text(family = "serif"),
-            legend.position = "right"
+            legend.position = "right",
+            panel.grid.major.y = element_line(color = "gray85", linewidth = 0.4),
+            panel.grid.minor.y = element_blank()
         )
 }
 
@@ -401,22 +411,80 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "m
     p
 }
 
+# Overlay event studies from a named list of single-LHS fixest objects.
+# Each model must be estimated with i(period_constr, mh, ref = ref_period).
+plot_es_multi <- function(est_list, vline_x = 1992.5, path = NULL,
+                           yscale = 1000, ref = ref_period,
+                           ylab = "Building damage (000s)") {
+    dt_all <- rbindlist(lapply(names(est_list), function(nm) {
+        ct <- as.data.table(coeftable(est_list[[nm]]), keep.rownames = TRUE)
+        idx <- grepl(":mh$", ct$rn)
+        dt <- data.table(
+            spec    = nm,
+            term    = ct$rn[idx],
+            est     = ct$Estimate[idx] / yscale,
+            se      = ct[["Std. Error"]][idx] / yscale
+        )
+        dt[, period  := as.integer(regmatches(term, regexpr("[0-9]{4}", term)))]
+        dt[, ci_low  := est - 1.96 * se]
+        dt[, ci_high := est + 1.96 * se]
+        rbind(dt, data.table(spec = nm, term = NA_character_,
+                             est = 0, se = 0, ci_low = 0, ci_high = 0,
+                             period = ref))
+    }))
+    setorder(dt_all, spec, period)
+    dt_all[, spec := factor(spec, levels = names(est_list))]
+
+    n <- length(est_list)
+    shapes <- c(16, 17, 15, 18)[seq_len(n)]
+
+    p <- ggplot(dt_all, aes(x = period, y = est,
+                             color = spec, fill = spec, shape = spec)) +
+        geom_ribbon(aes(ymin = ci_low, ymax = ci_high),
+                    alpha = 0.10, color = NA) +
+        geom_line() +
+        geom_point(size = 2) +
+        geom_vline(xintercept = vline_x, linetype = "dotted", color = "black") +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+        scale_x_continuous(breaks = sort(unique(dt_all$period))) +
+        scale_color_manual(values = v_palette[seq_len(n)]) +
+        scale_fill_manual(values  = v_palette[seq_len(n)]) +
+        scale_shape_manual(values = shapes) +
+        labs(x = "Construction period", y = ylab,
+             color = NULL, fill = NULL, shape = NULL) +
+        theme_paper() +
+        theme(legend.position = "bottom")
+
+    if (!is.null(path)) ggsave(path, p, width = 9, height = 5)
+    p
+}
+
+plot_es_multi(
+    est_rob_list,
+    path = file.path(out_dir, "es-building-damage-robust.pdf"))
+
 plot_es(est_claim_es, "net_building_pmt", yscale = 1000,
-        path = here("output", "event-study", "es-net-building-pmt.pdf"))
+        path = file.path(out_dir, "es-net-building-pmt.pdf"))
+
+plot_es(est_claim_es, "building_damage", yscale = 1000,
+        path = file.path(out_dir, "es-building-damage.pdf"))
 
 plot_es(est_claim_es, "net_contents_pmt", yscale = 1000,
-        path = here("output", "event-study", "es-net-contents-pmt.pdf"))
+        path = file.path(out_dir, "es-net-contents-pmt.pdf"))
+
+plot_es(est_claim_es, "building_damage_share",
+        path = file.path(out_dir, "es-building-damage-share.pdf"))
 
 plot_es(est_pclaim_es, "claim_rate",
-        path = here("output", "event-study", "es-claim-rate.pdf"))
+        path = file.path(out_dir, "es-claim-rate.pdf"))
 
 plot_es(est_pois_es, "policies_n",
-        path = here("output", "event-study", "es-policies.pdf"))
+        path = file.path(out_dir, "es-policies.pdf"))
 
-plot_es(est_share_es, "mh_claim_share", var = NULL, ref = 1993L,
+plot_es(est_share_es, "mh_claim_share", var = NULL, ref = ref_period,
         vline_x = 1993.5,
-        path = here("output", "event-study", "es-mh-claim-share.pdf"))
+        path = file.path(out_dir, "es-mh-claim-share.pdf"))
 
-plot_es(est_share_es, "mh_policy_share", var = NULL, ref = 1993L,
+plot_es(est_share_es, "mh_policy_share", var = NULL, ref = ref_period,
         vline_x = 1993.5,
-        path = here("output", "event-study", "es-mh-policy-share.pdf"))
+        path = file.path(out_dir, "es-mh-policy-share.pdf"))

@@ -8,7 +8,7 @@
 	pdflatex $*
 
 %.tex: %.md
-	pandoc --natbib $< --template=latex.template -o $@
+	pandoc --natbib $< --template=latex.template.article -o $@
 
 paper.html: paper.md
 	pandoc --citeproc paper.md --template=html.template -o $@

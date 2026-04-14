@@ -13,7 +13,7 @@ data_path <- Sys.getenv("DATA_PATH")
 # import ----
 
 dt <- readRDS(here("derived", "sample-mhs.Rds"))
-dt <- dt[between(year, 1988, 2000)]
+dt <- dt[between(year, 1988, 1999)]
 
 # estimate ----
 # prices in logs and levels
@@ -57,7 +57,9 @@ theme_paper <- function(base_size = 14) {
     theme_classic(base_size = base_size) +
         theme(
             text = element_text(family = "serif"),
-            legend.position = "right"
+            legend.position = "right",
+            panel.grid.major.y = element_line(color = "gray85", linewidth = 0.4),
+            panel.grid.minor.y = element_blank()
         )
 }
 
