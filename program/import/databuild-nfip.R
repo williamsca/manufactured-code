@@ -94,7 +94,8 @@ v_nom_claims <- c(
     "contents_covg",
     "building_repl_cost"
 )
-dt_claims[, (v_nom_claims) := lapply(.SD, function(x) x / cpi), .SDcols = v_nom_claims]
+dt_claims[, (v_nom_claims) := lapply(
+    .SD, function(x) x / (cpi * 1000)), .SDcols = v_nom_claims]
 
 message(sprintf(
     "Loaded %d claims (%d MH [floors=5], %d site-built [floors 1-3])",
@@ -189,7 +190,8 @@ v_nom_policy <- c(
     "building_policy_covg_tot",
     "contents_policy_covg_tot"
 )
-dt_pol[, (v_nom_policy) := lapply(.SD, function(x) x / cpi), .SDcols = v_nom_policy]
+dt_pol[, (v_nom_policy) := lapply(
+    .SD, function(x) x / (cpi * 1000)), .SDcols = v_nom_policy]
 
 message(sprintf(
     "Policy panel: %d rows (%d tracts, %d calendar years, 2 MH, %d construction years)",
@@ -252,6 +254,37 @@ stopifnot(nrow(dt_balanced[is.na(wind_zone)]) == 0L)
 dt_balanced[, treated     := (wind_zone >= 2L)]
 dt_balanced[, treated_wz3 := (wind_zone == 3L)]
 dt_balanced$wind_zone <- NULL
+
+# ---------------------------------------------------------------------------
+# 5.5. Merge SF building permits (county × construction year) ----
+#
+#   permits_sf_n is normalized to per-tract units so it is comparable to
+#   the policy count, which is already at tract level.
+# ---------------------------------------------------------------------------
+
+dt_perm <- readRDS(here("derived", "permits-co.Rds"))
+dt_perm[, countyfp := formatC(as.integer(countyfp), width = 5, flag = "0")]
+
+# unique tracts per county per construction year in the balanced panel
+dt_tracts <- dt_balanced[, .(n_tracts = uniqueN(tractfp)), by = .(countyfp, year_constr)]
+
+dt_perm_merge <- merge(
+    dt_perm[
+        between(year, year_min, year_max),
+        .(countyfp, year_constr = year, permits_sf_n = permits_sf)
+    ],
+    dt_tracts,
+    by = c("countyfp", "year_constr"),
+    all.x = TRUE
+)
+dt_perm_merge[n_tracts > 0L, permits_sf_n := permits_sf_n / n_tracts]
+dt_perm_merge[, n_tracts := NULL]
+
+dt_balanced <- merge(
+    dt_balanced, dt_perm_merge,
+    by = c("countyfp", "year_constr"),
+    all.x = TRUE
+)
 
 # ---------------------------------------------------------------------------
 # 6. Merge policy counts (annual → period) ----

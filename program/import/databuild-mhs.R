@@ -59,6 +59,15 @@ dt <- merge(dt, dt_cpi[, .(year, cpi)], by = "year", all.x = TRUE)
 
 stopifnot(!anyNA(dt$cpi))
 
+# BPS single-family permits aggregated to state-year
+dt_perm <- readRDS(here("derived", "permits-co.Rds"))
+dt_perm[, statefp := formatC(as.integer(statefp), width = 2, flag = "0")]
+dt_perm_state <- dt_perm[,
+    .(permits_sf = sum(permits_sf, na.rm = TRUE)),
+    by = .(statefp, year)
+]
+dt <- merge(dt, dt_perm_state, by = c("statefp", "year"), all.x = TRUE)
+
 # define outcomes ----
 v_price <- grep("avg_sales_price", names(dt), value = TRUE)
 dt[, (v_price) := lapply(.SD, function(x) x / cpi), .SDcols = v_price]
@@ -69,6 +78,10 @@ dt[, (v_price_ln) := lapply(.SD, log), .SDcols = v_price]
 v_ship <- grep("placements", names(dt), value = TRUE)
 v_ship_ln <- paste0(v_ship, "_ln")
 dt[, (v_ship_ln) := lapply(.SD, log), .SDcols = v_ship]
+
+dt[, placements_permits_ratio    := fifelse(
+    !is.na(permits_sf) & permits_sf > 0, placements / permits_sf, NA_real_)]
+dt[, placements_permits_ratio_ln := log(placements_permits_ratio)]
 
 # export ----
 saveRDS(dt, here("derived", "sample-mhs.Rds"))

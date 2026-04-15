@@ -55,10 +55,10 @@ ref_period <- 1994L - BIN_CONSTR_YEAR
 v_dict <- c(
     "claims_n" = "Claims (#)",
     "policies_n" = "Policies (#)",
-    "building_damage" = "Building damage (000s)",
-    "net_building_pmt" = "Net building payment (000s)",
-    "contents_damage" = "Contents damage (000s)",
-    "net_contents_pmt" = "Net contents payment (000s)",
+    "building_damage" = "Building damage",
+    "net_building_pmt" = "Net building pmt.",
+    "contents_damage" = "Contents damage",
+    "net_contents_pmt" = "Net contents pmt.",
     "claim_rate" = "Claims per policy",
     "repl_cost_ppol" = "Repl. cost",
     "policy_cost_ppol" = "Policy cost per policy",
@@ -68,8 +68,11 @@ v_dict <- c(
     "sfha_share" = "SFHA",
     "primary_res_share" = "Primary res.",
     "mandatory_purchase_share" = "Mandatory",
-    "building_damage_share" = "Building damage share of assessed value (%)",
-    "net_building_pmt_share" = "Building payment share (%)",
+    "policies_ppermit" = "Policies per SF permit",
+    "building_damage_share" = "Bldg. dmg. share (%)",
+    "net_building_pmt_share" = "Bldg. pmt. share (%)",
+    "contents_damage_share" = "Contents dmg. share (%)",
+    "net_contents_pmt_share" = "Contents pmt. share (%)",
     "mh_claim_share" = "MH share of claims",
     "mh_policy_share" = "MH share of policies",
     "geo" = geo_label,
@@ -112,7 +115,8 @@ v_raw <- c("claims_n", "policies_n",
            "repl_cost_tot", "policy_cost_tot",
            "building_policy_covg_tot", "contents_policy_covg_tot",
            "elevated_policy_n", "sfha_policy_n",
-           "primary_res_policy_n", "mandatory_purchase_policy_n")
+           "primary_res_policy_n", "mandatory_purchase_policy_n",
+           "permits_sf_n")
 
 dt_cell <- dt[
     !is.na(policies_n) & policies_n > 0L,
@@ -153,13 +157,14 @@ dt_cell[, (v_ppol) := lapply(
     .SD, function(x) fifelse(policies_n > 0L, x / policies_n, NA_real_)),
     .SDcols = v_ppol_tot]
 
-# rescale dollar-value per-policy outcomes to $1,000s
-v_cost_ppol <- c("repl_cost_ppol", "building_policy_covg_ppol", "contents_policy_covg_ppol")
-dt_cell[, (v_cost_ppol) := lapply(.SD, `/`, 1000), .SDcols = v_cost_ppol]
-
 # claim rate
 dt_cell[, claim_rate := fifelse(
     policies_n > 0L, claims_n / policies_n, NA_real_)]
+
+# policies per SF permit
+dt_cell[, policies_ppermit := fifelse(
+    !is.na(permits_sf_n) & permits_sf_n > 0, policies_n /
+    permits_sf_n, NA_real_)]
 dt_cell[, post_mh := as.integer(period_constr >= 1994L) * mh]
 
 dt_cell[, net_building_pmt_tot_ln := log(net_building_pmt_tot)]
@@ -219,9 +224,23 @@ fmla_claim_es <- as.formula(paste0(
     " | geo^period_loss + mh"
 ))
 
-est_claim_es <- feols(fmla_claim_es, data = dt_claims, lean = TRUE)
+est_claim_es <- feols(fmla_claim_es, data = dt_claims)
 etable(est_claim_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_claim_es[lhs = "building_pmt$"])
+
+v_alt <- c(
+    "building_damage$", "net_building_pmt$", "building_damage_share",
+    "contents_damage$", "net_contents_pmt$")
+
+etable(est_claim_es[lhs = v_alt], fitstat = c("n", "r2", "wr2", "my"))
+
+etable(
+    est_claim_es[lhs = v_alt],
+    tex = TRUE,
+    file = file.path(out_dir, "claims-outcomes.tex"),
+    fitstat = c("n", "r2", "my"),
+    digits = 2, digits.stats = 2, replace = TRUE
+)
 
 # cell-level event study (aggregated to period_constr bins)
 fmla_pclaim_es <- as.formula(paste0(
@@ -342,6 +361,27 @@ est_rob_list <- list(
 
 etable(est_rob_list)
 
+# geographic robustness: county vs. tract FEs ----
+# Compare baseline county-level controls with census-tract-level controls.
+# Both columns use the same interaction specification; only the geographic
+# granularity of the location × loss-period fixed effect varies.
+fmla_geo_rob <- building_damage ~
+    i(period_constr, mh, ref = ref_period) |
+    sw(countyfp^period_loss, tractfp^period_loss) + mh
+
+est_geo_rob <- feols(fmla_geo_rob, data = dt_claims, lean = TRUE)
+
+etable(est_geo_rob)
+
+etable(
+    est_geo_rob,
+    tex = TRUE,
+    file = here("output", "event-study", "countyfp", "geo-robustness.tex"),
+    fitstat = c("n", "r2", "my"),
+    digits = 2, digits.stats = 2, replace = TRUE,
+    headers = c("County FE", "Census tract FE")
+)
+
 # static ----
 
 # plots ----
@@ -370,6 +410,7 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "m
     } else {
         outcome
     }
+    if (ylab %in% c("Building damage")) ylab <- paste0(ylab, " (000s)")
 
     ct <- as.data.table(coeftable(est), keep.rownames = TRUE)
     # i(period_constr, mh) coefficients are named "period_constr::YYYY:mh"
@@ -413,7 +454,7 @@ plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "m
 # Overlay event studies from a named list of single-LHS fixest objects.
 # Each model must be estimated with i(period_constr, mh, ref = ref_period).
 plot_es_multi <- function(est_list, vline_x = 1992.5, path = NULL,
-                           yscale = 1000, ref = ref_period,
+                           yscale = 1, ref = ref_period,
                            ylab = "Building damage (000s)") {
     dt_all <- rbindlist(lapply(names(est_list), function(nm) {
         ct <- as.data.table(coeftable(est_list[[nm]]), keep.rownames = TRUE)
@@ -462,13 +503,13 @@ plot_es_multi(
     est_rob_list,
     path = file.path(out_dir, "es-building-damage-robust.pdf"))
 
-plot_es(est_claim_es, "net_building_pmt", yscale = 1000,
+plot_es(est_claim_es, "net_building_pmt",
         path = file.path(out_dir, "es-net-building-pmt.pdf"))
 
-plot_es(est_claim_es, "building_damage", yscale = 1000,
+plot_es(est_claim_es, "building_damage",
         path = file.path(out_dir, "es-building-damage.pdf"))
 
-plot_es(est_claim_es, "net_contents_pmt", yscale = 1000,
+plot_es(est_claim_es, "net_contents_pmt",
         path = file.path(out_dir, "es-net-contents-pmt.pdf"))
 
 plot_es(est_claim_es, "building_damage_share",

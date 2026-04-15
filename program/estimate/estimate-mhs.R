@@ -21,7 +21,8 @@ v_out_p <- grep("avg_sales_price", names(dt), value = TRUE)
 s_out_p <- paste0("c(", paste0(v_out_p, collapse = ", "), ")")
 
 # quantities in logs
-v_out_q <- c("placements_ln", "placements_single_ln", "placements_double_ln")
+v_out_q <- c("placements_ln", "placements_single_ln", "placements_double_ln",
+             "placements_permits_ratio")
 s_out_q <- paste0("c(", paste0(v_out_q, collapse = ", "), ")")
 
 fmla_p <- as.formula(paste0(
@@ -48,9 +49,10 @@ v_dict <- c(
     "avg_sales_price_ln"        = "Average sales price (log)",
     "avg_sales_price_single_ln" = "Average sales price, single-wide (log)",
     "avg_sales_price_double_ln" = "Average sales price, double-wide (log)",
-    "placements_ln"             = "Placements (log)",
-    "placements_single_ln"      = "Single-wide placements (log)",
-    "placements_double_ln"      = "Double-wide placements (log)"
+    "placements_ln"                  = "Placements (log)",
+    "placements_single_ln"           = "Single-wide placements (log)",
+    "placements_double_ln"           = "Double-wide placements (log)",
+    "placements_permits_ratio"    = "Placements / SF permits"
 )
 
 theme_paper <- function(base_size = 14) {
