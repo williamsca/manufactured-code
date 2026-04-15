@@ -1,6 +1,7 @@
 data/
 derived/
 output/
+literature/
 
 paper.tex
 paper.pdf

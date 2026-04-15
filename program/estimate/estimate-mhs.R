@@ -99,7 +99,7 @@ plot_es <- function(est, outcome = NULL, ref = 1993L, vline_x = 1993.5,
         geom_point(color = v_palette[1], size = 2) +
         geom_line(color = v_palette[1]) +
         geom_vline(xintercept = vline_x, linetype = "dotted", color = "black") +
-        geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+        # geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
         scale_x_continuous(breaks = dt_es$period) +
         labs(x = xlab, y = ylab) +
         theme_paper()
