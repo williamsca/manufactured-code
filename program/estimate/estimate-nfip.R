@@ -170,9 +170,12 @@ dt_cell[, post_mh := as.integer(period_constr >= 1994L) * mh]
 dt_cell[, net_building_pmt_tot_ln := log(net_building_pmt_tot)]
 
 # Poisson panel: aggregate all cells (including zero-policy) to period_constr
-dt_pois <- dt[, .(claims_n   = sum(claims_n,   na.rm = TRUE),
-                  policies_n = sum(policies_n, na.rm = TRUE)),
+dt_pois <- dt[, .(claims_n    = sum(claims_n,    na.rm = TRUE),
+                  policies_n  = sum(policies_n,  na.rm = TRUE),
+                  permits_sf_n = sum(permits_sf_n, na.rm = TRUE)),
     by = .(geo, period_loss, mh, period_constr)]
+dt_pois[, policies_ppermit := fifelse(
+    !is.na(permits_sf_n) & permits_sf_n > 0, policies_n / permits_sf_n, NA_real_)]
 
 # --- claim-level data ---
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
@@ -213,7 +216,7 @@ v_pclaim <- grep("_share$", v_claim, invert = TRUE, value = TRUE)
 v_pclaim <- paste0(v_pclaim, "_pclaim")
 s_pclaim <- paste0(
     "c(", paste0(v_pclaim, collapse = ", "),
-    ", claim_rate",
+    ", claim_rate", # ", ", "policies_ppermit",
     ", ", paste0(v_ppol, collapse = ", "),
     ")")
 
@@ -310,21 +313,31 @@ etable(est_share_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_share_es)
 
 # count event study (Poisson)
-v_out <- c("claims_n", "policies_n")
-s_out <- paste0("c(", paste0(v_out, collapse = ", "), ")")
-
 fmla_out_es <- as.formula(paste0(
-    s_out, " ~ i(period_constr, mh, ref = ref_period)",
+    "c(policies_n, claims_n)", " ~ i(period_constr, mh, ref = ref_period)",
     " | geo^period_loss + mh"
 ))
 
 est_pois_es <- fepois(
-    fmla_out_es, data = dt_pois,
-    lean = TRUE
+    fmla_out_es, data = dt_pois
 )
 etable(est_pois_es)
 
 iplot(est_pois_es)
+
+# OLS: policies per SF permit (ratio outcome, not count)
+est_ppermit_es <- feols(
+    policies_ppermit ~ i(period_constr, mh, ref = ref_period) |
+        geo^period_loss + mh,
+    data = dt_pois[!is.na(permits_sf_n) & permits_sf_n > 0],
+    lean = TRUE, weights = ~permits_sf_n,
+)
+
+etable(
+    list("PPML" = est_pois_es[lhs = "policies_n"][[1]]), # "OLS"  = est_ppermit_es
+    digits = 2, digits.stats = 2, fitstat = c("n", "r2", "my"),
+    tex = TRUE, replace = TRUE,
+    file = file.path(out_dir, "take-up.tex"))
 
 # ---------------------------------------------------------------------------
 # covariate-controlled robustness: building damage ----
@@ -379,7 +392,7 @@ etable(
     file = here("output", "event-study", "countyfp", "geo-robustness.tex"),
     fitstat = c("n", "r2", "my"),
     digits = 2, digits.stats = 2, replace = TRUE,
-    headers = c("County FE", "Census tract FE")
+    depvar = FALSE
 )
 
 # static ----
