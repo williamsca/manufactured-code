@@ -33,6 +33,10 @@ This paper contributes to several literatures. First, it provides direct evidenc
 
 Methodologically, @baylis_mandated_2021 implement a similar study of wildfire building codes in California and find large benefits to mandatory adaptation, with fiscal spillovers and insurance value potentially justifying tighter building codes even in areas with moderate wildfire risk. This paper improves on their empirical strategy by exploiting the fact that manufactured homes are regulated federally, allowing me to disentangle building code reforms from general vintage effects. Specifically, I compare site-built and manufactured homes in the same area, exposed to the same floods, and built in the same year. My design builds on the across-vintage methodology used in the economics literature to study building codes more broadly [@jacobsen_are_2013; @levinson_how_2016] and can be applied to any context where different housing types are subject to different regulatory bodies.
 
+I also contribute to a rich literature evaluating the National Flood Insurance Program [@solomon_optimal_2026]. My results suggest that HUD code reforms had moderate fiscal spillovers on the NFIP, reducing total payments by roughly \$24 million over the six years after the reform, assuming no effect on program take-up.[^fiscal-spillover]
+
+[^fiscal-spillover]: This calculation assumes reductions of \$5,500 and \$1,000 in building and contents payments per claim, respectively, and applies those to the 3,707 claims for MH made over the period 1994-1999.
+
 The scope of this paper is limited to only one channel of benefits -- flood damage reduction -- and does not attempt to estimate other benefits (e.g., wind damage reduction, spillovers to adjacent homes, reduced displacement, fiscal spillovers to \emph{ex post} disaster assistances). I leave the estimation of these channels to future work.
 
 The remainder of the paper is organized as follows. Section \ref{institutional-background} describes the institutional background and the 1994 HUD Code reform. Section \ref{data} describes the data. Section \ref{empirical-strategy} presents the empirical strategy. Section \ref{results} reports the results, and Section \ref{conclusion} concludes.
@@ -59,13 +63,13 @@ The NFIP data used in this paper record claims and policy information at the ind
 
 # Data
 
-## Cost Side: Manufactured Housing Survey
+## Manufactured Housing Prices and Shipments
 
 I estimate the price and quantity effects using a state-by-year panel from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state. I focus on the period immediately around the HUD code change, 1988 - 1999. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states (see Figure \ref{map:treated-states}).
 
-## Benefit Side: NFIP Claims and Policies
+## Flood Damage and Insurance Coverage
 
-The benefit-side analysis uses two datasets from FEMA's OpenFEMA platform: individual flood insurance claims and policy records. Claims data record the date of loss, construction year, building and contents damage amounts, NFIP payments, property characteristics, and the census tract. Policy data record coverage amounts, premium, property characteristics, and flood zone designation. Both datasets include a field identifying manufactured homes.
+I use two data from FEMA on individual flood insurance claims and policy records. Claims data record the date of loss, construction year, building and contents damage amounts, NFIP payments, property characteristics, and the census tract. Policy data record coverage amounts, premium, property characteristics, and flood zone designation. Both datasets include a field identifying manufactured homes.
 
 ### Final Sample
 
