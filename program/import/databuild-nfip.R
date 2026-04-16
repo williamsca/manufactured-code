@@ -3,9 +3,10 @@
 # Inputs:  $DATA_PATH/derived/fema.duckdb
 #          derived/ecfr-windzone.csv
 # Outputs: derived/nfip-claims.Rds   (claim-level, filtered + renamed)
-#          derived/nfip-balanced.Rds (tractfp × period_loss × mh × year_constr)
+#          derived/nfip-balanced.Rds (tractfp × period_loss × mh × year_constr;
+#                                     grid from policy data, 2009+)
 #
-# period_loss: 5-year bins (1994 = 1994-1998, 1999 = 1999-2003, ...)
+# period_loss: 5-year bins (2009 = 2009-2013, 2014 = 2014-2018, ...)
 # year_constr: individual construction year (binning done at estimation)
 
 rm(list = ls()); gc()
@@ -64,6 +65,8 @@ SELECT
 FROM nfip_claims
 WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
     AND yearOfLoss               IS NOT NULL
+    AND yearOfLoss               >= %d
+    AND yearOfLoss               <= %d
     AND originalConstructionDate IS NOT NULL
     AND countyCode               IS NOT NULL
     AND censusTract              IS NOT NULL
@@ -72,7 +75,7 @@ WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
     AND TRY_CAST(LEFT(censusTract, 2) AS INT) <= 56
 "
 
-dt_claims <- as.data.table(dbGetQuery(con, sql_claims))
+dt_claims <- as.data.table(dbGetQuery(con, sprintf(sql_claims, MIN_LOSS_YEAR, MAX_LOSS_YEAR)))
 
 dt_claims <- merge(
     dt_claims,
@@ -168,10 +171,10 @@ SELECT
     SUM(p.mandatory_purchase_policy)      AS mandatory_purchase_policy_n,
     SUM(p.sfha_policy)                    AS sfha_policy_n
 FROM filtered p
-JOIN generate_series(1994, 2025) AS s(year)
+JOIN generate_series(%d, %d) AS s(year)
     ON p.year_eff <= s.year AND p.year_term >= s.year
 GROUP BY p.tractfp, s.year, p.mh, p.year_constr
-", year_min, year_max)
+", year_min, year_max, MIN_LOSS_YEAR, MAX_LOSS_YEAR)
 
 dt_pol <- as.data.table(dbGetQuery(con, sql_policies))
 
@@ -201,6 +204,20 @@ message(sprintf(
     uniqueN(dt_pol$year_constr)
 ))
 
+# aggregate annual policies to 5-year loss periods
+dt_pol[, period_loss := ((year - 1994L) %/% 5L) * 5L + 1994L]
+dt_pol_period <- dt_pol[, .(
+    policies_n                    = sum(policies_n,                    na.rm = TRUE),
+    repl_cost_tot                 = sum(repl_cost_tot,                 na.rm = TRUE),
+    policy_cost_tot               = sum(policy_cost_tot,               na.rm = TRUE),
+    building_policy_covg_tot      = sum(building_policy_covg_tot,      na.rm = TRUE),
+    contents_policy_covg_tot      = sum(contents_policy_covg_tot,      na.rm = TRUE),
+    elevated_policy_n             = sum(elevated_policy_n,             na.rm = TRUE),
+    primary_res_policy_n          = sum(primary_res_policy_n,          na.rm = TRUE),
+    mandatory_purchase_policy_n   = sum(mandatory_purchase_policy_n,   na.rm = TRUE),
+    sfha_policy_n                 = sum(sfha_policy_n,                 na.rm = TRUE)
+), by = .(tractfp, period_loss, mh, year_constr)]
+
 # ---------------------------------------------------------------------------
 # 3. Aggregate claims to panel key ----
 # ---------------------------------------------------------------------------
@@ -214,7 +231,7 @@ v_dmg <- c("net_building_pmt", "building_damage", "building_value",
 dt_claims[, period_loss := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 
 dt_agg <- dt_claims[
-    year_loss >= 1994L,
+    year_loss >= 2009L,
     c(.(claims_n = .N), lapply(.SD, sum, na.rm = TRUE)),
     by      = .(tractfp, period_loss, mh, year_constr),
     .SDcols = v_dmg
@@ -222,30 +239,39 @@ dt_agg <- dt_claims[
 setnames(dt_agg, v_dmg, paste0(v_dmg, "_tot"))
 
 # ---------------------------------------------------------------------------
-# 4. Balance panel: exposed tract-periods × mh × year_constr grid ----
-#    Cells with no claims get zeros.
+# 4. Balance panel: policy grid × left-join policies and claims ----
+#    Grid = tract-periods with ≥1 policy, crossed with all mh × year_constr.
+#    Cells with no policies or no claims get zeros.
 # ---------------------------------------------------------------------------
 
-exposed_cy <- unique(dt_agg[, .(tractfp, period_loss)])
+exposed_pol <- unique(dt_pol_period[period_loss >= 2009L, .(tractfp, period_loss)])
 
-grid <- exposed_cy[
+grid <- exposed_pol[
     , CJ(mh = 0:1, year_constr = year_min:year_max),
     by = .(tractfp, period_loss)]
 grid[, countyfp := substr(tractfp, 1, 5)]
 grid[, statefp  := substr(tractfp, 1, 2)]
+grid[, post1994 := as.integer(year_constr >= 1994L)]
 
-dt_balanced <- merge(
-    grid, dt_agg,
-    by    = c("tractfp", "period_loss", "mh", "year_constr"),
-    all.x = TRUE
-)
-dt_balanced[, post1994 := as.integer(year_constr >= 1994L)]
+dt_balanced <- merge(grid, dt_pol_period, by = c("tractfp", "period_loss", "mh", "year_constr"), all.x = TRUE)
+dt_balanced <- merge(dt_balanced, dt_agg,  by = c("tractfp", "period_loss", "mh", "year_constr"), all.x = TRUE)
+
+# impute zero for cells with no matching policies
+v_pol_count <- c("policies_n", "elevated_policy_n", "primary_res_policy_n",
+                 "mandatory_purchase_policy_n", "sfha_policy_n")
+v_pol_amt   <- c("repl_cost_tot", "policy_cost_tot",
+                 "building_policy_covg_tot", "contents_policy_covg_tot")
+for (col in c(v_pol_count, v_pol_amt)) {
+    set(dt_balanced, which(is.na(dt_balanced[[col]])), col, 0)
+}
 
 # ---------------------------------------------------------------------------
 # 5. Merge treatment ----
 # ---------------------------------------------------------------------------
 
-dt_balanced <- merge(dt_balanced, dt_treat, by = "countyfp", all.x = TRUE)
+# NB: drops a handful of tracts with policies but no matching
+# county in the eCFR crosswalk
+dt_balanced <- merge(dt_balanced, dt_treat, by = "countyfp")
 
 # NYC boroughs: consolidated city-county government not in COG crosswalk
 dt_balanced[is.na(wind_zone) & statefp == "36", wind_zone := 1L]
@@ -277,7 +303,7 @@ dt_perm_merge <- merge(
     by = c("countyfp", "year_constr"),
     all.x = TRUE
 )
-dt_perm_merge[n_tracts > 0L, permits_sf_n := permits_sf_n / n_tracts]
+dt_perm_merge[n_tracts > 0L, permits_sf_n := as.numeric(permits_sf_n / n_tracts)]
 dt_perm_merge[, n_tracts := NULL]
 
 dt_balanced <- merge(
@@ -287,33 +313,7 @@ dt_balanced <- merge(
 )
 
 # ---------------------------------------------------------------------------
-# 6. Merge policy counts (annual → period) ----
-# ---------------------------------------------------------------------------
-
-dt_pol[, period_loss := ((year - 1994L) %/% 5L) * 5L + 1994L]
-dt_pol_period <- dt_pol[, .(
-    policies_n                    = sum(policies_n,                    na.rm = TRUE),
-    repl_cost_tot                 = sum(repl_cost_tot,                 na.rm = TRUE),
-    policy_cost_tot               = sum(policy_cost_tot,               na.rm = TRUE),
-    building_policy_covg_tot      = sum(building_policy_covg_tot,      na.rm = TRUE),
-    contents_policy_covg_tot      = sum(contents_policy_covg_tot,      na.rm = TRUE),
-    elevated_policy_n             = sum(elevated_policy_n,             na.rm = TRUE),
-    primary_res_policy_n          = sum(primary_res_policy_n,          na.rm = TRUE),
-    mandatory_purchase_policy_n   = sum(mandatory_purchase_policy_n,   na.rm = TRUE),
-    sfha_policy_n                 = sum(sfha_policy_n,                 na.rm = TRUE)
-), by = .(tractfp, period_loss, mh, year_constr)]
-
-dt_balanced <- merge(
-    dt_balanced, dt_pol_period,
-    by    = c("tractfp", "period_loss", "mh", "year_constr"),
-    all.x = TRUE
-)
-
-# impute zero policies for cells in periods covered by policy data (>= 2009)
-dt_balanced[is.na(policies_n) & period_loss >= 2009L, policies_n := 0L]
-
-# ---------------------------------------------------------------------------
-# 7. Derived outcomes ----
+# 6. Derived outcomes ----
 # ---------------------------------------------------------------------------
 
 # impute zero for missing claim outcomes
@@ -346,15 +346,12 @@ dt_balanced[, (v_shares) := lapply(
 # per-policy averages
 v_pol_avg <- gsub("_tot$", "_ppol", v_pol_tot)
 dt_balanced[, (v_pol_avg) := lapply(
-    .SD, function(x) fifelse(
-        !is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
+    .SD, function(x) fifelse(policies_n > 0L, x / policies_n, NA_real_)),
     .SDcols = v_pol_tot]
 
 v_pol_ln <- gsub("_tot$", "_ln", v_pol_tot)
 dt_balanced[, (v_pol_ln) := lapply(
-    .SD, function(x) fifelse(
-        !is.na(policies_n) & policies_n > 0L & x > 0,
-        log(x / policies_n), NA_real_)),
+    .SD, function(x) fifelse(policies_n > 0L & x > 0, log(x / policies_n), NA_real_)),
     .SDcols = v_pol_tot]
 
 # policy composition shares
@@ -366,28 +363,18 @@ v_pol_share_n <- c(
 )
 v_pol_share <- sub("_policy_n$", "_share", v_pol_share_n)
 dt_balanced[, (v_pol_share) := lapply(
-    .SD, function(x) fifelse(
-        !is.na(policies_n) & policies_n > 0L, x / policies_n, NA_real_)),
+    .SD, function(x) fifelse(policies_n > 0L, x / policies_n, NA_real_)),
     .SDcols = v_pol_share_n]
 
 # claim rate: claims per policy in force
-dt_balanced[, claim_rate := fifelse(
-    !is.na(policies_n) & policies_n > 0L,
-    claims_n / policies_n,
-    NA_real_
-)]
-
-message(sprintf(
-    "Policy merge: %.1f%% of panel cells have policy coverage",
-    100 * dt_balanced[!is.na(policies_n), .N] / nrow(dt_balanced)
-))
+dt_balanced[, claim_rate := fifelse(policies_n > 0L, claims_n / policies_n, NA_real_)]
 
 setkey(dt_balanced, tractfp, period_loss, mh, year_constr)
 
 saveRDS(dt_balanced, here("derived", "nfip-balanced.Rds"))
 message(sprintf(
-    "Saved balanced panel: %d rows (%d tract-periods × 2 MH × %d construction years)",
+    "Saved balanced panel: %d rows (%d tract-periods, %d tracts, 2009+)",
     nrow(dt_balanced),
     uniqueN(dt_balanced[, .(tractfp, period_loss)]),
-    length(unique(dt_balanced$year_constr))
+    uniqueN(dt_balanced$tractfp)
 ))

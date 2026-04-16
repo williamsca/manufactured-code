@@ -14,6 +14,11 @@ dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 dt[, mh_lbl     := fifelse(mh == 1, "MH", "Site-built")]
 dt[, period_lbl := fifelse(post1994 == 1, "Post-1994", "Pre-1994")]
 
+# average annual damage
+dt[period_loss > 2009, (sum(building_damage_tot, na.rm = TRUE) +
+      sum(contents_damage_tot, na.rm = TRUE)) /
+    sum(policies_n, na.rm = TRUE), by = .(mh)]
+
 # aggregate to cell-level weighted means ----
 # use claims_n as weight for per-claim averages and policies_n for per-policy averages
 
@@ -62,9 +67,9 @@ v_vars <- c("avg_bldg_damage", "avg_cont_damage", "avg_bldg_coverage",
             "elevated_share", "sfha_share",
             "primary_res_share", "mandatory_purch_share")
 v_labels <- c(
-    "Avg. building damage (\\$)",
-    "Avg. contents damage (\\$)",
-    "Avg. building coverage (\\$)",
+    "Building damage (\\$)",
+    "Contents damage (\\$)",
+    "Building coverage (\\$)",
     "Total claims",
     "Total policies",
     "Elevated building (\\%)",
