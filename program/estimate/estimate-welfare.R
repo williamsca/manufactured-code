@@ -1,19 +1,19 @@
 # Back-of-envelope cost-benefit calculation for the 1994 HUD wind standard
 #
-# Three scenarios for the flood-damage benefit:
-#   (A) Insured MH only: uses NFIP claim rate directly (upper bound on risk)
-#   (B) All MH (unconditional): scales claim rate by NFIP take-up share,
-#       applying insured damage rates to the full stock (lower bound)
-#   (C) Sensitivity grid: varies discount rate, home lifespan, and
-#       per-claim damage reduction
+# Uses county × vintage data from databuild-welfare.R, with vintage bins
+# matching Census 2000 HCT006 (1980-1989, 1990-1994, 1995-1998, 1999-2000).
+# 1990-1994 treated as pre-treatment throughout (conservative).
 #
-# Main inputs:
-#   derived/welfare-county.Rds
-#   Point estimates from estimate-nfip.R:
-#     delta_building: treatment effect on building damage per claim ($000 real 2000)
-#     delta_contents: treatment effect on contents damage per claim ($000 real 2000)
+# Outputs four calculations:
+#   1. Per-unit NPV for the purchaser of a post-1994 MH (private cost-benefit)
+#   2. Total NFIP fiscal savings from post-1994 MH (insured claims in sample)
+#   3. Total NFIP fiscal savings scaled to Census stock (all post-1994 MH)
+#   4. Sensitivity grid over discount rate, lifespan, claim rate assumption
 #
-# Output: printed tables; no file saved (results go directly into paper)
+# Main input:   derived/welfare-county-vintage.Rds
+# Point estimates from estimate-nfip.R (Table claims-outcomes):
+#   delta_building: building damage reduction per claim ($000 real 2000)
+#   delta_contents: contents damage reduction per claim ($000 real 2000)
 
 rm(list = ls())
 library(here)
@@ -25,155 +25,227 @@ source(here("program", "import", "project-params.R"))
 # Parameters ----
 # ---------------------------------------------------------------------------
 
-# Per-claim damage reductions from main estimates (Table claims-outcomes)
-# Use range to bracket uncertainty
-DELTA_BUILDING_LO <- 4.0   # $000 real 2000
-DELTA_BUILDING_HI <- 7.0
+# Per-claim damage reductions from main regression (Table claims-outcomes)
+DELTA_BUILDING_LO <- 5.0   # $000 real 2000
+DELTA_BUILDING_HI <- 6.0
 DELTA_CONTENTS_LO <- 1.0
-DELTA_CONTENTS_HI <- 2.0
+DELTA_CONTENTS_HI <- 1.0
 
 # Compliance cost from MHS price event study
-COST_LO <- 4.0             # $000 real 2000
+COST_LO <- 5.0             # $000 real 2000
 COST_HI <- 5.0
 
 # Discount rates and home lifespan for NPV calculation
 DISCOUNT_RATES <- c(0, 0.03, 0.07)
-LIFESPANS      <- c(20, 30, 40)      # years
+LIFESPANS      <- c(20, 30, 40)
+
+# Census 2000 is used as MH stock denominator for unconditional rates.
+# Policy panel spans roughly 1994-2014 (20 years) for pre-1994 vintages,
+# shorter for post-1994 vintages as construction ramps up post-reform.
+YEARS_COVERED <- 20L
 
 # ---------------------------------------------------------------------------
-# 1. Load data ----
+# 1. Load and aggregate to national vintage-level totals ----
 # ---------------------------------------------------------------------------
 
-dt <- readRDS(here("derived", "welfare-county.Rds"))
+dt <- readRDS(here("derived", "welfare-county-vintage.Rds"))
 
-# ---------------------------------------------------------------------------
-# 2. Aggregate to national averages ----
-# ---------------------------------------------------------------------------
-
-# Weighted mean claim rate (weight = policy-years) by vintage
-nat_insured <- dt[!is.na(claim_rate_insured) & !is.na(policy_years), .(
+nat <- dt[!is.na(claim_rate_insured) & !is.na(policy_years), .(
     policy_years        = sum(policy_years),
     claims_n            = sum(claims_n),
     building_damage_tot = sum(building_damage_tot),
     contents_damage_tot = sum(contents_damage_tot),
     mh_units_2000       = sum(mh_units_2000, na.rm = TRUE)
-), by = post1994]
+), by = .(vintage_census, post1994)]
 
-nat_insured[, claim_rate_insured := claims_n / policy_years]
-nat_insured[, building_damage_pa := building_damage_tot / policy_years]
-nat_insured[, contents_damage_pa := contents_damage_tot / policy_years]
+nat[, claim_rate_insured := claims_n / policy_years]
+nat[, building_damage_pa := building_damage_tot / policy_years]
+nat[, contents_damage_pa := contents_damage_tot / policy_years]
 
-cat("\n=== Insured MH: national aggregate by vintage ===\n")
-print(nat_insured[, .(
-    post1994, policy_years, claims_n,
-    claim_rate_insured   = round(claim_rate_insured, 4),
-    building_damage_pa   = round(building_damage_pa, 3),
-    contents_damage_pa   = round(contents_damage_pa, 3)
+cat("\n=== National aggregate by vintage ===\n")
+print(nat[order(vintage_census), .(
+    vintage_census,
+    post1994,
+    policy_years        = round(policy_years),
+    claims_n,
+    mh_units_2000,
+    claim_rate_insured  = round(claim_rate_insured,  4),
+    building_damage_pa  = round(building_damage_pa,  3),
+    contents_damage_pa  = round(contents_damage_pa,  3)
 )])
 
 # ---------------------------------------------------------------------------
-# 3. Estimate NFIP take-up share to recover unconditional claim rate ----
-#
-#   take_up = policy_years / (mh_units_2000 × years_covered)
-#   years_covered: 1994-2014 (20 years of policy data in sample)
-#   This overstates take-up if the Census 2000 stock does not match the
-#   stock in the NFIP sample years, but serves as a reasonable approximation.
+# 2. NFIP take-up by vintage ----
 # ---------------------------------------------------------------------------
 
-YEARS_COVERED <- 20L   # 1994-2014 (approximate range of policy panel)
-
-nat_insured[, mh_stock_years := mh_units_2000 * YEARS_COVERED]
-nat_insured[, take_up := fifelse(
+nat[, mh_stock_years := mh_units_2000 * YEARS_COVERED]
+nat[, take_up := fifelse(
     mh_stock_years > 0,
     policy_years / mh_stock_years,
     NA_real_
 )]
 
-cat("\n=== Estimated NFIP take-up by vintage ===\n")
-print(nat_insured[, .(
-    post1994,
+cat("\n=== NFIP take-up by vintage ===\n")
+print(nat[order(vintage_census), .(
+    vintage_census, post1994,
     mh_units_2000,
-    policy_years,
-    take_up = round(take_up, 3)
+    policy_years = round(policy_years),
+    take_up      = round(take_up, 3)
 )])
 
-# unconditional claim rate: multiply insured rate by take-up
-nat_insured[, claim_rate_unconditional := claim_rate_insured * take_up]
+# ---------------------------------------------------------------------------
+# 3. Counterfactual claim rate for NPV calculation ----
+#
+#   Use the pre-1994 pooled insured claim rate (1980-1989 + 1990-1994) as the
+#   counterfactual risk faced by a post-1994 MH absent the HUD standard.
+#   This is conservative: older vintages may face somewhat higher hazard due
+#   to siting in lower-lying areas. We also report 1990-1994 alone as an
+#   alternative counterfactual (more similar construction vintage).
+# ---------------------------------------------------------------------------
+
+rate_pre_pooled <- nat[post1994 == FALSE, sum(claims_n) / sum(policy_years)]
+rate_pre_9094   <- nat[vintage_census == "1990_1994", claim_rate_insured]
+
+cat(sprintf(
+    "\nCounterfactual claim rates (per policy-year):\n"
+))
+cat(sprintf("  Pre-1994 pooled: %.4f\n", rate_pre_pooled))
+cat(sprintf("  1990-1994 only:  %.4f\n", rate_pre_9094))
 
 # ---------------------------------------------------------------------------
-# 4. NPV calculation for a range of parameters ----
+# 4. Per-unit NPV for a post-1994 MH purchaser ----
 # ---------------------------------------------------------------------------
 
-npv_annuity <- function(annual_benefit, r, T) {
-    if (r == 0) return(annual_benefit * T)
-    annual_benefit * (1 - (1 + r)^(-T)) / r
+npv_annuity <- function(annual_benefit, r, lifespan) {
+    if (r == 0) return(annual_benefit * lifespan)
+    annual_benefit * (1 - (1 + r)^(-lifespan)) / r
 }
 
 scenarios <- CJ(
-    claim_rate_type   = c("insured", "unconditional"),
-    delta_type        = c("low", "high"),
-    discount_rate     = DISCOUNT_RATES,
-    lifespan          = LIFESPANS
+    counterfactual = c("pooled_pre", "vintage_9094"),
+    delta_type     = c("low", "high"),
+    discount_rate  = DISCOUNT_RATES,
+    lifespan       = LIFESPANS
 )
 
-# fill in claim rate and damage reduction
-pre_rate_insured       <- nat_insured[post1994 == 0L, claim_rate_insured]
-pre_rate_unconditional <- nat_insured[post1994 == 0L, claim_rate_unconditional]
-
 scenarios[, claim_rate := fcase(
-    claim_rate_type == "insured",       pre_rate_insured,
-    claim_rate_type == "unconditional", pre_rate_unconditional
+    counterfactual == "pooled_pre",   rate_pre_pooled,
+    counterfactual == "vintage_9094", rate_pre_9094
 )]
-
 scenarios[, delta_total := fcase(
     delta_type == "low",  DELTA_BUILDING_LO + DELTA_CONTENTS_LO,
     delta_type == "high", DELTA_BUILDING_HI + DELTA_CONTENTS_HI
 )]
-
-# annual expected benefit = claim_rate × per-claim damage reduction
 scenarios[, annual_benefit := claim_rate * delta_total]
+scenarios[, npv_benefit := mapply(npv_annuity, annual_benefit,
+                                  discount_rate, lifespan)]
+scenarios[, bcr_lo := npv_benefit / COST_HI]
+scenarios[, bcr_hi := npv_benefit / COST_LO]
 
-# NPV over home lifespan
-scenarios[, npv_benefit := mapply(npv_annuity, annual_benefit, discount_rate, lifespan)]
-
-# ratio to compliance cost
-scenarios[, bcr_lo := npv_benefit / COST_HI]   # conservative: low benefit / high cost
-scenarios[, bcr_hi := npv_benefit / COST_LO]   # optimistic:   high benefit / low cost
-
-cat("\n=== NPV of flood benefits and benefit-cost ratios ===\n")
+cat("\n=== Per-unit NPV and benefit-cost ratio (r=0.03, T=30) ===\n")
 cat(sprintf(
     "Compliance cost: $%.0f-$%.0fk (real 2000)\n",
-    COST_LO * 1000, COST_HI * 1000
+    COST_LO * 1e3, COST_HI * 1e3
 ))
 cat(sprintf(
-    "Per-claim damage reduction: $%.0f-$%.0fk building + $%.0f-$%.0fk contents\n",
-    DELTA_BUILDING_LO * 1000, DELTA_BUILDING_HI * 1000,
-    DELTA_CONTENTS_LO * 1000, DELTA_CONTENTS_HI * 1000
+    "Per-claim damage reduction: $%.0f-$%.0fk building,",
+    DELTA_BUILDING_LO * 1e3, DELTA_BUILDING_HI * 1e3
 ))
-
-print(scenarios[discount_rate == 0.03 | lifespan == 30, .(
-    claim_rate_type, delta_type, discount_rate, lifespan,
+cat(sprintf(
+    " $%.0f-$%.0fk contents\n",
+    DELTA_CONTENTS_LO * 1e3, DELTA_CONTENTS_HI * 1e3
+))
+print(scenarios[discount_rate == 0.03 & lifespan == 30, .(
+    counterfactual, delta_type,
+    claim_rate     = round(claim_rate,     4),
     annual_benefit = round(annual_benefit, 4),
-    npv_benefit    = round(npv_benefit, 2),
-    bcr_lo         = round(bcr_lo, 2),
-    bcr_hi         = round(bcr_hi, 2)
-)][order(claim_rate_type, delta_type, discount_rate, lifespan)])
+    npv_benefit    = round(npv_benefit,    2),
+    bcr_lo         = round(bcr_lo,         2),
+    bcr_hi         = round(bcr_hi,         2)
+)][order(counterfactual, delta_type)])
+
+cat("\n=== Full sensitivity grid (select rows) ===\n")
+print(scenarios[, .(
+    counterfactual, delta_type, discount_rate, lifespan,
+    npv_benefit = round(npv_benefit, 2),
+    bcr_lo      = round(bcr_lo,      2),
+    bcr_hi      = round(bcr_hi,      2)
+)][order(counterfactual, delta_type, discount_rate, lifespan)])
 
 # ---------------------------------------------------------------------------
-# 5. Aggregate fiscal spillover ----
+# 5. NFIP fiscal savings from post-1994 MH claims in sample ----
 #
-#   Total NFIP savings = delta × claims filed by post-1994 MH over sample
+#   Observed claims × per-claim reduction. Captures only insured MH claims
+#   that actually occurred in the NFIP data; lower bound on NFIP savings.
 # ---------------------------------------------------------------------------
 
-post_claims <- nat_insured[post1994 == 1L, claims_n]
+post_claims_bldg <- nat[post1994 == TRUE, sum(claims_n)]
 
-cat("\n=== Fiscal spillover (total NFIP savings from post-1994 MH claims) ===\n")
+cat("\n=== NFIP fiscal savings: observed claims in sample ===\n")
+cat(sprintf("Post-1994 MH claims in sample: %d\n", post_claims_bldg))
 cat(sprintf(
-    "Post-1994 MH claims in sample: %d\n",
-    post_claims
+    "Building savings:  $%.1fM - $%.1fM\n",
+    post_claims_bldg * DELTA_BUILDING_LO / 1e3,
+    post_claims_bldg * DELTA_BUILDING_HI / 1e3
 ))
 cat(sprintf(
-    "Estimated total NFIP savings: $%.1fM - $%.1fM\n",
-    post_claims * (DELTA_BUILDING_LO + DELTA_CONTENTS_LO) / 1000,
-    post_claims * (DELTA_BUILDING_HI + DELTA_CONTENTS_HI) / 1000
+    "Contents savings:  $%.1fM - $%.1fM\n",
+    post_claims_bldg * DELTA_CONTENTS_LO / 1e3,
+    post_claims_bldg * DELTA_CONTENTS_HI / 1e3
 ))
+cat(sprintf(
+    "Total NFIP savings: $%.1fM - $%.1fM\n",
+    post_claims_bldg * (DELTA_BUILDING_LO + DELTA_CONTENTS_LO) / 1e3,
+    post_claims_bldg * (DELTA_BUILDING_HI + DELTA_CONTENTS_HI) / 1e3
+))
+
+# ---------------------------------------------------------------------------
+# 6. Total NFIP fiscal savings scaled to Census stock ----
+#
+#   Uses the Census 2000 count of post-1994 MH as the stock denominator and
+#   the pre-1994 insured claim rate as counterfactual frequency. This assumes
+#   post-1994 MH face the same underlying flood hazard as pre-1994 MH -- the
+#   composition checks suggest post-1994 MH are *more* exposed (higher SFHA
+#   share), so this is conservative. Damage reduction per claim is the
+#   regression estimate applied to the pre-1994 claim frequency.
+#
+#   Note: this estimates savings to *all* MH (insured and uninsured), not
+#   only NFIP payments. Uninsured MH owners bear losses privately; FEMA IA
+#   and SBA programs partially cover them. The NFIP-specific share equals
+#   the take-up-weighted portion.
+# ---------------------------------------------------------------------------
+
+mh_stock_post94 <- nat[post1994 == TRUE, sum(mh_units_2000, na.rm = TRUE)]
+take_up_post94  <- nat[post1994 == TRUE,
+    sum(policy_years) / sum(mh_stock_years, na.rm = TRUE)]
+
+expected_claims_per_yr_pooled <- rate_pre_pooled * mh_stock_post94
+expected_claims_per_yr_9094   <- rate_pre_9094   * mh_stock_post94
+
+cat(sprintf("\n=== Total savings scaled to Census post-1994 MH stock ===\n"))
+cat(sprintf("Post-1994 MH stock (Census 2000, occupied): %.0f units\n",
+            mh_stock_post94))
+cat(sprintf("Estimated NFIP take-up (post-1994 vintages): %.1f%%\n",
+            take_up_post94 * 100))
+cat(sprintf(
+    "Expected flood claims/yr (pooled pre rate): %.0f\n",
+    expected_claims_per_yr_pooled
+))
+cat(sprintf(
+    "Expected flood claims/yr (1990-1994 rate):  %.0f\n",
+    expected_claims_per_yr_9094
+))
+
+for (delta in c(
+    DELTA_BUILDING_LO + DELTA_CONTENTS_LO,
+    DELTA_BUILDING_HI + DELTA_CONTENTS_HI
+)) {
+    ann_saving_pooled <- expected_claims_per_yr_pooled * delta
+    ann_saving_9094   <- expected_claims_per_yr_9094   * delta
+    cat(sprintf(
+        "Annual total savings (delta=$%.0fk): pooled=$%.2fM, 1990-94=$%.2fM\n",
+        delta * 1e3,
+        ann_saving_pooled / 1e3,
+        ann_saving_9094   / 1e3
+    ))
+}
