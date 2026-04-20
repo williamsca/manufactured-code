@@ -26,8 +26,8 @@ library(ggplot2)
 args <- commandArgs(trailingOnly = TRUE)
 bin_arg <- args[grepl("^[0-9]+$", args)][1L]
 geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
-BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
-agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
+BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 1L
+agg_geo <- if (!is.na(geo_arg)) geo_arg else "statefp"
 
 source(here("program", "import", "project-params.R"))
 
@@ -78,6 +78,7 @@ v_dict <- c(
     "mh_claim_share" = "MH share of claims",
     "mh_policy_share" = "MH share of policies",
     "geo" = geo_label,
+    "statefp" = "State",
     "countyfp" = "County",
     "tractfp" = "Census tract",
     "period_loss" = "Loss period",
@@ -185,8 +186,10 @@ dt_claims <- dt_claims[
     between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) &
     between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)]
 dt_claims[, geo := get(agg_geo)]
+dt_claims[, statefp := substr(countyfp, 1L, 2L)]
 dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
-dt_claims[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
+dt_claims[, period_constr := bin_constr(
+    year_constr, BIN_CONSTR_YEAR)]
 dt_claims[, post1994      := as.integer(year_constr >= 1994L)]
 
 v_shares <- c("building_damage", "net_building_pmt")
@@ -223,14 +226,22 @@ s_pclaim <- paste0(
     ", ", paste0(v_ppol, collapse = ", "),
     ")")
 
+# Standardized estimation sample for claim-level OLS and Poisson. Net payments
+# can be negative when recoveries exceed gross payouts; Poisson does not admit
+# negative outcomes, so drop these rows so both estimators run on the same set.
+dt_claims_est <- dt_claims[
+    (is.na(net_building_pmt) | net_building_pmt >= 0) &
+    (is.na(net_contents_pmt) | net_contents_pmt >= 0)
+]
+
 # event studies ----
 # claim-level event study
 fmla_claim_es <- as.formula(paste0(
     s_claim, " ~ i(period_constr, mh, ref = ref_period)",
-    " | geo^period_loss + mh"
+    " | statefp^year_loss + mh + period_constr"
 ))
 
-est_claim_es <- feols(fmla_claim_es, data = dt_claims)
+est_claim_es <- feols(fmla_claim_es, data = dt_claims_est)
 etable(est_claim_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_claim_es[lhs = "building_pmt$"])
 
@@ -238,7 +249,8 @@ v_alt <- c(
     "building_damage$", "net_building_pmt$", "building_damage_share",
     "contents_damage$", "net_contents_pmt$")
 
-etable(est_claim_es[lhs = v_alt], fitstat = c("n", "r2", "wr2", "my"))
+etable(
+    est_claim_es[lhs = v_alt], fitstat = c("n", "r2", "wr2", "my"))
 
 etable(
     est_claim_es[lhs = v_alt],
@@ -248,10 +260,15 @@ etable(
     digits = 2, digits.stats = 2, replace = TRUE
 )
 
+# Poisson event study on damages/payments
+est_claim_pois <- fepois(fmla_claim_es, data = dt_claims_est)
+
+etable(est_claim_pois)
+
 # cell-level event study (aggregated to period_constr bins)
 fmla_pclaim_es <- as.formula(paste0(
     s_pclaim, " ~ i(period_constr, mh, ref = ref_period)",
-    " | geo^period_loss + mh")
+    " | geo^period_loss + mh + period_constr")
 )
 
 est_pclaim_es <- feols(
@@ -369,10 +386,10 @@ fmla_rob_d <- building_damage ~
     tractfp^period_loss + mh
 
 est_rob_list <- list(
-    "Baseline"          = feols(fmla_rob_a, data = dt_claims, lean = TRUE),
-    "+ Controls"     = feols(fmla_rob_b, data = dt_claims, lean = TRUE),
-    "+ Tract FE"  = feols(fmla_rob_c, data = dt_claims, lean = TRUE),
-    "+ Controls + Tract FE"    = feols(fmla_rob_d, data = dt_claims, lean = TRUE)
+    "Baseline"          = feols(fmla_rob_a, data = dt_claims_est, lean = TRUE),
+    "+ Controls"     = feols(fmla_rob_b, data = dt_claims_est, lean = TRUE),
+    "+ Tract FE"  = feols(fmla_rob_c, data = dt_claims_est, lean = TRUE),
+    "+ Controls + Tract FE"    = feols(fmla_rob_d, data = dt_claims_est, lean = TRUE)
 )
 
 etable(est_rob_list, tex = TRUE,
@@ -388,7 +405,7 @@ fmla_geo_rob <- building_damage ~
     i(period_constr, mh, ref = ref_period) |
     sw(countyfp^period_loss, tractfp^period_loss) + mh
 
-est_geo_rob <- feols(fmla_geo_rob, data = dt_claims, lean = TRUE)
+est_geo_rob <- feols(fmla_geo_rob, data = dt_claims_est, lean = TRUE)
 
 etable(est_geo_rob)
 
