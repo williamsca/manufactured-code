@@ -413,7 +413,7 @@ etable(est_geo_rob)
 etable(
     est_geo_rob,
     tex = TRUE,
-    file = here("output", "event-study", "countyfp", "geo-robustness.tex"),
+    file = here("output", "event-study", "geo-robustness.tex"),
     fitstat = c("n", "r2", "my"),
     digits = 2, digits.stats = 2, replace = TRUE,
     depvar = FALSE

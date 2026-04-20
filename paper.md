@@ -137,12 +137,13 @@ The composition shifts work against the main result. Relative to pre-1994 manufa
 
 The one composition shift that works in the direction of the main result is the elevated-building share, which rises by 5 percentage points for post-1998 construction vintages. Elevation is plausibly part of the treatment channel---the HUD Code encouraged improved siting and installation practices---rather than a confound. Primary-residence share is essentially unchanged across vintages.
 
-
+<!--
 ## Robustness
 
 The main building damage results rely on county $\times$ loss-period fixed effects to absorb location-specific variation in storm severity. A concern is that within-county variation in flood exposure---for instance, proximity to a floodplain or drainage infrastructure---could differ systematically across construction vintages and housing types. I address this by re-estimating the primary building damage specification with census tract $\times$ loss-period fixed effects, which absorb finer-grained geographic heterogeneity.
 
 Table \ref{tab:geo-robustness} compares the two specifications. The tract-level estimates are very similar in magnitude to the county-level baseline, with modestly wider confidence intervals reflecting the smaller sample sizes within tracts. The agreement across geographic controls supports the identifying assumption that vintage effects are not confounded by within-county variation in flood exposure.
+-->
 
 # Discussion
 
@@ -217,7 +218,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Standards on Net Building Payment per Claim}\label{fig:es-building-damage}
-  \includegraphics[width=\textwidth]{output/event-study/countyfp/es-building-damage.pdf}
+  \includegraphics[width=\textwidth]{output/event-study/statefp/es-building-damage.pdf}
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-benefit}. Nominal values are deflated to 2000 dollars. Source: OpenFEMA claims data.
@@ -230,7 +231,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Supplementary Claims Outcomes}\label{tab:claims-outcomes}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/claims-outcomes.tex}
+    \input{output/event-study/statefp/claims-outcomes.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data. All damage and payment values are reported in thousands of 2000 dollars. \emph{Bldg.\ dmg.\ share} reports damage as a percentage of the assessed building value. Source: OpenFEMA claims data.
     \end{tablenotes}
@@ -243,7 +244,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Policy Composition}\label{tab:composition}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/policy-composition.tex}
+    \input{output/event-study/statefp/policy-composition.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on the cell-level panel, with observations weighted by number of policies. \emph{Repl. cost}, \emph{Bldg covg.}, and \emph{Contents covg.} refer to the estimated replacement cost, building coverage amount, and contents coverage amount, respectively, and are reported in thousands of 2000 dollars. All other outcomes are fractions. \emph{Elevated} indicates that the building satisfies the NFIP definition of an elevated building; \emph{SFHA} indicates that the property is located in a Special Flood Hazard Area; \emph{Primary res.} indicates that the home is a primary residence; and \emph{Mandatory} indicates that flood insurance was required by the mortgage lender.  Source: OpenFEMA policy data.
     \end{tablenotes}
@@ -251,18 +252,20 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \end{table}
 \end{landscape}
 
+<!--
 \begin{landscape}
 \begin{table}[htbp]
   \centering
   \caption{Building Damage - Robustness}\label{tab:geo-robustness}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/geo-robustness.tex}
+    \input{output/event-study/geo-robustness.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data. Column (1) uses county $\times$ loss-period fixed effects (baseline). Column (2) replaces county with census tract $\times$ loss-period fixed effects. Building damage values are in thousands of 2000 dollars. Source: OpenFEMA claims data.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
 \end{landscape}
+-->
 
 \clearpage
 
@@ -278,7 +281,7 @@ Table \ref{tab:take-up} reports estimates from a PPML model of total policy coun
   \centering
   \caption{NFIP Take-Up}\label{tab:take-up}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/take-up.tex}
+    \input{output/event-study/statefp/take-up.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on the cell-level panel. Column (1) estimates a PPML model with total policies as the outcome. Source: OpenFEMA policy data.
     \end{tablenotes}
