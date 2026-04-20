@@ -75,7 +75,7 @@ WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
     AND TRY_CAST(LEFT(censusTract, 2) AS INT) <= 56
 "
 
-dt_claims <- as.data.table(dbGetQuery(con, sprintf(sql_claims, MIN_LOSS_YEAR, MAX_LOSS_YEAR)))
+dt_claims <- as.data.table(dbGetQuery(con, sprintf(sql_claims, MIN_YEAR_LOSS, MAX_YEAR_LOSS)))
 
 dt_claims <- merge(
     dt_claims,
@@ -174,7 +174,7 @@ FROM filtered p
 JOIN generate_series(%d, %d) AS s(year)
     ON p.year_eff <= s.year AND p.year_term >= s.year
 GROUP BY p.tractfp, s.year, p.mh, p.year_constr
-", year_min, year_max, MIN_LOSS_YEAR, MAX_LOSS_YEAR)
+", year_min, year_max, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
 
 dt_pol <- as.data.table(dbGetQuery(con, sql_policies))
 

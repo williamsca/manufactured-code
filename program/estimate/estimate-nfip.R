@@ -29,8 +29,7 @@ geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
 BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
 agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
-MIN_YEAR <- 1986L
-MAX_YEAR <- 1999L
+source(here("program", "import", "project-params.R"))
 
 if (!agg_geo %in% c("countyfp", "tractfp")) {
     stop("agg_geo must be one of 'countyfp' or 'tractfp'.")
@@ -66,6 +65,9 @@ v_dict <- c(
     "contents_policy_covg_ppol" = "Contents covg.",
     "elevated_share" = "Elevated",
     "sfha_share" = "SFHA",
+    "water_depth" = "Water depth (ft)",
+    "elevated" = "Elevated",
+    "sfha" = "SFHA",
     "primary_res_share" = "Primary res.",
     "mandatory_purchase_share" = "Mandatory",
     "policies_ppermit" = "Policies per SF permit",
@@ -92,7 +94,7 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- balanced panel ---
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
-dt <- dt[between(year_constr, MIN_YEAR, MAX_YEAR)]
+dt <- dt[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 dt[, geo := get(agg_geo)]
 dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
@@ -180,7 +182,8 @@ dt_pois[, policies_ppermit := fifelse(
 # --- claim-level data ---
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- dt_claims[
-    between(year_constr, MIN_YEAR, MAX_YEAR) & year_loss >= 1994]
+    between(year_constr, MIN_YEAR, MAX_YEAR) &
+    between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)]
 dt_claims[, geo := get(agg_geo)]
 dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 dt_claims[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
@@ -352,27 +355,30 @@ fmla_rob_a <- building_damage ~
     geo^period_loss + mh
 
 fmla_rob_b <- building_damage ~
-    i(period_constr, mh, ref = ref_period) + water_depth |
+    i(period_constr, mh, ref = ref_period) +
+    water_depth + elevated + sfha + water_depth |
     geo^period_loss + mh
 
 fmla_rob_c <- building_damage ~
-    i(period_constr, mh, ref = ref_period) +
-    water_depth + elevated + sfha |
-    geo^period_loss + mh
+    i(period_constr, mh, ref = ref_period) |
+    tractfp^period_loss + mh
 
 fmla_rob_d <- building_damage ~
     i(period_constr, mh, ref = ref_period) +
-    water_depth + elevated + sfha + primary_res |
-    geo^period_loss + mh + occupancy_type
+    water_depth + elevated + sfha  |
+    tractfp^period_loss + mh
 
 est_rob_list <- list(
     "Baseline"          = feols(fmla_rob_a, data = dt_claims, lean = TRUE),
-    "+ Water depth"     = feols(fmla_rob_b, data = dt_claims, lean = TRUE),
-    "+ Flood controls"  = feols(fmla_rob_c, data = dt_claims, lean = TRUE),
-    "+ Demographics"    = feols(fmla_rob_d, data = dt_claims, lean = TRUE)
+    "+ Controls"     = feols(fmla_rob_b, data = dt_claims, lean = TRUE),
+    "+ Tract FE"  = feols(fmla_rob_c, data = dt_claims, lean = TRUE),
+    "+ Controls + Tract FE"    = feols(fmla_rob_d, data = dt_claims, lean = TRUE)
 )
 
-etable(est_rob_list)
+etable(est_rob_list, tex = TRUE,
+    file = here("output", "event-study", agg_geo, "robustness.tex"),
+    fitstat = c("n", "r2"), digits = 2, digits.stats = 2, replace = TRUE,
+    depvar = FALSE)
 
 # geographic robustness: county vs. tract FEs ----
 # Compare baseline county-level controls with census-tract-level controls.

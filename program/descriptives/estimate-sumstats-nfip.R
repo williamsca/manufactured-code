@@ -1,96 +1,90 @@
-# Summary statistics: NFIP outcomes by pre/post-1994 × MH
+# Summary statistics: NFIP outcomes by MH vs site-built
 #
-# Inputs:  derived/nfip-balanced.Rds
-# Outputs: tables/sumstats-nfip.tex
+# Inputs:  derived/nfip-balanced.Rds  (2009-2023, policy outcomes)
+#          derived/nfip-claims.Rds    (1994-2023, claim outcomes)
+# Output:  output/descriptives/sumstats-nfip.tex
 
 rm(list = ls())
 library(here)
 library(data.table)
 library(kableExtra)
 
-# import ----
+source(here("program", "import", "project-params.R"))
+
+# ── Panel A: balanced panel (2009–2023) ──────────────────────────────────────
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 
-dt[, mh_lbl     := fifelse(mh == 1, "MH", "Site-built")]
-dt[, period_lbl := fifelse(post1994 == 1, "Post-1994", "Pre-1994")]
+dt[, mh_lbl := fifelse(mh == 1, "MH", "Site-built")]
 
-# average annual damage
-dt[period_loss > 2009, (sum(building_damage_tot, na.rm = TRUE) +
-      sum(contents_damage_tot, na.rm = TRUE)) /
-    sum(policies_n, na.rm = TRUE), by = .(mh)]
+pol_stats <- dt[, .(
+    total_policies        = sum(policies_n, na.rm = TRUE),
+    claim_rate            = weighted.mean(claim_rate,
+                                          policies_n, na.rm = TRUE),
+    elevated_share        = weighted.mean(elevated_share,
+                                          policies_n, na.rm = TRUE),
+    sfha_share            = weighted.mean(sfha_share,
+                                          policies_n, na.rm = TRUE),
+    primary_res_share     = weighted.mean(primary_res_share,
+                                          policies_n, na.rm = TRUE),
+    mandatory_purch_share = weighted.mean(mandatory_purchase_share,
+                                          policies_n, na.rm = TRUE)
+), by = .(mh_lbl)]
 
-# aggregate to cell-level weighted means ----
-# use claims_n as weight for per-claim averages and policies_n for per-policy averages
+# ── Panel B: claims data (1994–2023) ─────────────────────────────────────────
+dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
+dt_claims <- dt_claims[
+    between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) &
+        between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
+]
 
-summarize_cell <- function(d) {
-    list(
-        avg_bldg_damage      = weighted.mean(d$building_damage_pclaim, d$claims_n,
-                                              na.rm = TRUE),
-        avg_cont_damage      = weighted.mean(d$contents_damage_pclaim, d$claims_n,
-                                              na.rm = TRUE),
-        avg_bldg_coverage    = weighted.mean(d$building_policy_covg_ppol, d$policies_n,
-                                              na.rm = TRUE),
-        total_claims         = sum(d$claims_n,   na.rm = TRUE),
-        total_policies       = sum(d$policies_n, na.rm = TRUE),
-        elevated_share       = weighted.mean(d$elevated_share,           d$policies_n,
-                                              na.rm = TRUE),
-        sfha_share           = weighted.mean(d$sfha_share,               d$policies_n,
-                                              na.rm = TRUE),
-        primary_res_share    = weighted.mean(d$primary_res_share,        d$policies_n,
-                                              na.rm = TRUE),
-        mandatory_purch_share = weighted.mean(d$mandatory_purchase_share, d$policies_n,
-                                              na.rm = TRUE)
-    )
-}
+dt_claims[, mh_lbl := fifelse(mh == 1, "MH", "Site-built")]
 
-groups <- dt[, summarize_cell(.SD),
-             by = .(period_lbl, mh_lbl),
-             .SDcols = c("building_damage_pclaim", "contents_damage_pclaim",
-                         "building_policy_covg_ppol", "claims_n", "policies_n",
-                         "elevated_share", "sfha_share",
-                         "primary_res_share", "mandatory_purchase_share")]
+claim_stats <- dt_claims[, .(
+    total_claims     = .N,
+    avg_bldg_damage  = mean(building_damage,  na.rm = TRUE),
+    avg_cont_damage  = mean(contents_damage,  na.rm = TRUE)
+), by = .(mh_lbl)]
 
-# reshape: one row per variable, one column per group ----
-groups[, group := paste(period_lbl, mh_lbl, sep = " / ")]
+# ── Reshape to wide (variable × housing type) ────────────────────────────────
+col_order <- c("MH", "Site-built")
 
-# ordered column sequence
-col_order <- c(
-    "Pre-1994 / MH", "Pre-1994 / Site-built",
-    "Post-1994 / MH", "Post-1994 / Site-built"
-)
+# Panel A wide
+pol_long  <- melt(pol_stats,  id.vars = "mh_lbl")
+pol_wide  <- dcast(pol_long,  variable ~ mh_lbl, value.var = "value")
 
-groups[, group := factor(group, levels = col_order)]
-setorder(groups, group)
+# Panel B wide
+claim_long <- melt(claim_stats, id.vars = "mh_lbl")
+claim_wide <- dcast(claim_long, variable ~ mh_lbl, value.var = "value")
 
-v_vars <- c("avg_bldg_damage", "avg_cont_damage", "avg_bldg_coverage",
-            "total_claims", "total_policies",
-            "elevated_share", "sfha_share",
-            "primary_res_share", "mandatory_purch_share")
-v_labels <- c(
-    "Building damage (\\$)",
-    "Contents damage (\\$)",
-    "Building coverage (\\$)",
-    "Total claims",
+# ── Variable ordering and labels ─────────────────────────────────────────────
+v_pol_vars <- c("total_policies", "claim_rate",
+                "elevated_share", "sfha_share",
+                "primary_res_share", "mandatory_purch_share")
+v_pol_labels <- c(
     "Total policies",
+    "Claim rate",
     "Elevated building (\\%)",
     "SFHA (\\%)",
     "Primary residence (\\%)",
     "Mandatory purchase (\\%)"
 )
 
-# wide format: variables in rows, groups in columns
-dt_wide <- dcast(
-    melt(groups, id.vars = "group", measure.vars = v_vars),
-    variable ~ group,
-    value.var = "value"
+v_claim_vars <- c("total_claims", "avg_bldg_damage", "avg_cont_damage")
+v_claim_labels <- c(
+    "Total claims",
+    "Building damage (\\$)",
+    "Contents damage (\\$)"
 )
-dt_wide[, variable := factor(variable, levels = v_vars)]
-setorder(dt_wide, variable)
 
-# format numbers
-fmt_row <- function(x, var) {
-    if (var %in% c("avg_bldg_damage", "avg_cont_damage", "avg_bldg_coverage")) {
-        formatC(x, format = "f", digits = 0, big.mark = ",")
+pol_wide[,   variable := factor(variable, levels = v_pol_vars)]
+claim_wide[, variable := factor(variable, levels = v_claim_vars)]
+setorder(pol_wide,   variable)
+setorder(claim_wide, variable)
+
+# ── Format numbers ────────────────────────────────────────────────────────────
+fmt_pol <- function(x, var) {
+    if (var %in% c("claim_rate")) {
+        formatC(x, format = "f", digits = 3)
     } else if (var %in% c("elevated_share", "sfha_share",
                            "primary_res_share", "mandatory_purch_share")) {
         formatC(x * 100, format = "f", digits = 1)
@@ -99,44 +93,48 @@ fmt_row <- function(x, var) {
     }
 }
 
-dt_fmt <- copy(dt_wide)
-cols_to_fmt <- setdiff(names(dt_fmt), "variable")
-
-# convert to character first so row-by-row assignment doesn't coerce to NA
-dt_fmt[, (cols_to_fmt) := lapply(.SD, as.character), .SDcols = cols_to_fmt]
-
-for (j in seq_along(v_vars)) {
-    var <- v_vars[j]
-    dt_fmt[variable == var,
-           (cols_to_fmt) := lapply(.SD, function(x) fmt_row(as.numeric(x), var = var)),
-           .SDcols = cols_to_fmt]
+fmt_claim <- function(x, var) {
+    if (var %in% c("avg_bldg_damage", "avg_cont_damage")) {
+        formatC(x, format = "f", digits = 0, big.mark = ",")
+    } else {
+        formatC(x, format = "f", digits = 0, big.mark = ",")
+    }
 }
 
-dt_fmt[, variable := v_labels]
-setnames(dt_fmt, "variable", "Variable")
+format_panel <- function(dt_wide, v_vars, v_labels, fmt_fn) {
+    dt_fmt <- copy(dt_wide)
+    cols   <- col_order
+    dt_fmt[, (cols) := lapply(.SD, as.character), .SDcols = cols]
+    for (j in seq_along(v_vars)) {
+        var <- v_vars[j]
+        dt_fmt[variable == var,
+               (cols) := lapply(.SD,
+                   function(x) fmt_fn(as.numeric(x), var = var)),
+               .SDcols = cols]
+    }
+    dt_fmt[, variable := v_labels]
+    setnames(dt_fmt, "variable", "Variable")
+    setcolorder(dt_fmt, c("Variable", col_order))
+    dt_fmt
+}
 
-# ensure column order matches col_order
-setcolorder(dt_fmt, c("Variable", col_order))
+pol_fmt   <- format_panel(pol_wide,   v_pol_vars,   v_pol_labels,   fmt_pol)
+claim_fmt <- format_panel(claim_wide, v_claim_vars, v_claim_labels, fmt_claim)
 
-# build kable ----
+dt_all <- rbind(pol_fmt, claim_fmt)
+
+# ── Build kable ───────────────────────────────────────────────────────────────
 kbl(
-    dt_fmt,
-    format    = "latex",
-    booktabs  = TRUE,
-    escape    = FALSE,
-    col.names = c("Variable", rep("", 4)),
-    align = c("l", rep("r", 4))
+    dt_all,
+    format   = "latex",
+    booktabs = TRUE,
+    escape   = FALSE,
+    col.names = c("Variable", "MH", "Site-built"),
+    align    = c("l", "r", "r")
 ) |>
-add_header_above(c(
-    " "           = 1,
-    "MH"          = 1,
-    "Site-built"  = 1,
-    "MH"          = 1,
-    "Site-built"  = 1
-)) |>
-add_header_above(c(
-    " "         = 1,
-    "Pre-1994"  = 2,
-    "Post-1994" = 2
-)) |>
-(\(x) writeLines(as.character(x), here("output", "descriptives", "sumstats-nfip.tex")))()
+pack_rows("Policy outcomes (2009--2023)", 1, nrow(pol_fmt)) |>
+pack_rows("Claim outcomes (1994--2023)",  nrow(pol_fmt) + 1, nrow(dt_all)) |>
+(\(x) writeLines(
+    as.character(x),
+    here("output", "descriptives", "sumstats-nfip.tex")
+))()
