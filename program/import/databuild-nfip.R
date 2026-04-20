@@ -117,11 +117,12 @@ saveRDS(dt_claims, here("derived", "nfip-claims.Rds"))
 message(sprintf("Saved %d claims to derived/nfip-claims.Rds", nrow(dt_claims)))
 
 # ---------------------------------------------------------------------------
-# 2. Policies: expand to calendar years via DuckDB range join ----
+# 2. Policies: assign each policy to a single calendar year by midpoint ----
 #
-#   A policy covers calendar year Y if year_eff <= Y <= year_term.
-#   DuckDB's range join handles this efficiently without a Cartesian
-#   intermediate in R.
+#   Approximation: most NFIP policies are 365 days, so the midpoint year
+#   captures ~all of the exposure. Avoids the double-counting that a
+#   range-join of year_eff..year_term produces when a policy spans two
+#   calendar years.
 # ---------------------------------------------------------------------------
 
 sql_policies <- sprintf("
@@ -130,8 +131,8 @@ WITH filtered AS (
         censusTract                                                       AS tractfp,
         YEAR(originalConstructionDate)                                    AS year_constr,
         CASE WHEN numberOfFloorsInInsuredBuilding = 5 THEN 1 ELSE 0 END  AS mh,
-        YEAR(policyEffectiveDate)                                         AS year_eff,
-        YEAR(policyTerminationDate)                                       AS year_term,
+        YEAR(policyEffectiveDate
+             + (policyTerminationDate - policyEffectiveDate) / 2)         AS year,
         CAST(buildingReplacementCost AS DOUBLE)                           AS repl_cost,
         CAST(policyCost              AS DOUBLE)                           AS policy_cost,
         CAST(totalBuildingInsuranceCoverage AS DOUBLE)                    AS building_policy_covg,
@@ -157,23 +158,22 @@ WITH filtered AS (
         AND YEAR(originalConstructionDate) BETWEEN %d AND %d
 )
 SELECT
-    p.tractfp,
-    s.year,
-    p.mh,
-    p.year_constr,
+    tractfp,
+    year,
+    mh,
+    year_constr,
     COUNT(*)                              AS policies_n,
-    SUM(p.repl_cost)                      AS repl_cost_tot,
-    SUM(p.policy_cost)                    AS policy_cost_tot,
-    SUM(p.building_policy_covg)           AS building_policy_covg_tot,
-    SUM(p.contents_policy_covg)           AS contents_policy_covg_tot,
-    SUM(p.elevated_policy)                AS elevated_policy_n,
-    SUM(p.primary_res_policy)             AS primary_res_policy_n,
-    SUM(p.mandatory_purchase_policy)      AS mandatory_purchase_policy_n,
-    SUM(p.sfha_policy)                    AS sfha_policy_n
-FROM filtered p
-JOIN generate_series(%d, %d) AS s(year)
-    ON p.year_eff <= s.year AND p.year_term >= s.year
-GROUP BY p.tractfp, s.year, p.mh, p.year_constr
+    SUM(repl_cost)                        AS repl_cost_tot,
+    SUM(policy_cost)                      AS policy_cost_tot,
+    SUM(building_policy_covg)             AS building_policy_covg_tot,
+    SUM(contents_policy_covg)             AS contents_policy_covg_tot,
+    SUM(elevated_policy)                  AS elevated_policy_n,
+    SUM(primary_res_policy)               AS primary_res_policy_n,
+    SUM(mandatory_purchase_policy)        AS mandatory_purchase_policy_n,
+    SUM(sfha_policy)                      AS sfha_policy_n
+FROM filtered
+WHERE year BETWEEN %d AND %d
+GROUP BY tractfp, year, mh, year_constr
 ", year_min, year_max, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
 
 dt_pol <- as.data.table(dbGetQuery(con, sql_policies))

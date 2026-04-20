@@ -182,7 +182,7 @@ dt_pois[, policies_ppermit := fifelse(
 # --- claim-level data ---
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- dt_claims[
-    between(year_constr, MIN_YEAR, MAX_YEAR) &
+    between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) &
     between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)]
 dt_claims[, geo := get(agg_geo)]
 dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]

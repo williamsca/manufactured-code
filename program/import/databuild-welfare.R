@@ -62,7 +62,7 @@ dt_welfare <- dt_bal[, .(
     claims_n            = sum(claims_n,            na.rm = TRUE),
     building_damage_tot = sum(building_damage_tot, na.rm = TRUE),
     contents_damage_tot = sum(contents_damage_tot, na.rm = TRUE),
-    policy_years        = sum(policies_n / 5,      na.rm = TRUE)
+    policy_years        = sum(policies_n / 51,      na.rm = TRUE)
 ), by = .(countyfp, vintage_census)]
 
 dt_welfare[, post1994 := vintage_census %in% c("1995_1998", "1999_2000")]

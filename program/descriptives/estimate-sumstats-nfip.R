@@ -17,9 +17,8 @@ dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 dt[, mh_lbl := fifelse(mh == 1, "MH", "Site-built")]
 
 pol_stats <- dt[, .(
-    total_policies        = sum(policies_n, na.rm = TRUE),
-    claim_rate            = weighted.mean(claim_rate,
-                                          policies_n, na.rm = TRUE),
+    policies_tot        = sum(policies_n, na.rm = TRUE),
+    claims_tot            = sum(claims_n, na.rm = TRUE),
     elevated_share        = weighted.mean(elevated_share,
                                           policies_n, na.rm = TRUE),
     sfha_share            = weighted.mean(sfha_share,
@@ -29,6 +28,7 @@ pol_stats <- dt[, .(
     mandatory_purch_share = weighted.mean(mandatory_purchase_share,
                                           policies_n, na.rm = TRUE)
 ), by = .(mh_lbl)]
+pol_stats[, claim_rate := claims_tot / policies_tot]
 
 # ── Panel B: claims data (1994–2023) ─────────────────────────────────────────
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
