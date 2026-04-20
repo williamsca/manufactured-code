@@ -31,10 +31,11 @@ agg_geo <- if (!is.na(geo_arg)) geo_arg else "statefp"
 
 source(here("program", "import", "project-params.R"))
 
-if (!agg_geo %in% c("countyfp", "tractfp")) {
-    stop("agg_geo must be one of 'countyfp' or 'tractfp'.")
+if (!agg_geo %in% c("countyfp", "tractfp", "statefp")) {
+    stop("agg_geo must be one of 'countyfp', 'tractfp', or 'statefp'.")
 }
 geo_label <- c(
+    "statefp" = "State",
     "countyfp" = "County",
     "tractfp" = "Census tract"
 )[[agg_geo]]
@@ -185,8 +186,8 @@ dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- dt_claims[
     between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) &
     between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)]
-dt_claims[, geo := get(agg_geo)]
 dt_claims[, statefp := substr(countyfp, 1L, 2L)]
+dt_claims[, geo := get(agg_geo)]
 dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 dt_claims[, period_constr := bin_constr(
     year_constr, BIN_CONSTR_YEAR)]
