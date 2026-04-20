@@ -16,7 +16,7 @@
 #   countyfp, vintage_census, post1994
 #   mh_units_2000         : occupied MH stock from Census 2000 HCT006
 #   total_units_2000      : total occupied housing units (all types)
-#   policy_years          : total policy-years (insured exposure)
+#   policies_n          : total one-year policies (insured exposure)
 #   claims_n              : total claims
 #   building_damage_tot   : total building damage ($000 real 2000)
 #   contents_damage_tot   : total contents damage ($000 real 2000)
@@ -62,7 +62,7 @@ dt_welfare <- dt_bal[, .(
     claims_n            = sum(claims_n,            na.rm = TRUE),
     building_damage_tot = sum(building_damage_tot, na.rm = TRUE),
     contents_damage_tot = sum(contents_damage_tot, na.rm = TRUE),
-    policy_years        = sum(policies_n / 51,      na.rm = TRUE)
+    policies_n        = sum(policies_n,      na.rm = TRUE)
 ), by = .(countyfp, vintage_census)]
 
 dt_welfare[, post1994 := vintage_census %in% c("1995_1998", "1999_2000")]
@@ -76,13 +76,13 @@ dt_welfare[, vintage_census := factor(
 # ---------------------------------------------------------------------------
 
 dt_welfare[, claim_rate_insured := fifelse(
-    policy_years > 0, claims_n / policy_years, NA_real_
+    policies_n > 0, claims_n / policies_n, NA_real_
 )]
 dt_welfare[, building_damage_pa := fifelse(
-    policy_years > 0, building_damage_tot / policy_years, NA_real_
+    policies_n > 0, building_damage_tot / policies_n, NA_real_
 )]
 dt_welfare[, contents_damage_pa := fifelse(
-    policy_years > 0, contents_damage_tot / policy_years, NA_real_
+    policies_n > 0, contents_damage_tot / policies_n, NA_real_
 )]
 
 # ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ message(sprintf(
 setcolorder(dt_welfare, c(
     "countyfp", "vintage_census", "post1994",
     "mh_units_2000", "total_units_2000",
-    "policy_years", "claims_n",
+    "policies_n", "claims_n",
     "building_damage_tot", "contents_damage_tot",
     "claim_rate_insured",
     "building_damage_pa", "contents_damage_pa"

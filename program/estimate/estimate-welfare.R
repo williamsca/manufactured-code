@@ -26,14 +26,15 @@ source(here("program", "import", "project-params.R"))
 # ---------------------------------------------------------------------------
 
 # Per-claim damage reductions from main regression (Table claims-outcomes)
-DELTA_BUILDING_LO <- 5.0   # $000 real 2000
-DELTA_BUILDING_HI <- 6.0
-DELTA_CONTENTS_LO <- 1.0
-DELTA_CONTENTS_HI <- 1.0
+DELTA_BUILDING <- 5  # $000 real 2000
+DELTA_CONTENTS <- 2.0  # $000 real 2000
+
+# Per-claim payment reductions for NFIP fiscal savings (section 5)
+DELTA_BUILDING_PAYMENT <- 4.0  # $000 real 2000
+DELTA_CONTENTS_PAYMENT <- .7  # $000 real 2000
 
 # Compliance cost from MHS price event study
-COST_LO <- 5.0             # $000 real 2000
-COST_HI <- 5.0
+COST <- 5.0            # $000 real 2000
 
 # Discount rates and home lifespan for NPV calculation
 DISCOUNT_RATES <- c(0, 0.03, 0.07)
@@ -50,23 +51,23 @@ YEARS_COVERED <- 20L
 
 dt <- readRDS(here("derived", "welfare-county-vintage.Rds"))
 
-nat <- dt[!is.na(claim_rate_insured) & !is.na(policy_years), .(
-    policy_years        = sum(policy_years),
+nat <- dt[!is.na(claim_rate_insured) & !is.na(policies_n), .(
+    policies_n        = sum(policies_n),
     claims_n            = sum(claims_n),
     building_damage_tot = sum(building_damage_tot),
     contents_damage_tot = sum(contents_damage_tot),
     mh_units_2000       = sum(mh_units_2000, na.rm = TRUE)
 ), by = .(vintage_census, post1994)]
 
-nat[, claim_rate_insured := claims_n / policy_years]
-nat[, building_damage_pa := building_damage_tot / policy_years]
-nat[, contents_damage_pa := contents_damage_tot / policy_years]
+nat[, claim_rate_insured := claims_n / policies_n]
+nat[, building_damage_pa := building_damage_tot / policies_n]
+nat[, contents_damage_pa := contents_damage_tot / policies_n]
 
 cat("\n=== National aggregate by vintage ===\n")
 print(nat[order(vintage_census), .(
     vintage_census,
     post1994,
-    policy_years        = round(policy_years),
+    policies_n        = round(policies_n),
     claims_n,
     mh_units_2000,
     claim_rate_insured  = round(claim_rate_insured,  4),
@@ -81,7 +82,7 @@ print(nat[order(vintage_census), .(
 nat[, mh_stock_years := mh_units_2000 * YEARS_COVERED]
 nat[, take_up := fifelse(
     mh_stock_years > 0,
-    policy_years / mh_stock_years,
+    policies_n / mh_stock_years,
     NA_real_
 )]
 
@@ -89,7 +90,7 @@ cat("\n=== NFIP take-up by vintage ===\n")
 print(nat[order(vintage_census), .(
     vintage_census, post1994,
     mh_units_2000,
-    policy_years = round(policy_years),
+    policies_n = round(policies_n),
     take_up      = round(take_up, 3)
 )])
 
@@ -103,7 +104,7 @@ print(nat[order(vintage_census), .(
 #   alternative counterfactual (more similar construction vintage).
 # ---------------------------------------------------------------------------
 
-rate_pre_pooled <- nat[post1994 == FALSE, sum(claims_n) / sum(policy_years)]
+rate_pre_pooled <- nat[post1994 == FALSE, sum(claims_n) / sum(policies_n)]
 rate_pre_9094   <- nat[vintage_census == "1990_1994", claim_rate_insured]
 
 cat(sprintf(
@@ -123,7 +124,6 @@ npv_annuity <- function(annual_benefit, r, lifespan) {
 
 scenarios <- CJ(
     counterfactual = c("pooled_pre", "vintage_9094"),
-    delta_type     = c("low", "high"),
     discount_rate  = DISCOUNT_RATES,
     lifespan       = LIFESPANS
 )
@@ -132,45 +132,32 @@ scenarios[, claim_rate := fcase(
     counterfactual == "pooled_pre",   rate_pre_pooled,
     counterfactual == "vintage_9094", rate_pre_9094
 )]
-scenarios[, delta_total := fcase(
-    delta_type == "low",  DELTA_BUILDING_LO + DELTA_CONTENTS_LO,
-    delta_type == "high", DELTA_BUILDING_HI + DELTA_CONTENTS_HI
-)]
+scenarios[, delta_total    := DELTA_BUILDING + DELTA_CONTENTS]
 scenarios[, annual_benefit := claim_rate * delta_total]
-scenarios[, npv_benefit := mapply(npv_annuity, annual_benefit,
-                                  discount_rate, lifespan)]
-scenarios[, bcr_lo := npv_benefit / COST_HI]
-scenarios[, bcr_hi := npv_benefit / COST_LO]
+scenarios[, npv_benefit    := mapply(npv_annuity, annual_benefit,
+                                     discount_rate, lifespan)]
+scenarios[, bcr := npv_benefit / COST]
 
 cat("\n=== Per-unit NPV and benefit-cost ratio (r=0.03, T=30) ===\n")
+cat(sprintf("Compliance cost: $%.0fk (real 2000)\n", COST * 1e3))
 cat(sprintf(
-    "Compliance cost: $%.0f-$%.0fk (real 2000)\n",
-    COST_LO * 1e3, COST_HI * 1e3
+    "Per-claim damage reduction: $%.0fk building, $%.0fk contents\n",
+    DELTA_BUILDING * 1e3, DELTA_CONTENTS * 1e3
 ))
-cat(sprintf(
-    "Per-claim damage reduction: $%.0f-$%.0fk building,",
-    DELTA_BUILDING_LO * 1e3, DELTA_BUILDING_HI * 1e3
-))
-cat(sprintf(
-    " $%.0f-$%.0fk contents\n",
-    DELTA_CONTENTS_LO * 1e3, DELTA_CONTENTS_HI * 1e3
-))
-print(scenarios[discount_rate == 0.03 & lifespan == 30, .(
-    counterfactual, delta_type,
+print(scenarios[discount_rate == 0.03 & lifespan == 20, .(
+    counterfactual,
     claim_rate     = round(claim_rate,     4),
     annual_benefit = round(annual_benefit, 4),
     npv_benefit    = round(npv_benefit,    2),
-    bcr_lo         = round(bcr_lo,         2),
-    bcr_hi         = round(bcr_hi,         2)
-)][order(counterfactual, delta_type)])
+    bcr            = round(bcr,            2)
+)][order(counterfactual)])
 
-cat("\n=== Full sensitivity grid (select rows) ===\n")
+cat("\n=== Full sensitivity grid ===\n")
 print(scenarios[, .(
-    counterfactual, delta_type, discount_rate, lifespan,
+    counterfactual, discount_rate, lifespan,
     npv_benefit = round(npv_benefit, 2),
-    bcr_lo      = round(bcr_lo,      2),
-    bcr_hi      = round(bcr_hi,      2)
-)][order(counterfactual, delta_type, discount_rate, lifespan)])
+    bcr         = round(bcr,         2)
+)][order(counterfactual, discount_rate, lifespan)])
 
 # ---------------------------------------------------------------------------
 # 5. NFIP fiscal savings from post-1994 MH claims in sample ----
@@ -183,21 +170,12 @@ post_claims_bldg <- nat[post1994 == TRUE, sum(claims_n)]
 
 cat("\n=== NFIP fiscal savings: observed claims in sample ===\n")
 cat(sprintf("Post-1994 MH claims in sample: %d\n", post_claims_bldg))
-cat(sprintf(
-    "Building savings:  $%.1fM - $%.1fM\n",
-    post_claims_bldg * DELTA_BUILDING_LO / 1e3,
-    post_claims_bldg * DELTA_BUILDING_HI / 1e3
-))
-cat(sprintf(
-    "Contents savings:  $%.1fM - $%.1fM\n",
-    post_claims_bldg * DELTA_CONTENTS_LO / 1e3,
-    post_claims_bldg * DELTA_CONTENTS_HI / 1e3
-))
-cat(sprintf(
-    "Total NFIP savings: $%.1fM - $%.1fM\n",
-    post_claims_bldg * (DELTA_BUILDING_LO + DELTA_CONTENTS_LO) / 1e3,
-    post_claims_bldg * (DELTA_BUILDING_HI + DELTA_CONTENTS_HI) / 1e3
-))
+cat(sprintf("Building savings:  $%.1fM\n",
+    post_claims_bldg * DELTA_BUILDING_PAYMENT / 1e3))
+cat(sprintf("Contents savings:  $%.1fM\n",
+    post_claims_bldg * DELTA_CONTENTS_PAYMENT / 1e3))
+cat(sprintf("Total NFIP savings: $%.1fM\n",
+    post_claims_bldg * (DELTA_BUILDING_PAYMENT + DELTA_CONTENTS_PAYMENT) / 1e3))
 
 # ---------------------------------------------------------------------------
 # 6. Total NFIP fiscal savings scaled to Census stock ----
@@ -217,7 +195,7 @@ cat(sprintf(
 
 mh_stock_post94 <- nat[post1994 == TRUE, sum(mh_units_2000, na.rm = TRUE)]
 take_up_post94  <- nat[post1994 == TRUE,
-    sum(policy_years) / sum(mh_stock_years, na.rm = TRUE)]
+    sum(policies_n) / sum(mh_stock_years, na.rm = TRUE)]
 
 expected_claims_per_yr_pooled <- rate_pre_pooled * mh_stock_post94
 expected_claims_per_yr_9094   <- rate_pre_9094   * mh_stock_post94
@@ -236,16 +214,12 @@ cat(sprintf(
     expected_claims_per_yr_9094
 ))
 
-for (delta in c(
-    DELTA_BUILDING_LO + DELTA_CONTENTS_LO,
-    DELTA_BUILDING_HI + DELTA_CONTENTS_HI
-)) {
-    ann_saving_pooled <- expected_claims_per_yr_pooled * delta
-    ann_saving_9094   <- expected_claims_per_yr_9094   * delta
-    cat(sprintf(
-        "Annual total savings (delta=$%.0fk): pooled=$%.2fM, 1990-94=$%.2fM\n",
-        delta * 1e3,
-        ann_saving_pooled / 1e3,
-        ann_saving_9094   / 1e3
-    ))
-}
+delta             <- DELTA_BUILDING + DELTA_CONTENTS
+ann_saving_pooled <- expected_claims_per_yr_pooled * delta
+ann_saving_9094   <- expected_claims_per_yr_9094   * delta
+cat(sprintf(
+    "Annual total savings (delta=$%.0fk): pooled=$%.2fM, 1990-94=$%.2fM\n",
+    delta * 1e3,
+    ann_saving_pooled / 1e3,
+    ann_saving_9094   / 1e3
+))

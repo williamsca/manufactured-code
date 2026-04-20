@@ -29,6 +29,7 @@ pol_stats <- dt[, .(
                                           policies_n, na.rm = TRUE)
 ), by = .(mh_lbl)]
 pol_stats[, claim_rate := claims_tot / policies_tot]
+pol_stats$claims_tot <- NULL
 
 # ── Panel B: claims data (1994–2023) ─────────────────────────────────────────
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))

@@ -132,7 +132,7 @@ WITH filtered AS (
         YEAR(originalConstructionDate)                                    AS year_constr,
         CASE WHEN numberOfFloorsInInsuredBuilding = 5 THEN 1 ELSE 0 END  AS mh,
         YEAR(policyEffectiveDate
-             + (policyTerminationDate - policyEffectiveDate) / 2)         AS year,
+             + CAST((policyTerminationDate - policyEffectiveDate) / 2 AS INTEGER)) AS year,
         CAST(buildingReplacementCost AS DOUBLE)                           AS repl_cost,
         CAST(policyCost              AS DOUBLE)                           AS policy_cost,
         CAST(totalBuildingInsuranceCoverage AS DOUBLE)                    AS building_policy_covg,
