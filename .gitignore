@@ -2,6 +2,8 @@ data/
 derived/
 output/
 literature/
+notes/apps/*.txt
+notes/apps/*.md
 
 paper.tex
 paper.pdf

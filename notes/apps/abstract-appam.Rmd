@@ -1,0 +1,58 @@
+---
+title: "APPAM Abstract --- The Returns to Climate Adaptation in Manufactured Housing"
+author:
+- name: Colin Williams
+  affiliation: University of Virginia
+  email: "`chv7bg@virginia.edu`{=latex}"
+date: \today
+output:
+  pdf_document:
+    keep_tex: false
+    number_sections: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(data.table)
+library(here)
+
+# Load scalars produced by estimation scripts.
+mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
+nfip_sc <- fread(here("output", "results", "nfip-scalars.csv"))
+welf_sc <- fread(here("output", "results", "welfare-scalars.csv"))
+ss_sc   <- fread(here("output", "results", "sumstats-nfip-scalars.csv"))
+
+get_mhs  <- function(nm) mhs_sc[statistic == nm,  value]
+get_nfip <- function(nm) nfip_sc[statistic == nm, value]
+get_welf <- function(nm) welf_sc[statistic == nm, value]
+get_ss   <- function(nm) ss_sc[statistic == nm,   value]
+
+fmt_d <- function(x, digits = 0) {
+    paste0("\\$", formatC(abs(round(x * 1000)), format = "f",
+                          digits = digits, big.mark = ","))
+}
+fmt_pct <- function(x, digits = 0) {
+    paste0(formatC(round(x, digits), format = "f", digits = digits), "%")
+}
+
+price_eff      <- fmt_d(get_mhs("price_effect_level"))
+price_pct      <- fmt_pct(get_mhs("price_effect_pct"))
+avg_price_tr   <- fmt_d(get_mhs("avg_price_treated_pre"))
+bldg_dmg_eff   <- fmt_d(abs(get_nfip("building_damage_avg")))
+bldg_shr_avg   <- round(abs(get_nfip("building_damage_share_avg")))
+net_cont_eff   <- fmt_d(abs(get_nfip("net_contents_pmt_avg")))
+bldg_pct_avg   <- round(abs(get_nfip("building_damage_avg")) /
+                         get_nfip("avg_building_damage_all") * 100)
+claim_rate_fmt <- fmt_pct(get_welf("claim_rate_pooled_pre") * 100, 1)
+npv_baseline   <- fmt_d(get_welf("npv_3pct_20yr"))
+bcr_pct        <- fmt_pct(get_welf("bcr_3pct_20yr") * 100)
+cost_fmt       <- fmt_d(get_welf("compliance_cost"))
+nfip_sav_m     <- paste0("$", round(get_welf("nfip_savings_total") / 1000),
+                          " million")
+```
+
+Does mandated climate adaptation pay for itself? Building codes and other forms of mandatory adaptation investment are a potentially powerful tool for reducing disaster losses, but the returns to these investments are poorly understood and their interaction with insurance markets and disaster relief remains largely unexamined. I study the 1994 HUD wind standard reform, which required structural upgrades---steel strapping, upgraded sheathing fastening, and impact-rated windows---to manufactured homes sited in hurricane-prone wind zones. The reform provides a uniquely clean setting to identify the returns to building codes: because manufactured homes are regulated federally and preempt state and local codes, the 1994 standard applied uniformly nationwide on a date set by HUD, while leaving site-built homes of the same vintage unaffected.
+
+I estimate both sides of the cost-benefit ledger. On the cost side, a difference-in-differences using the Census Bureau's Manufactured Housing Survey shows that prices in treated states (those containing wind zones II or III) rose by `r price_eff`, an `r price_pct` increase on an average of `r avg_price_tr`, with no detectable effect on placement counts. On the benefit side, I exploit claim and policy microdata from the National Flood Insurance Program (NFIP) to compare flood damage across manufactured and site-built homes of different construction vintages exposed to the same floods in the same census tract. This double difference in housing type and vintage absorbs secular changes in construction quality and storm severity, isolating the manufactured-home-specific break at 1994. Post-1994 manufactured homes experience `r bldg_dmg_eff` lower building damage per claim, or roughly `r bldg_pct_avg`% of the average claim, with parallel pre-trends and a sharp break at 1994. Damage as a share of assessed value falls by roughly `r bldg_shr_avg`%, and contents payments decline by `r net_cont_eff` per claim. Composition checks show that post-1994 manufactured homes have higher replacement costs, higher coverage, and greater SFHA exposure---shifts that work against the main result and imply the damage estimates are a lower bound.
+
+A back-of-envelope calculation combining a pre-reform claim rate of `r claim_rate_fmt` with the per-claim damage reduction yields an expected present value of `r npv_baseline` in flood damage reduction over a 20-year lifespan, recovering roughly `r bcr_pct` of the `r cost_fmt` compliance cost through the flood channel alone. The fiscal spillover to the NFIP is on the order of `r nfip_sav_m` on observed post-reform claims, with likely larger spillovers to \emph{ex post} FEMA and SBA disaster relief. For the 22 million Americans in manufactured homes---disproportionately low-income, credit-constrained, and underinsured---the HUD standard functions as built-in catastrophe insurance: it reduces risk automatically, without premiums, claim filing, or eligibility requirements that many manufactured homeowners cannot meet. The results suggest that mandated adaptation can be a cost-effective policy tool for protecting populations that private insurance markets largely fail to reach, with returns that extend well beyond the targeted hazard.
