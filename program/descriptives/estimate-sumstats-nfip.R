@@ -139,3 +139,33 @@ pack_rows("Claim outcomes (1994--2023)",  nrow(pol_fmt) + 1, nrow(dt_all)) |>
     as.character(x),
     here("output", "descriptives", "sumstats-nfip.tex")
 ))()
+
+# Export scalars ----
+dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
+fwrite(
+    data.table(
+        statistic = c(
+            "policies_mh",            "policies_sb",
+            "claim_rate_mh",          "claim_rate_sb",
+            "avg_building_damage_mh", "avg_building_damage_sb",
+            "avg_contents_damage_mh", "avg_contents_damage_sb",
+            "total_claims_mh",        "total_claims_all",
+            "mh_claim_share"
+        ),
+        value = c(
+            pol_stats[mh_lbl == "MH",         policies_tot],
+            pol_stats[mh_lbl == "Site-built",  policies_tot],
+            pol_stats[mh_lbl == "MH",         claim_rate],
+            pol_stats[mh_lbl == "Site-built",  claim_rate],
+            claim_stats[mh_lbl == "MH",        avg_bldg_damage],
+            claim_stats[mh_lbl == "Site-built", avg_bldg_damage],
+            claim_stats[mh_lbl == "MH",        avg_cont_damage],
+            claim_stats[mh_lbl == "Site-built", avg_cont_damage],
+            claim_stats[mh_lbl == "MH",        total_claims],
+            claim_stats[, sum(total_claims)],
+            claim_stats[mh_lbl == "MH", total_claims] /
+                claim_stats[, sum(total_claims)]
+        )
+    ),
+    here("output", "results", "sumstats-nfip-scalars.csv")
+)

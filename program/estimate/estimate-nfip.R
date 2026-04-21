@@ -565,3 +565,49 @@ plot_es(est_share_es, "mh_claim_share", var = NULL, ref = ref_period,
 plot_es(est_share_es, "mh_policy_share", var = NULL, ref = ref_period,
         vline_x = 1993.5,
         path = file.path(out_dir, "es-mh-policy-share.pdf"))
+
+# Export key scalars ----
+dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
+
+extract_post_stats <- function(est_obj, outcome, scale = 1) {
+    ct <- as.data.table(coeftable(est_obj[lhs = outcome][[1]]),
+                        keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    post <- ct[period >= 1994L, Estimate / scale]
+    list(avg = mean(post), min = min(post), max = max(post))
+}
+
+eff_bldg_dmg <- extract_post_stats(est_claim_es, "building_damage",      1000)
+eff_net_bldg <- extract_post_stats(est_claim_es, "net_building_pmt",     1000)
+eff_cont_dmg <- extract_post_stats(est_claim_es, "contents_damage",      1000)
+eff_net_cont <- extract_post_stats(est_claim_es, "net_contents_pmt",     1000)
+eff_bldg_shr <- extract_post_stats(est_claim_es, "building_damage_share",   1)
+avg_bldg_dmg_all <- mean(dt_claims_est$building_damage, na.rm = TRUE) / 1000
+
+fwrite(
+    data.table(
+        statistic = c(
+            "building_damage_avg",       "building_damage_min",
+            "building_damage_max",
+            "net_building_pmt_avg",      "net_building_pmt_min",
+            "net_building_pmt_max",
+            "contents_damage_avg",       "contents_damage_min",
+            "contents_damage_max",
+            "net_contents_pmt_avg",      "net_contents_pmt_min",
+            "net_contents_pmt_max",
+            "building_damage_share_avg", "building_damage_share_min",
+            "building_damage_share_max",
+            "avg_building_damage_all"
+        ),
+        value = c(
+            eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
+            eff_net_bldg$avg, eff_net_bldg$min, eff_net_bldg$max,
+            eff_cont_dmg$avg, eff_cont_dmg$min, eff_cont_dmg$max,
+            eff_net_cont$avg, eff_net_cont$min, eff_net_cont$max,
+            eff_bldg_shr$avg, eff_bldg_shr$min, eff_bldg_shr$max,
+            avg_bldg_dmg_all
+        )
+    ),
+    here("output", "results", "nfip-scalars.csv")
+)

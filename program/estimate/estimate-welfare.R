@@ -25,16 +25,18 @@ source(here("program", "import", "project-params.R"))
 # Parameters ----
 # ---------------------------------------------------------------------------
 
-# Per-claim damage reductions from main regression (Table claims-outcomes)
-DELTA_BUILDING <- 5  # $000 real 2000
-DELTA_CONTENTS <- 2.0  # $000 real 2000
+# Per-claim damage/payment reductions from nfip-scalars.csv (estimate-nfip.R)
+# Compliance cost from mhs-scalars.csv (estimate-mhs.R)
+nfip_sc <- fread(here("output", "results", "nfip-scalars.csv"))
+mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
+get_nfip_sc <- function(nm) nfip_sc[statistic == nm, value]
+get_mhs_sc  <- function(nm) mhs_sc[statistic == nm, value]
 
-# Per-claim payment reductions for NFIP fiscal savings (section 5)
-DELTA_BUILDING_PAYMENT <- 4.0  # $000 real 2000
-DELTA_CONTENTS_PAYMENT <- .7  # $000 real 2000
-
-# Compliance cost from MHS price event study
-COST <- 5.0            # $000 real 2000
+DELTA_BUILDING         <- abs(get_nfip_sc("building_damage_avg"))
+DELTA_CONTENTS         <- abs(get_nfip_sc("contents_damage_avg"))
+DELTA_BUILDING_PAYMENT <- abs(get_nfip_sc("net_building_pmt_avg"))
+DELTA_CONTENTS_PAYMENT <- abs(get_nfip_sc("net_contents_pmt_avg"))
+COST                   <- get_mhs_sc("price_effect_level")
 
 # Discount rates and home lifespan for NPV calculation
 DISCOUNT_RATES <- c(0, 0.03, 0.07)
@@ -223,3 +225,42 @@ cat(sprintf(
     ann_saving_pooled / 1e3,
     ann_saving_9094   / 1e3
 ))
+
+# ---------------------------------------------------------------------------
+# Export welfare scalars ----
+# ---------------------------------------------------------------------------
+
+npv_baseline <- scenarios[
+    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
+    npv_benefit]
+bcr_baseline <- scenarios[
+    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
+    bcr]
+annual_benefit_baseline <- scenarios[
+    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
+    annual_benefit]
+nfip_savings_total <- post_claims_bldg *
+    (DELTA_BUILDING_PAYMENT + DELTA_CONTENTS_PAYMENT)
+
+dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
+fwrite(
+    data.table(
+        statistic = c(
+            "compliance_cost",
+            "delta_building", "delta_contents", "delta_total",
+            "delta_building_pmt", "delta_contents_pmt",
+            "claim_rate_pooled_pre", "claim_rate_9094",
+            "annual_benefit", "npv_3pct_20yr", "bcr_3pct_20yr",
+            "post_claims_n", "nfip_savings_total"
+        ),
+        value = c(
+            COST,
+            DELTA_BUILDING, DELTA_CONTENTS, DELTA_BUILDING + DELTA_CONTENTS,
+            DELTA_BUILDING_PAYMENT, DELTA_CONTENTS_PAYMENT,
+            rate_pre_pooled, rate_pre_9094,
+            annual_benefit_baseline, npv_baseline, bcr_baseline,
+            post_claims_bldg, nfip_savings_total
+        )
+    ),
+    here("output", "results", "welfare-scalars.csv")
+)

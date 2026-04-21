@@ -123,3 +123,28 @@ for (out in v_out_q) {
     plot_es(est_q, out,
             path = here("output", "event-study", paste0("es-mhs-", out, ".pdf")))
 }
+
+# Export key scalars ----
+dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
+
+ct_price <- as.data.table(
+    coeftable(est_p[lhs = "avg_sales_price"][[1]]),
+    keep.rownames = TRUE)
+ct_price[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+ct_price <- ct_price[grepl(":treated$", rn)]
+
+price_effect_level <- ct_price[year >= 1994, mean(Estimate / 1000)]
+price_effect_1994  <- ct_price[year == 1994, Estimate / 1000]
+avg_price_treated_pre <- dt[treated == TRUE & year < 1994,
+    weighted.mean(avg_sales_price / 1000, placements, na.rm = TRUE)]
+price_effect_pct <- price_effect_level / avg_price_treated_pre * 100
+
+fwrite(
+    data.table(
+        statistic = c("price_effect_level", "price_effect_1994",
+                      "avg_price_treated_pre", "price_effect_pct"),
+        value     = c(price_effect_level, price_effect_1994,
+                      avg_price_treated_pre, price_effect_pct)
+    ),
+    here("output", "results", "mhs-scalars.csv")
+)
