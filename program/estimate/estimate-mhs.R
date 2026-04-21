@@ -133,10 +133,10 @@ ct_price <- as.data.table(
 ct_price[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
 ct_price <- ct_price[grepl(":treated$", rn)]
 
-price_effect_level <- ct_price[year >= 1994, mean(Estimate)]
-price_effect_1994  <- ct_price[year == 1994, Estimate]
+price_effect_level <- ct_price[year >= 1994, mean(Estimate) / 1000]
+price_effect_1994  <- ct_price[year == 1994, Estimate / 1000]
 avg_price_treated_pre <- dt[treated == TRUE & year < 1994,
-    weighted.mean(avg_sales_price, placements, na.rm = TRUE)]
+    weighted.mean(avg_sales_price, placements, na.rm = TRUE) / 1000]
 price_effect_pct <- price_effect_level / avg_price_treated_pre * 100
 
 fwrite(

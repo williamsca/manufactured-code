@@ -35,8 +35,8 @@ get_ss   <- function(nm) ss_sc[statistic == nm,   value]
 
 # Formatting helpers.  All monetary values stored in $000 (2000 dollars).
 fmt_d <- function(x, digits = 0) {
-    paste0("$", formatC(abs(round(x * 1000)), format = "f",
-                        digits = digits, big.mark = ","))
+    paste0("\\$", formatC(abs(round(x * 1000)), format = "f",
+                          digits = digits, big.mark = ","))
 }
 fmt_pct <- function(x, digits = 0) {
     paste0(formatC(round(x, digits), format = "f", digits = digits), "%")
@@ -72,7 +72,7 @@ mh_claim_pct   <- round(get_ss("mh_claim_share") * 100, 1)
 ```
 
 \begin{abstract}
-Does mandated climate adaptation pay for itself? I study the 1994 HUD wind standard reform, which required structural upgrades to manufactured homes in hurricane-prone areas. Using claim and policy data from the National Flood Insurance Program (NFIP), I compare flood damage to manufactured and site-built homes of different construction vintages exposed to floods in the same county and over the same period. Manufactured homes built after 1994 experience almost `r bldg_dmg_eff` lower building damage payments per claim relative to site-built homes of the same vintage. On the cost side, the reform raised manufactured home prices by about `r price_eff` in treated states. A back-of-envelope calculation suggests the flood channel alone recovers a substantial share of the upfront cost, and the total return---including wind damage, uninsured losses, and reduced risk---is likely higher. For the 22 million Americans living in manufactured homes, many of whom are low-income and lack disaster insurance, the HUD standard functions as built-in catastrophe insurance: it reduces risk automatically, without requiring annual premium payments, claims filing, or compliance with eligibility rules that many manufactured homeowners cannot meet.
+Does mandated climate adaptation pay for itself? I study the 1994 HUD wind standard reform, which required structural upgrades to manufactured homes in hurricane-prone areas. Using claim and policy data from the National Flood Insurance Program (NFIP), I compare flood damage to manufactured and site-built homes of different construction vintages exposed to floods in the same county and over the same period. Manufactured homes built after 1994 experience `r bldg_dmg_eff` lower building damage payments per claim relative to site-built homes of the same vintage. On the cost side, the reform raised manufactured home prices by `r price_eff` in treated states. A back-of-envelope calculation suggests the flood channel alone recovers a substantial share of the upfront cost, and the total return---including wind damage, uninsured losses, and reduced risk---is likely higher. For the 22 million Americans living in manufactured homes, many of whom are low-income and lack disaster insurance, the HUD standard functions as built-in catastrophe insurance: it reduces risk automatically, without requiring annual premium payments, claims filing, or compliance with eligibility rules that many manufactured homeowners cannot meet.
 \end{abstract}
 
 # Introduction
@@ -85,7 +85,7 @@ The U.S. experienced over 100 billion-dollar climate disasters over the five yea
 
 Government mandates for costly adaptation may be justified if private take-up is hindered by frictions. For instance, households may misperceive climate risk [@bakkensen_going_2022; @gallagher_learning_2014]. They may fail to internalize benefits to their neighbors [@baylis_mandated_2021]. They may enjoy limited upside from adaptation if mitigation behaviors are not reflected in insurance premiums [@wagner_adaptation_2022]. Finally, they may rely on public insurance programs and disaster relief instead [@deryugina_fiscal_2017; @baylis_moral_2019].
 
-I estimate both the direct cost of compliance, in the form of additional construction costs; and the direct benefits, in reduced disaster damage. I then calibrate the self-insurance value of adaptation under a range of assumptions about risk preferences. My results suggest that the returns to mandated adaptation are likely positive, even through the single channel of flood damage reduction, and that the self-insurance value of the regulation is substantial for low-income households who do not purchase insurance against catastrophic loss.
+I estimate both the direct cost of compliance, in the form of additional construction costs; and the direct benefits, in reduced flood damage. My results indicate that benefits from the single channel of flood damage reduction that do not outweight the considerable cost of the reform. However, it is possible that accounting for other benefits, such as the insurance value and non-flooding damages, would yield a positive private benefit-cost ratio.
 
 On the cost side, I use the Census Bureau's Manufactured Housing Survey to estimate a difference-in-differences comparing manufactured home prices in states with HUD wind zones II and III (treated) to zone I states (control), before and after 1994. Prices in treated states rose by `r price_eff`, an increase of roughly `r price_pct` on an average of `r avg_price_tr` in treated states. There is no detectable effect on placements, though point estimates are imprecise. Taking the point estimates at face value, a price increase with no change in quantity is consistent with a world where households value the HUD-mandated improvements roughly at cost.
 
@@ -95,7 +95,7 @@ Post-1994 manufactured homes experience `r bldg_dmg_eff` lower building damage p
 
 Combining costs and benefits at the unit level yields a back-of-envelope private cost-benefit calculation for the purchaser of a post-1994 manufactured home. Among insured MH in the NFIP data, the pre-1994 annual claim rate is roughly `r claim_rate_fmt`. Applied to per-claim reductions of `r delta_bldg` in building damages and `r delta_cont` in contents damages, this implies an expected annual damage reduction of `r ann_benefit`, or `r npv_baseline` discounting at 3% over a 20-year MH lifespan. Expected savings from reduced flood damage alone are roughly `r bcr_pct` of the `r cost_fmt` compliance cost. Among the set of households who purchase flood insurance, the flood channel recovers a meaningful share of cost, even before counting the wind channel that the regulation actually targets, reduced displacement, or uninsured losses.
 
-At the aggregate level, the reform generates meaningful fiscal spillovers. The point estimates imply reductions of roughly `r net_bldg_eff` in net building payments and `r net_cont_eff` in net contents payments per MH claim. Applied to the `r n_post_claims` claims on MH built between 1994 and 1999 observed in the NFIP sample, this yields roughly `r nfip_sav_m` in direct NFIP payment savings---a conservative figure that conditions on filing a claim and does not scale to the full stock of post-reform MH.[^fiscal-nfip] Spillovers to \emph{ex post} disaster relief---most notably FEMA Individual Assistance, SBA disaster loans, and state emergency grants, which disproportionately serve uninsured MH residents---are likely substantially larger. <!--\textcolor{red}{[PLACEHOLDER: estimate of \emph{ex post} disaster relief spillover to be added.]}-->
+At the aggregate level, the reform generates meaningful fiscal spillovers. The point estimates imply reductions of roughly `r net_bldg_eff` in net building payments and `r net_cont_eff` in net contents payments per MH claim. Applied to the `r n_post_claims` claims on MH built between 1994 and 1999 observed in the NFIP sample, this yields roughly `r nfip_sav_m` in direct NFIP payment savings---a conservative figure that conditions on filing a claim and does not scale to the full stock of post-reform MH.[^fiscal-nfip] Spillovers to \emph{ex post} disaster relief---most notably FEMA Individual Assistance, SBA disaster loans, and state emergency grants---are likely substantially larger. <!--\textcolor{red}{[PLACEHOLDER: estimate of \emph{ex post} disaster relief spillover to be added.]}-->
 
 [^fiscal-nfip]: The `r n_post_claims` claims for MH built 1994-1999 are observed over loss years 1994-2023. This calculation assumes no change in claim frequency or policy take-up and applies the main-specification payment reductions to the observed claim count.
 
@@ -167,9 +167,9 @@ Y_{it} = \alpha_{c(i),t} + \delta_m + \sum_k \beta_k (\mathbf{1}[\nu_i = k] \tim
 \label{eq:event-study-benefit}
 \end{equation}
 
-where $Y_{it}$ is the outcome for claim $i$ (e.g., building damage), $\alpha_{c(i),t}$ is a county $\times$ loss-period fixed effect absorbing location-specific storm severity, $\delta_m$ is a manufactured housing indicator absorbing time-invariant differences between housing types, $\text{MH}_i$ is an indicator for manufactured homes, and $\nu_i$ is the construction vintage bin of home $i$. The coefficients $\beta_k$ capture the manufactured-home-specific vintage profile relative to the 1992 reference bin. Post-1994 coefficients are the treatment effects.
+where $Y_{it}$ is the outcome for claim $i$ (e.g., building damage), $\alpha_{c(i),t}$ is a geography $\times$ loss-year fixed effect absorbing location-specific storm severity, $\delta_m$ is a manufactured housing indicator absorbing time-invariant differences between housing types, $\text{MH}_i$ is an indicator for manufactured homes, and $\nu_i$ is the construction vintage bin of home $i$. The coefficients $\beta_k$ capture the manufactured-home-specific vintage profile relative to the 1992 reference bin. Post-1994 coefficients are the treatment effects.
 
-Identification relies on a parallel trends assumption in the vintage profile of outcomes between manufactured and site-built homes in the absence of the HUD code reform. In other words, homes built at different times may experience different levels of flood damage due to changes in construction quality, storm severity, or intra-county location, but these vintage effects should be the same for manufactured and site-built homes. I support this assumption by showing flat pre-trends in the event study specification across a broad range of claim-level and cell-level outcomes.
+Identification relies on a parallel trends assumption in the vintage profile of outcomes between manufactured and site-built homes in the absence of the HUD code reform. In other words, homes built at different times may experience different levels of flood damage due to changes in construction quality, storm severity, or intra-geography location, but these vintage effects should be the same for manufactured and site-built homes. I support this assumption by showing flat pre-trends in the event study specification across a broad range of claim-level and cell-level outcomes.
 
 I expect the treatment effect to grow with later construction cohorts as compliance rates increase. Because of lags between production and installation, some units with post-1994 construction dates may have been manufactured before the regulation went into effect in July of 1994.
 
@@ -197,9 +197,9 @@ Table \ref{tab:claims-outcomes} presents supplementary outcomes on insurance pay
 
 A concern with the vintage-based design is that post-1994 manufactured home policyholders may differ systematically from pre-1994 policyholders, and that these compositional differences rather than construction quality drive the damage results. Table \ref{tab:composition} reports the full set of policy composition event studies.
 
-The composition shifts work against the main result. Relative to pre-1994 manufactured homes, post-1994 manufactured home policies have higher replacement cost (\$20--30,000), higher building coverage (\$8--14,000 per policy), and higher contents coverage (\$1,000 per policy). Post-1994 manufactured homes are also more concentrated in SFHAs (2--7 percentage points higher). These shifts would all tend to increase expected NFIP payments, not lower them, making the damage reduction estimates conservative.
+The composition shifts work against the main result. Relative to pre-1994 manufactured homes, post-1994 manufactured home policies have higher replacement cost (\$20--30,000), higher building coverage (\$8--15,000 per policy), and higher contents coverage (\$1-2,000 per policy). Post-1994 manufactured homes are also more concentrated in SFHAs (3--7 percentage points higher). These shifts would all tend to increase expected NFIP payments, not lower them, making the damage reduction estimates conservative.
 
-The one composition shift that works in the direction of the main result is the elevated-building share, which rises by 5 percentage points for post-1998 construction vintages. Elevation is plausibly part of the treatment channel---the HUD Code encouraged improved siting and installation practices---rather than a confound. Primary-residence share is essentially unchanged across vintages.
+The one composition shift that works in the direction of the main result is the elevated-building share, which rises by 6 percentage points for post-1999 construction vintages. Elevation is plausibly part of the treatment channel---the HUD Code encouraged improved siting and installation practices---rather than a confound. Primary-residence share and mandatory purchases are essentially unchanged across vintages.
 
 <!--
 ## Robustness
@@ -308,7 +308,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Policy Composition}\label{tab:composition}
   \begin{threeparttable}
-    \input{output/event-study/statefp/policy-composition.tex}
+    \input{output/event-study/countyfp/policy-composition.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on the cell-level panel, with observations weighted by number of policies. \emph{Repl. cost}, \emph{Bldg covg.}, and \emph{Contents covg.} refer to the estimated replacement cost, building coverage amount, and contents coverage amount, respectively, and are reported in thousands of 2000 dollars. All other outcomes are fractions. \emph{Elevated} indicates that the building satisfies the NFIP definition of an elevated building; \emph{SFHA} indicates that the property is located in a Special Flood Hazard Area; \emph{Primary res.} indicates that the home is a primary residence; and \emph{Mandatory} indicates that flood insurance was required by the mortgage lender.  Source: OpenFEMA policy data.
     \end{tablenotes}
@@ -351,3 +351,5 @@ Table \ref{tab:take-up} reports estimates from a PPML model of total policy coun
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
+
+\clearpage

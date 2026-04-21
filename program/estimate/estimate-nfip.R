@@ -27,7 +27,7 @@ args <- commandArgs(trailingOnly = TRUE)
 bin_arg <- args[grepl("^[0-9]+$", args)][1L]
 geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
 BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 1L
-agg_geo <- if (!is.na(geo_arg)) geo_arg else "statefp"
+agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
 source(here("program", "import", "project-params.R"))
 
@@ -83,6 +83,7 @@ v_dict <- c(
     "countyfp" = "County",
     "tractfp" = "Census tract",
     "period_loss" = "Loss period",
+    "year_loss" = "Loss year",
     "mh" = "MH",
     "period_constr" = "$\\nu_i$"
 )
@@ -255,8 +256,9 @@ etable(
 
 etable(
     est_claim_es[lhs = v_alt],
-    tex = TRUE,
-    file = file.path(out_dir, "claims-outcomes.tex"),
+    tex = TRUE, se.below = FALSE,
+    file = here("output", "event-study", "statefp",
+        "claims-outcomes.tex"),
     fitstat = c("n", "r2", "my"),
     digits = 2, digits.stats = 2, replace = TRUE
 )
@@ -286,9 +288,9 @@ v_comp <- c(
     "building_policy_covg_ppol",
     "contents_policy_covg_ppol",
     "elevated_share",
-    "sfha_share",
-    "primary_res_share",
-    "mandatory_purchase_share"
+    "sfha_share"
+    # "primary_res_share",
+    #"mandatory_purchase_share"
 )
 s_comp <- paste0("c(", paste(v_comp, collapse = ", "), ")")
 
@@ -307,7 +309,7 @@ etable(est_comp_post, fitstat = c("n", "r2", "wr2", "my"))
 
 etable(
     est_comp_post,
-    tex = TRUE,
+    tex = TRUE, se.below = FALSE,
     file = file.path(out_dir, "policy-composition.tex"),
     fitstat = c("n", "r2", "my"),
     # keep = "post_mh",
@@ -578,12 +580,12 @@ extract_post_stats <- function(est_obj, outcome, scale = 1) {
     list(avg = mean(post), min = min(post), max = max(post))
 }
 
-eff_bldg_dmg <- extract_post_stats(est_claim_es, "building_damage",      .001)
-eff_net_bldg <- extract_post_stats(est_claim_es, "net_building_pmt",     .001)
-eff_cont_dmg <- extract_post_stats(est_claim_es, "contents_damage",      .001)
-eff_net_cont <- extract_post_stats(est_claim_es, "net_contents_pmt",     .001)
+eff_bldg_dmg <- extract_post_stats(est_claim_es, "building_damage",      1)
+eff_net_bldg <- extract_post_stats(est_claim_es, "net_building_pmt",     1)
+eff_cont_dmg <- extract_post_stats(est_claim_es, "contents_damage",      1)
+eff_net_cont <- extract_post_stats(est_claim_es, "net_contents_pmt",     1)
 eff_bldg_shr <- extract_post_stats(est_claim_es, "building_damage_share",   1)
-avg_bldg_dmg_all <- mean(dt_claims_est$building_damage, na.rm = TRUE) / .001
+avg_bldg_dmg_all <- mean(dt_claims_est$building_damage, na.rm = TRUE)
 
 fwrite(
     data.table(
