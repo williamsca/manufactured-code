@@ -578,12 +578,12 @@ extract_post_stats <- function(est_obj, outcome, scale = 1) {
     list(avg = mean(post), min = min(post), max = max(post))
 }
 
-eff_bldg_dmg <- extract_post_stats(est_claim_es, "building_damage",      1000)
-eff_net_bldg <- extract_post_stats(est_claim_es, "net_building_pmt",     1000)
-eff_cont_dmg <- extract_post_stats(est_claim_es, "contents_damage",      1000)
-eff_net_cont <- extract_post_stats(est_claim_es, "net_contents_pmt",     1000)
+eff_bldg_dmg <- extract_post_stats(est_claim_es, "building_damage",      .001)
+eff_net_bldg <- extract_post_stats(est_claim_es, "net_building_pmt",     .001)
+eff_cont_dmg <- extract_post_stats(est_claim_es, "contents_damage",      .001)
+eff_net_cont <- extract_post_stats(est_claim_es, "net_contents_pmt",     .001)
 eff_bldg_shr <- extract_post_stats(est_claim_es, "building_damage_share",   1)
-avg_bldg_dmg_all <- mean(dt_claims_est$building_damage, na.rm = TRUE) / 1000
+avg_bldg_dmg_all <- mean(dt_claims_est$building_damage, na.rm = TRUE) / .001
 
 fwrite(
     data.table(
