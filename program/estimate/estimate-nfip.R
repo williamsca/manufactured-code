@@ -26,7 +26,7 @@ library(ggplot2)
 args <- commandArgs(trailingOnly = TRUE)
 bin_arg <- args[grepl("^[0-9]+$", args)][1L]
 geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
-BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 1L
+BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
 agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
 source(here("program", "import", "project-params.R"))
@@ -193,6 +193,7 @@ dt_claims[, period_loss   := ((year_loss - 1994L) %/% 5L) * 5L + 1994L]
 dt_claims[, period_constr := bin_constr(
     year_constr, BIN_CONSTR_YEAR)]
 dt_claims[, post1994      := as.integer(year_constr >= 1994L)]
+dt_claims[, post_mh       := post1994 * mh]
 
 v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
@@ -243,7 +244,7 @@ fmla_claim_es <- as.formula(paste0(
     " | geo^year_loss + mh + period_constr"
 ))
 
-est_claim_es <- feols(fmla_claim_es, data = dt_claims_est)
+est_claim_es <- feols(fmla_claim_es, data = dt_claims_est, cluster = ~countyfp)
 etable(est_claim_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_claim_es[lhs = "building_pmt$"])
 
@@ -263,7 +264,7 @@ etable(
 )
 
 # Poisson event study on damages/payments
-est_claim_pois <- fepois(fmla_claim_es, data = dt_claims_est)
+est_claim_pois <- fepois(fmla_claim_es, data = dt_claims_est, cluster = ~countyfp)
 
 etable(est_claim_pois)
 
@@ -388,10 +389,10 @@ fmla_rob_d <- building_damage ~
     tractfp^period_loss + mh
 
 est_rob_list <- list(
-    "Baseline"          = feols(fmla_rob_a, data = dt_claims_est, lean = TRUE),
-    "+ Controls"     = feols(fmla_rob_b, data = dt_claims_est, lean = TRUE),
-    "+ Tract FE"  = feols(fmla_rob_c, data = dt_claims_est, lean = TRUE),
-    "+ Controls + Tract FE"    = feols(fmla_rob_d, data = dt_claims_est, lean = TRUE)
+    "Baseline"          = feols(fmla_rob_a, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
+    "+ Controls"     = feols(fmla_rob_b, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
+    "+ Tract FE"  = feols(fmla_rob_c, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
+    "+ Controls + Tract FE"    = feols(fmla_rob_d, data = dt_claims_est, lean = TRUE, cluster = ~countyfp)
 )
 
 etable(est_rob_list, tex = TRUE,
@@ -408,7 +409,7 @@ fmla_geo_rob <- building_damage ~
     i(period_constr, mh, ref = ref_period) |
     sw(statefp^period_loss, countyfp^period_loss, tractfp^period_loss) + mh
 
-est_geo_rob <- feols(fmla_geo_rob, data = dt_claims_est, lean = TRUE)
+est_geo_rob <- feols(fmla_geo_rob, data = dt_claims_est, lean = TRUE, cluster = ~countyfp)
 
 etable(est_geo_rob)
 
@@ -422,6 +423,24 @@ etable(
 )
 
 # static ----
+# Headline ATT: single post_mh coefficient in place of the event study's
+# eleven individually-noisy period_constr x mh terms. Same sample, FE
+# structure, and clustering as fmla_claim_es, collapsing the vintage
+# profile to a pre/post-1994 comparison.
+fmla_static <- as.formula(paste0(
+    s_claim, " ~ post_mh | geo^year_loss + mh + post1994"
+))
+
+est_static <- feols(fmla_static, data = dt_claims_est, cluster = ~countyfp)
+etable(est_static[lhs = v_alt], fitstat = c("n", "r2", "my"))
+
+etable(
+    est_static[lhs = v_alt],
+    tex = TRUE, se.below = FALSE,
+    file = file.path(out_dir, "claims-outcomes-static.tex"),
+    fitstat = c("n", "r2", "my"),
+    digits = 2, digits.stats = 2, replace = TRUE
+)
 
 # plots ----
 v_palette <- c("#0072B2", "#D55E00", "#009E73", "#F0E442")
@@ -587,6 +606,20 @@ eff_net_cont <- extract_post_stats(est_claim_es, "net_contents_pmt",     1)
 eff_bldg_shr <- extract_post_stats(est_claim_es, "building_damage_share",   1)
 avg_bldg_dmg_all <- mean(dt_claims_est$building_damage, na.rm = TRUE)
 
+# static ATT: single post_mh coefficient per outcome (headline number)
+extract_static <- function(est_obj, outcome) {
+    ct <- as.data.table(coeftable(est_obj[lhs = outcome][[1]]),
+                        keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    list(est = ct$Estimate, se = ct[["Std. Error"]], t = ct[["t value"]])
+}
+
+stc_bldg_dmg <- extract_static(est_static, "building_damage")
+stc_net_bldg <- extract_static(est_static, "net_building_pmt")
+stc_cont_dmg <- extract_static(est_static, "contents_damage")
+stc_net_cont <- extract_static(est_static, "net_contents_pmt")
+stc_bldg_shr <- extract_static(est_static, "building_damage_share")
+
 fwrite(
     data.table(
         statistic = c(
@@ -600,7 +633,17 @@ fwrite(
             "net_contents_pmt_max",
             "building_damage_share_avg", "building_damage_share_min",
             "building_damage_share_max",
-            "avg_building_damage_all"
+            "avg_building_damage_all",
+            "building_damage_static",    "building_damage_static_se",
+            "building_damage_static_t",
+            "net_building_pmt_static",   "net_building_pmt_static_se",
+            "net_building_pmt_static_t",
+            "contents_damage_static",    "contents_damage_static_se",
+            "contents_damage_static_t",
+            "net_contents_pmt_static",   "net_contents_pmt_static_se",
+            "net_contents_pmt_static_t",
+            "building_damage_share_static", "building_damage_share_static_se",
+            "building_damage_share_static_t"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -608,7 +651,12 @@ fwrite(
             eff_cont_dmg$avg, eff_cont_dmg$min, eff_cont_dmg$max,
             eff_net_cont$avg, eff_net_cont$min, eff_net_cont$max,
             eff_bldg_shr$avg, eff_bldg_shr$min, eff_bldg_shr$max,
-            avg_bldg_dmg_all
+            avg_bldg_dmg_all,
+            stc_bldg_dmg$est, stc_bldg_dmg$se, stc_bldg_dmg$t,
+            stc_net_bldg$est, stc_net_bldg$se, stc_net_bldg$t,
+            stc_cont_dmg$est, stc_cont_dmg$se, stc_cont_dmg$t,
+            stc_net_cont$est, stc_net_cont$se, stc_net_cont$t,
+            stc_bldg_shr$est, stc_bldg_shr$se, stc_bldg_shr$t
         )
     ),
     here("output", "results", "nfip-scalars.csv")

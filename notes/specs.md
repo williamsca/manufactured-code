@@ -4,7 +4,7 @@ Source of truth for every table/figure in `paper.Rmd`/`slides.tex`. Paper text
 is checked against this file, not against memory. Update in the same commit
 as any spec change (see `TODO.md` PROCESS).
 
-Last verified: 2026-08-11, against commit at the top of `notes/LOG.md`.
+Last verified: 2026-08-12, against commit at the top of `notes/LOG.md` (Chunk C1).
 
 ## 1. MHS price/quantity event study (Eq. 1)
 
@@ -21,26 +21,51 @@ Last verified: 2026-08-11, against commit at the top of `notes/LOG.md`.
 ## 2. NFIP claim-level event study (Eq. 2) — main result
 
 - **Script:** `program/estimate/estimate-nfip.R`, run with default args
-  (`agg_geo = "countyfp"`, `BIN_CONSTR_YEAR = 1`)
+  (`agg_geo = "countyfp"`, `BIN_CONSTR_YEAR = 2`, fixed 2026-08-12 in
+  Chunk C1 — was `1L`, i.e. annual bins, contradicting `paper.Rmd`'s
+  claim of two-year binning)
 - **Data:** `derived/nfip-claims.Rds`, restricted to
-  `year_constr` in [1988, 1999] and `year_loss` in [1994, 2023]
+  `year_constr` in [1983, 1999] and `year_loss` in [1994, 2023]
   (`MIN_YEAR_CONSTR`/`MAX_YEAR_CONSTR`/`MIN_YEAR_LOSS`/`MAX_YEAR_LOSS` in
-  `program/import/project-params.R`); rows with negative net payments
-  after recoveries are dropped so the OLS and Poisson estimators share a
-  sample (`dt_claims_est`).
-- **Spec:** `c(building_damage, net_building_pmt, ...) ~ i(period_constr, mh, ref = 1993) | geo^year_loss + mh + period_constr`,
+  `program/import/project-params.R`; `MIN_YEAR_CONSTR` extended from 1988
+  to 1983 in Chunk C1 to buy a longer pre-period for the parallel-trends
+  check — `MAX_YEAR_CONSTR` extension is an open question, not decided);
+  rows with negative net payments after recoveries are dropped so the OLS
+  and Poisson estimators share a sample (`dt_claims_est`).
+- **Spec:** `c(building_damage, net_building_pmt, ...) ~ i(period_constr, mh, ref = 1992) | geo^year_loss + mh + period_constr`,
   where `geo = countyfp`, `period_constr` is the construction-vintage bin
-  (annual, since `BIN_CONSTR_YEAR = 1` in the default run — see script
-  header for the general binning convention), and `mh` indicates
-  manufactured housing.
+  (two-year, `BIN_CONSTR_YEAR = 2`, ref bin 1992-1993 — see script header
+  for the general binning convention), and `mh` indicates manufactured
+  housing.
 - **Baseline geography: county × loss-year.** See §5 below — this was a
-  code/text mismatch as of the start of this chunk and has been fixed.
+  code/text mismatch as of the start of Chunk A and has been fixed.
 - **Weights:** none (claim-level OLS/Poisson)
-- **Clustering:** none (IID SEs). Flagged for Chunk B ("clustering line in
-  the robustness table").
+- **Clustering: by county (`countyfp`, 2,245 clusters)**, fixed 2026-08-12
+  in Chunk C1 — previously no `cluster` argument was passed, so `fixest`
+  silently defaulted to `geo^year_loss` (arbitrary correlation within a
+  county-loss-year, but independence across loss years within a county,
+  which is not defensible given repeat flooding and persistent local
+  siting practices). SEs move only modestly (see Chunk C1 diagnostics in
+  `TODO.md` DONE). Applies to all claim-level specs: `est_claim_es`,
+  `est_claim_pois`, `est_static`, `est_rob_list` (a-d), `est_geo_rob`.
+  State clustering (49 clusters) considered and rejected as the default —
+  visibly noisier variance estimate; pair with a wild cluster bootstrap if
+  a referee asks for it. Two-way county + loss-year rejected: returned a
+  non-positive-definite VCOV and is redundant given `geo^year_loss`.
+- **Static ATT (Chunk C1, new):** `c(building_damage, net_building_pmt, building_damage_share, contents_damage, net_contents_pmt) ~ post_mh | geo^year_loss + mh + post1994`,
+  same sample/geography/clustering as above, collapsing the vintage
+  profile to a single post-1994 × MH coefficient (`post_mh`). This is now
+  the **headline number** reported in the abstract/intro/results — the
+  event study is retained for pre-trends and the compliance ramp, not as
+  the headline figure. Outputs to
+  `output/event-study/countyfp/claims-outcomes-static.tex` (Table
+  `tab:claims-outcomes-static`) and `*_static`/`*_static_se`/`*_static_t`
+  rows in `nfip-scalars.csv`.
 - **Outputs:** `output/event-study/countyfp/claims-outcomes.tex` (Table
   `tab:claims-outcomes`), `output/event-study/countyfp/es-building-damage.pdf`
-  (Figure `fig:es-building-damage`), `output/results/nfip-scalars.csv`
+  (Figure `fig:es-building-damage`, shows `building_damage` — the caption
+  previously said "Net Building Payment per Claim," a mismatch fixed in
+  Chunk C1), `output/results/nfip-scalars.csv`
 
 ## 3. NFIP cell-level event studies (take-up, MH share, policy composition)
 
@@ -244,3 +269,61 @@ not sourced via `` `r ...` `` scalar references.
   `sfha_share`, and `elevated_share` to `nfip-scalars.csv`, parallel to
   `extract_post_stats()`'s existing pattern — left for a follow-up chunk
   given Chunk A's low-effort budget for August.
+
+## 10. Chunk C1 baseline-spec fixes (2026-08-12)
+
+Four changes to the NFIP claim-level design, all contained to
+`estimate-nfip.R`, `project-params.R`, and the run-order documented above.
+Rationale and diagnostics are in `TODO.md` Chunk C1; this section records
+the resulting spec, which is what §2 above now reflects.
+
+1. **Clustering** — added `cluster = ~countyfp` to every claim-level spec
+   (previously IID/`geo^year_loss`-default SEs). Defensibility fix, not a
+   power fix; see §2.
+2. **Bin width** — `BIN_CONSTR_YEAR` default changed `1L` → `2L`. The
+   Makefile calls `estimate-nfip.R` with no arguments, so this was
+   previously building the paper on annual bins while `paper.Rmd` claimed
+   two-year bins; now they agree. Reference bin is 1992-1993 (`ref_period
+   = 1994 - BIN_CONSTR_YEAR = 1992`).
+3. **Sample window** — `MIN_YEAR_CONSTR` changed `1988L` → `1983L` in
+   `project-params.R`. Buys a longer pre-period for the parallel-trends
+   test; claim counts are healthy back through the late 1970s. This
+   parameter is shared by `estimate-nfip.R` and
+   `estimate-sumstats-nfip.R`, so the summary-statistics table's
+   construction-year range moved too (`paper.Rmd` Table `tab:sumstats-nfip`
+   note updated 1986–1999 → 1983–1999). `MAX_YEAR_CONSTR` extension is an
+   **open question**, not decided this chunk — see `TODO.md`.
+4. **Static ATT** — added the previously-empty `# static ----` section:
+   `post_mh` (single post-1994 × MH coefficient) in place of the
+   event-study's per-vintage-bin interactions, same sample/FE/clustering.
+   Reported as the headline number in the abstract, introduction, and
+   results (`paper.Rmd` `bldg_dmg_eff`, now sourced from
+   `building_damage_static` rather than the event-study average
+   `building_damage_avg`, which is retained as `bldg_dmg_evt_avg` for
+   describing the post-1994 ramp). New Table `tab:claims-outcomes-static`
+   (`output/event-study/countyfp/claims-outcomes-static.tex`), wrapped in
+   `landscape` like Table `tab:claims-outcomes` — 5 columns overflow the
+   page width without it (caught by rendering the PDF and checking, not by
+   inspection). New `*_static`/`*_static_se`/`*_static_t` scalar rows in
+   `nfip-scalars.csv` for `building_damage`, `net_building_pmt`,
+   `contents_damage`, `net_contents_pmt`, `building_damage_share`.
+
+**Also fixed:** the `fig:es-building-damage` caption said "Net Building
+Payment per Claim" but the figure is generated from `building_damage`
+(`plot_es(est_claim_es, "building_damage", ...)`) and the body text already
+described it as building damage — caption corrected to match figure and
+text, not the other way around, since building damage (not net payment) is
+the outcome discussed in the surrounding prose and is what the static
+headline table reports.
+
+**Downstream:** all of `nfip-scalars.csv` moved (new sample/bins/clustering
++ new static rows), so `welfare-scalars.csv` and every abstract/intro/
+results/discussion number derived from it shifted. Full chain verified this
+chunk: `make estimates && make test && make paper.pdf` from a fresh
+`paper.pdf`, no errors. `make data` (raw import layer) not reverified — see
+§7's standing caveat about `$DATA_PATH` access.
+
+**Not done, per TODO's "considered and deliberately not adopted":** the
+`+ Controls` robustness columns (`fmla_rob_b`, `fmla_rob_d`) were not
+relabeled as a decomposition in this chunk — text-only change, deferred to
+whichever chunk writes up that section (constrains Chunk F).

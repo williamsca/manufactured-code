@@ -4,6 +4,110 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk C1 — Fix specifications (2026-08-12)
+
+**Base commit:** 7209775
+
+### What was done
+
+Four baseline-spec fixes to the NFIP claim-level design (`estimate-nfip.R`,
+`project-params.R`), all identified in Chunk A/the review and scoped in
+`TODO.md` Chunk C1. Run before D–G since every downstream number moves.
+
+1. **Cluster by county.** `est_claim_es`, `est_claim_pois`, the four
+   `est_rob_list` covariate-robustness specs, and `est_geo_rob` now pass
+   `cluster = ~countyfp` (2,245 clusters). Previously no `cluster` argument
+   was set, so `fixest` silently defaulted to the first FE (`geo^year_loss`),
+   which is not defensible given repeat flooding and persistent local
+   siting practices within a county. This is a defensibility fix — SEs
+   move only modestly, per the diagnostics logged in `TODO.md`.
+2. **Two-year construction bins as the default.** `BIN_CONSTR_YEAR`
+   default changed `1L` → `2L` (`estimate-nfip.R:29`). The Makefile calls
+   the script with no arguments, so the paper was being built on annual
+   bins while `paper.Rmd` already claimed two-year binning — now true.
+   Reference bin moves from 1993 to 1992-1993, matching the paper text's
+   "1992 reference bin" (already correct, was a latent bug).
+3. **Extended construction window to 1983.** `MIN_YEAR_CONSTR` changed
+   `1988L` → `1983L` in `project-params.R`. Buys a longer pre-period for
+   the parallel-trends test. This constant is shared with
+   `estimate-sumstats-nfip.R`, so the summary-stats table's
+   construction-year range moved too — updated the note in `paper.Rmd`
+   (`tab:sumstats-nfip`, was "1986–1999," now correctly "1983–1999").
+   `MAX_YEAR_CONSTR` extension past 1999 is an **open question**, not
+   decided this chunk (see the 2005 construction-year-bin sentinel-value
+   flag in `TODO.md`).
+4. **Added the static TWFE.** Filled in the previously-empty `# static
+   ----` section: `post_mh` (single post-1994 × MH coefficient) on the
+   same sample/FE/clustering as the event study, for `building_damage`,
+   `net_building_pmt`, `building_damage_share`, `contents_damage`, and
+   `net_contents_pmt`. New table
+   `output/event-study/countyfp/claims-outcomes-static.tex`
+   (`tab:claims-outcomes-static` in `paper.Rmd`, wrapped in `landscape` —
+   without it the 5-column table overflowed the page width, caught by
+   rendering and checking the PDF). New `*_static`/`*_static_se`/
+   `*_static_t` scalar rows in `nfip-scalars.csv`. Wired into the
+   abstract, introduction, and results as the **headline number**
+   (`paper.Rmd`'s `bldg_dmg_eff` now reads `building_damage_static`
+   instead of the event-study average `building_damage_avg`, which is
+   kept as a separate `bldg_dmg_evt_avg` for describing the post-1994
+   ramp in the results text, not as the headline).
+
+**Also fixed (from the same TODO item's bookkeeping):** the
+`fig:es-building-damage` caption said "Net Building Payment per Claim" but
+the figure and surrounding prose are both about `building_damage` —
+corrected the caption to match, rather than changing the figure or text.
+
+### What changed in outputs
+
+- `paper.pdf`: headline building-damage effect changed from the
+  event-study average (~$4,800/claim) to the static ATT (~$3,700/claim,
+  SE ~$1,650) — a real point-estimate change, not just a relabeling, since
+  clustering, binning, and the sample window all changed simultaneously
+  with the switch to the static estimator. Abstract, intro, and Results
+  §Benefit Side all updated; `tab:sumstats-nfip` construction-year range
+  note corrected.
+- `output/results/nfip-scalars.csv`, `output/results/welfare-scalars.csv`:
+  regenerated; new `*_static` rows added to the former.
+- `output/event-study/countyfp/*.tex`, `output/event-study/countyfp/*.pdf`:
+  regenerated under the new spec; new `claims-outcomes-static.tex`.
+- `notes/specs.md` §2 rewritten to describe the new spec; new §10
+  documents the chunk's changes and rationale in one place.
+
+### Verified
+
+- `make estimates && make test && make paper.pdf` — clean run from a
+  deleted `paper.pdf`, on the `derived/*.Rds` files already on disk
+  (no `$DATA_PATH` access in this session, consistent with Chunk A's
+  environment note — `make data` not reverified).
+- `make test` — all fake-data tests pass unchanged (they exercise the
+  estimator logic, not these specific parameter values).
+- Spot-checked the rendered PDF text (`pdftotext`) for: the new headline
+  number in the abstract and intro, the static table rendering all 5
+  columns after the `landscape` fix, and the corrected 1983–1999
+  construction-year range in both the Final Sample paragraph and the
+  summary-statistics table note.
+
+**Resolved same session:** Colin confirmed `building_damage` as the
+headline outcome (2026-08-12) — matches what was implemented, no code
+change needed. `TODO.md`'s bookkeeping item and `notes/specs.md` §10
+updated to record the decision explicitly rather than leaving it open.
+
+### Open questions for check-in
+
+1. Whether to extend `MAX_YEAR_CONSTR` past 1999 (TODO.md flags a likely
+   sentinel-value issue in the 2005 construction-year bin to check first —
+   not investigated this chunk).
+2. Table `tab:claims-outcomes-static` sits directly after Table
+   `tab:claims-outcomes`, both in `landscape`, which means two full
+   landscape pages back-to-back — fine as a draft, may want to reflow for
+   the APPAM version.
+3. Did not touch the `+ Controls` robustness columns' labeling (mediators
+   vs. cleaner estimate) — per TODO.md's "considered and deliberately not
+   adopted" note, that's a text-only change left for whichever chunk
+   writes up that section (constrains Chunk F).
+
+---
+
 ## Chunk A — Verification harness and reconciliation (2026-08-11)
 
 **Base commit:** f899e87

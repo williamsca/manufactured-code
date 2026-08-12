@@ -46,7 +46,13 @@ fmt_pct <- function(x, digits = 0) {
 price_eff      <- fmt_d(get_mhs("price_effect_level"))
 price_pct      <- fmt_pct(get_mhs("price_effect_pct"))
 avg_price_tr   <- fmt_d(get_mhs("avg_price_treated_pre"))
-bldg_dmg_eff   <- fmt_d(abs(get_nfip("building_damage_avg")))
+# Headline ATT: static post_mh coefficient (single precisely-estimated
+# number), not the average of the event study's eleven noisy period_constr
+# x mh coefficients. The event study (bldg_dmg_evt_avg) is retained for
+# describing pre-trends and the post-1994 ramp, not as the headline figure.
+bldg_dmg_eff   <- fmt_d(abs(get_nfip("building_damage_static")))
+bldg_dmg_se    <- fmt_d(abs(get_nfip("building_damage_static_se")))
+bldg_dmg_evt_avg <- fmt_d(abs(get_nfip("building_damage_avg")))
 bldg_shr_avg   <- round(abs(get_nfip("building_damage_share_avg")))
 # range: effects are negative; min is most negative (largest abs effect)
 bldg_shr_lo    <- round(abs(get_nfip("building_damage_share_max")))
@@ -141,7 +147,7 @@ I use two datasets from FEMA on individual flood insurance claims and policy rec
 
 ### Final Sample
 
-I restrict the sample to homes with construction years between 1986 and 1999 and loss dates from 1994 onward. Because claims for manufactured homes are relatively rare, I bin both the construction year and loss year in two and five year periods, respectively, to improve power. For the policy analysis, I construct a balanced panel at the county $\times$ loss-period $\times$ housing-type $\times$ construction-period level, including cells with zero claims. Each cell reports the total number of unique policies which were active at any time during the loss-period along with the average policy characteristics.
+I restrict the sample to homes with construction years between 1983 and 1999 and loss dates from 1994 onward. Because claims for manufactured homes are relatively rare, I bin both the construction year and loss year in two and five year periods, respectively, to improve power. For the policy analysis, I construct a balanced panel at the county $\times$ loss-period $\times$ housing-type $\times$ construction-period level, including cells with zero claims. Each cell reports the total number of unique policies which were active at any time during the loss-period along with the average policy characteristics.
 
 All nominal values are deflated to constant (2000) dollars using the CPI-U. I restrict both samples to the continental US. Table \ref{tab:sumstats-nfip} reports summary statistics for the NFIP data by construction vintage and housing type. Manufactured homes generally experience lower building and contents damage than site-built homes, with correspondingly lower coverage amounts. I observe `r n_mh_claims` claims for manufactured homes in the sample, or roughly `r mh_claim_pct`% of all claims, substantially lower than the share of manufactured homes in the overall housing stock \citep{genz_why_2001}.
 
@@ -189,7 +195,7 @@ Figure \ref{fig:es-placements} shows the corresponding event study for log place
 
 ### Post 1994 MH experience lower flood damages
 
-Figure \ref{fig:es-building-damage} presents the main result: the event study for average building damage per claim. Pre-1994 construction-period coefficients are flat and close to zero, confirming parallel vintage trends between manufactured and site-built homes before the HUD standard took effect. Beginning with the 1994 construction cohort, manufactured homes experience sharply lower building damage relative to site-built homes. The effect stabilizes at over `r bldg_dmg_eff` per claim, or almost `r bldg_pct_avg`% of the average building damage across all claims.
+Figure \ref{fig:es-building-damage} presents the event study for building damage per claim. Pre-1994 construction-period coefficients are flat and close to zero, confirming parallel vintage trends between manufactured and site-built homes before the HUD standard took effect. Beginning with the 1994 construction cohort, manufactured homes experience sharply lower building damage relative to site-built homes, stabilizing at over `r bldg_dmg_evt_avg` per claim in later cohorts as compliance ramps up. Table \ref{tab:claims-outcomes-static} collapses this vintage profile to a single pre/post-1994 comparison: manufactured homes built after 1994 experience `r bldg_dmg_eff` (SE `r bldg_dmg_se`) lower building damage per claim than site-built homes of the same vintage, or almost `r bldg_pct_avg`% of the average building damage across all claims. I report this static estimate as the headline number, since it is a single precisely-estimated average treatment effect rather than an average of eleven individually-noisy event-study coefficients; the event study itself remains the vehicle for showing flat pre-trends and the compliance ramp.
 
 Table \ref{tab:claims-outcomes} presents supplementary outcomes on insurance payments and damage to the building's contents. Column (3) shows effects on building damage as a share of its assessed value. Conditional on filing a claim, post-1994 manufactured homes tend to experience damage that is between `r bldg_shr_lo`% and `r bldg_shr_hi`% less as a proportion of their value than site-built homes of the same vintage. While the HUD wind standard raised prices, it decreased both absolute and relative flood damages. Contents damage and payments decline by roughly `r cont_dmg_eff` and `r net_cont_eff`, respectively, consistent with improved structural integrity.
 
@@ -252,7 +258,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \begin{threeparttable}
     \input{output/descriptives/sumstats-nfip.tex}
     \begin{tablenotes}
-      \item Notes: Summary statistics for the NFIP data by housing type. Panel A reports policy-level outcomes from the balanced panel (2009--2023), which covers policy years for homes with construction years 1986--1999; share variables (elevated building, SFHA, primary residence, mandatory purchase) and claim rate are weighted means using the number of policies as weights. Claim rate is the number of claims per policy-year. Panel B reports claim-level means from the full claims sample (1994--2023), restricted to the same construction year range. All nominal values are deflated to constant (2000) dollars. Source: FEMA OpenFEMA claims and policy data.
+      \item Notes: Summary statistics for the NFIP data by housing type. Panel A reports policy-level outcomes from the balanced panel (2009--2023), which covers policy years for homes with construction years 1983--1999; share variables (elevated building, SFHA, primary residence, mandatory purchase) and claim rate are weighted means using the number of policies as weights. Claim rate is the number of claims per policy-year. Panel B reports claim-level means from the full claims sample (1994--2023), restricted to the same construction year range. All nominal values are deflated to constant (2000) dollars. Source: FEMA OpenFEMA claims and policy data.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
@@ -281,7 +287,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 
 \begin{figure}[htbp]
   \centering
-  \caption{Effect of 1994 HUD Standards on Net Building Payment per Claim}\label{fig:es-building-damage}
+  \caption{Effect of 1994 HUD Standards on Building Damage per Claim}\label{fig:es-building-damage}
   \includegraphics{output/event-study/countyfp/es-building-damage.pdf}
   \begin{flushleft}
   \begin{footnotesize}
@@ -297,7 +303,20 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \begin{threeparttable}
     \input{output/event-study/countyfp/claims-outcomes.tex}
     \begin{tablenotes}
-      \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data. All damage and payment values are reported in thousands of 2000 dollars. \emph{Bldg.\ dmg.\ share} reports damage as a percentage of the assessed building value. Source: OpenFEMA claims data.
+      \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data. Standard errors clustered by county. All damage and payment values are reported in thousands of 2000 dollars. \emph{Bldg.\ dmg.\ share} reports damage as a percentage of the assessed building value. Source: OpenFEMA claims data.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+\end{landscape}
+
+\begin{landscape}
+\begin{table}[htbp]
+  \centering
+  \caption{Static Difference-in-Differences}\label{tab:claims-outcomes-static}
+  \begin{threeparttable}
+    \input{output/event-study/countyfp/claims-outcomes-static.tex}
+    \begin{tablenotes}
+      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-benefit}, replacing the vintage-bin interactions $\sum_k \beta_k (\mathbf{1}[\nu_i = k] \times \text{MH}_i)$ with a single post-1994 $\times$ MH indicator (\emph{post\_mh}), estimated on the same claim-level sample and county $\times$ loss-year fixed effects as Table \ref{tab:claims-outcomes}, with a separate post-1994 main effect. Standard errors clustered by county. All damage and payment values are reported in thousands of 2000 dollars. Source: OpenFEMA claims data.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
