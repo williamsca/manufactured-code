@@ -240,7 +240,7 @@ dt_claims_est <- dt_claims[
 # claim-level event study
 fmla_claim_es <- as.formula(paste0(
     s_claim, " ~ i(period_constr, mh, ref = ref_period)",
-    " | statefp^year_loss + mh + period_constr"
+    " | geo^year_loss + mh + period_constr"
 ))
 
 est_claim_es <- feols(fmla_claim_es, data = dt_claims_est)
@@ -257,8 +257,7 @@ etable(
 etable(
     est_claim_es[lhs = v_alt],
     tex = TRUE, se.below = FALSE,
-    file = here("output", "event-study", "statefp",
-        "claims-outcomes.tex"),
+    file = file.path(out_dir, "claims-outcomes.tex"),
     fitstat = c("n", "r2", "my"),
     digits = 2, digits.stats = 2, replace = TRUE
 )
@@ -296,7 +295,7 @@ s_comp <- paste0("c(", paste(v_comp, collapse = ", "), ")")
 
 fmla_comp_post <- as.formula(paste0(
     s_comp, " ~ i(period_constr, mh, ref = ref_period)",
-    " | geo^period_loss + mh"
+    " | geo^period_loss + mh + period_constr"
 ))
 
 est_comp_post <- feols(
@@ -338,7 +337,7 @@ iplot(est_share_es)
 # count event study (Poisson)
 fmla_out_es <- as.formula(paste0(
     "c(policies_n, claims_n)", " ~ i(period_constr, mh, ref = ref_period)",
-    " | geo^period_loss + mh"
+    " | geo^period_loss + mh + period_constr"
 ))
 
 est_pois_es <- fepois(
@@ -351,7 +350,7 @@ iplot(est_pois_es)
 # OLS: policies per SF permit (ratio outcome, not count)
 est_ppermit_es <- feols(
     policies_ppermit ~ i(period_constr, mh, ref = ref_period) |
-        geo^period_loss + mh,
+        geo^period_loss + mh + period_constr,
     data = dt_pois[!is.na(permits_sf_n) & permits_sf_n > 0],
     lean = TRUE, weights = ~permits_sf_n,
 )
@@ -400,13 +399,14 @@ etable(est_rob_list, tex = TRUE,
     fitstat = c("n", "r2"), digits = 2, digits.stats = 2, replace = TRUE,
     depvar = FALSE)
 
-# geographic robustness: county vs. tract FEs ----
-# Compare baseline county-level controls with census-tract-level controls.
-# Both columns use the same interaction specification; only the geographic
+# geographic robustness: state vs. county vs. tract FEs ----
+# County is the baseline geography for the main results (see fmla_claim_es
+# above). Compare against coarser (state) and finer (tract) alternatives.
+# All columns use the same interaction specification; only the geographic
 # granularity of the location × loss-period fixed effect varies.
 fmla_geo_rob <- building_damage ~
     i(period_constr, mh, ref = ref_period) |
-    sw(countyfp^period_loss, tractfp^period_loss) + mh
+    sw(statefp^period_loss, countyfp^period_loss, tractfp^period_loss) + mh
 
 est_geo_rob <- feols(fmla_geo_rob, data = dt_claims_est, lean = TRUE)
 

@@ -20,6 +20,7 @@ library(here)
 library(data.table)
 
 source(here("program", "import", "project-params.R"))
+source(here("program", "estimate", "welfare-lib.R"))
 
 # ---------------------------------------------------------------------------
 # Parameters ----
@@ -118,11 +119,6 @@ cat(sprintf("  1990-1994 only:  %.4f\n", rate_pre_9094))
 # ---------------------------------------------------------------------------
 # 4. Per-unit NPV for a post-1994 MH purchaser ----
 # ---------------------------------------------------------------------------
-
-npv_annuity <- function(annual_benefit, r, lifespan) {
-    if (r == 0) return(annual_benefit * lifespan)
-    annual_benefit * (1 - (1 + r)^(-lifespan)) / r
-}
 
 scenarios <- CJ(
     counterfactual = c("pooled_pre", "vintage_9094"),

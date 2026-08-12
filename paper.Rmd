@@ -89,7 +89,7 @@ I estimate both the direct cost of compliance, in the form of additional constru
 
 On the cost side, I use the Census Bureau's Manufactured Housing Survey to estimate a difference-in-differences comparing manufactured home prices in states with HUD wind zones II and III (treated) to zone I states (control), before and after 1994. Prices in treated states rose by `r price_eff`, an increase of roughly `r price_pct` on an average of `r avg_price_tr` in treated states. There is no detectable effect on placements, though point estimates are imprecise. Taking the point estimates at face value, a price increase with no change in quantity is consistent with a world where households value the HUD-mandated improvements roughly at cost.
 
-On the benefit side, I use flood insurance claim and policy data from the National Flood Insurance Program (NFIP) to estimate the effect of the HUD standard on flood damage. My identification strategy exploits two sources of variation: MH versus site-built housing, and post-1994 versus pre-1994 construction vintage. Tract by flood-loss-period fixed effects ensure comparisons are made only between homes exposed to the same floods in the same location. This is a double-difference in vintage and housing type: the site-built comparison group absorbs secular changes in construction quality and storm severity, isolating the manufactured-home-specific break at 1994.
+On the benefit side, I use flood insurance claim and policy data from the National Flood Insurance Program (NFIP) to estimate the effect of the HUD standard on flood damage. My identification strategy exploits two sources of variation: MH versus site-built housing, and post-1994 versus pre-1994 construction vintage. County by flood-loss-period fixed effects ensure comparisons are made only between homes exposed to the same floods in the same location. This is a double-difference in vintage and housing type: the site-built comparison group absorbs secular changes in construction quality and storm severity, isolating the manufactured-home-specific break at 1994.
 
 Post-1994 manufactured homes experience `r bldg_dmg_eff` lower building damage per claim relative to pre-1994 manufactured homes, compared to the same vintage difference for site-built homes. The event study shows flat pre-trends and a sharp break at 1994 that grows slightly with later construction cohorts, consistent with delays between the manufacture and installation of MH. I also find that damage as a share of the building's assessed value declines by approximately `r bldg_shr_avg`% and that contents payments decline by about `r net_cont_eff` per claim. At the same time, MH policies for post-1994 vintages have higher replacement costs and coverage amounts, and are more likely to be located in high-risk areas, all of which would tend to increase expected NFIP payments. These compositional shifts suggest that the estimated damage reductions comprise a lower bound on the true treatment effect of the HUD standard on flood damage.
 
@@ -282,7 +282,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Standards on Net Building Payment per Claim}\label{fig:es-building-damage}
-  \includegraphics{output/event-study/statefp/es-building-damage.pdf}
+  \includegraphics{output/event-study/countyfp/es-building-damage.pdf}
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-benefit}. Nominal values are deflated to 2000 dollars. Source: OpenFEMA claims data.
@@ -295,7 +295,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Supplementary Claims Outcomes}\label{tab:claims-outcomes}
   \begin{threeparttable}
-    \input{output/event-study/statefp/claims-outcomes.tex}
+    \input{output/event-study/countyfp/claims-outcomes.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data. All damage and payment values are reported in thousands of 2000 dollars. \emph{Bldg.\ dmg.\ share} reports damage as a percentage of the assessed building value. Source: OpenFEMA claims data.
     \end{tablenotes}
@@ -324,7 +324,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \begin{threeparttable}
     \input{output/event-study/geo-robustness.tex}
     \begin{tablenotes}
-      \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data. Column (1) uses county $\times$ loss-period fixed effects (baseline). Column (2) replaces county with census tract $\times$ loss-period fixed effects. Building damage values are in thousands of 2000 dollars. Source: OpenFEMA claims data.
+      \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data (outcome: building damage, in thousands of 2000 dollars). Column (2) uses county $\times$ loss-period fixed effects (baseline, as in Table \ref{tab:claims-outcomes}). Column (1) coarsens to state $\times$ loss-period; column (3) refines to census tract $\times$ loss-period. Source: OpenFEMA claims data.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
@@ -345,7 +345,7 @@ Table \ref{tab:take-up} reports estimates from a PPML model of total policy coun
   \centering
   \caption{NFIP Take-Up}\label{tab:take-up}
   \begin{threeparttable}
-    \input{output/event-study/statefp/take-up.tex}
+    \input{output/event-study/countyfp/take-up.tex}
     \begin{tablenotes}
       \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on the cell-level panel. Column (1) estimates a PPML model with total policies as the outcome. Source: OpenFEMA policy data.
     \end{tablenotes}
