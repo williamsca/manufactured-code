@@ -16,14 +16,38 @@ year_max <- 2003L
 # import ----
 
 # wind zone classification
-dt_treat <- fread(
+dt_wz <- fread(
     here("derived", "ecfr-windzone.csv"),
     keepLeadingZeros = TRUE
 )
 
+dt_treat <- copy(dt_wz)
 dt_treat[, statefp := substr(countyfp, 1, 2)]
 
 dt_treat <- dt_treat[, .(wind_zone = max(wind_zone)), by = .(statefp)]
+
+# continuous treatment intensity: MH-stock-weighted share of a state's
+# 1980-2000 MH stock sitting in a Zone II/III county. Binary `treated`
+# above is diluted (e.g. GA has one WZ2/3 county but is coded fully
+# treated); this recovers within-treated-group variation in how much of
+# the state's MH stock the reform actually bound on. A handful of
+# counties (AK, HI, NYC boroughs, renamed/consolidated FIPS codes) have
+# no eCFR match; following the `statefp == 36` fallback in
+# databuild-nfip.R, unmatched counties default to Zone I.
+dt_stock <- readRDS(here("derived", "census2000-mh-county-vintage.Rds"))
+dt_stock <- dt_stock[, .(mh_stock = sum(mh_units)), by = countyfp]
+
+dt_intensity <- merge(dt_stock, dt_wz, by = "countyfp", all.x = TRUE)
+dt_intensity[is.na(wind_zone), wind_zone := 1L]
+dt_intensity[, statefp := substr(countyfp, 1, 2)]
+
+dt_intensity <- dt_intensity[, .(
+    mh_stock      = sum(mh_stock),
+    mh_stock_wz23 = sum(mh_stock * (wind_zone >= 2L))
+), by = statefp]
+dt_intensity[, treated_intensity := mh_stock_wz23 / mh_stock]
+
+saveRDS(dt_intensity, here("derived", "mhs-windzone-intensity.Rds"))
 
 # state crosswalk
 dt_state <- fread(
@@ -53,6 +77,15 @@ stopifnot(!anyNA(dt$wind_zone))
 
 dt[, treated := (wind_zone >= 2)]
 dt[, treated_wz3 := (wind_zone == 3)]
+
+dt <- merge(
+    dt, dt_intensity[, .(statefp, treated_intensity)],
+    by = "statefp", all.x = TRUE)
+dt[is.na(treated_intensity), treated_intensity := 0]
+
+# high-intensity treated states only: FL, LA, MA (see notes/specs.md
+# Chunk C for the state table with all intensities)
+dt[, high_intensity := statefp %in% c("12", "22", "25")]
 
 # CPI
 dt <- merge(dt, dt_cpi[, .(year, cpi)], by = "year", all.x = TRUE)

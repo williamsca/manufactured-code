@@ -83,7 +83,7 @@ The paper cites the adaptation and building-code literature, but it does not for
 
 ### 1. Common Vintage Effects Are Missing From The Benefit Specification
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The primary benefit-side specification is an event study that imposes no functional form on the vintage profile:
@@ -117,7 +117,7 @@ This paragraph moves too quickly from observed policy characteristics to the dir
 
 ### 3. Conclusion Overstates Cost Effectiveness Relative To The Reported Calculation
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > For the 22 million Americans living in manufactured homes—disproportionately low-income, credit-constrained, and underinsured—these findings have direct policy relevance. The HUD standard provides catastrophe protection to a population that private insurance markets largely fail to reach. As climate change intensifies hurricane and flood risk, the returns to mandated adaptation investment in this housing sector are likely growing. The results suggest that building code reform
@@ -133,7 +133,7 @@ The cost-benefit calculation reports a present value of roughly $1,600 in expect
 
 ### 4. Population Claim Goes Beyond The NFIP Claim Sample
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > For the 22 million Americans living in manufactured homes—disproportionately low-income, credit-constrained, and underinsured—these findings have direct policy relevance. The HUD standard provides catastrophe protection to a population that private insurance markets largely fail to reach. As climate change intensifies hurricane and flood risk, the returns to mandated adaptation investment in this housing sector are likely growing. The results suggest that building code reform
@@ -149,7 +149,7 @@ The institutional logic is plausible: a construction standard applies whether or
 
 ### 5. Per-Claim Damage Reduction Is Stated Inconsistently
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The 1994 HUD wind standard reform raised manufactured home prices by roughly $5,000 and reduced flood damage by $7,000 per claim. Even through this single channel, the expected damage reduction recovers a meaningful share of the compliance cost over a home’s lifespan.
@@ -173,7 +173,7 @@ The phrase "all factory-built housing" is too broad for the institutional claim 
 
 ### 7. Wind-Zone Requirements Are Not Uniform Nationwide
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The preemption of local codes is a distinctive feature of the manufactured housing market. Site-built homes are subject to state and local building codes, which vary substantially across jurisdictions and are enforced through local permitting and inspection processes. Manufactured homes, by contrast, must meet a single federal standard. This institutional feature is central to the identification strategy: the 1994 reform applied uniformly to all manufactured homes nationwide, while leaving site-built homes unaffected.
@@ -185,7 +185,7 @@ The paragraph correctly emphasizes federal administration and preemption, but th
 
 ### 8. Window Requirement Appears Overstated
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > In 1994, HUD revised the Manufactured Home Construction and Safety Standards—the federal building code governing all factory-built housing—to impose wind resistance requirements. The reform created a three-zone wind classification system and required structural upgrades including steel strapping, upgraded sheathing fastening, and impact-rated windows for homes sited in high-wind zones.
@@ -197,7 +197,7 @@ The examples should track the actual wind provisions closely, since they anchor 
 
 ### 9. Chattel-Loan Exemption Is Stated Too Broadly
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The National Flood Insurance Program provides federally backed flood insurance to property owners in participating communities. Flood insurance is mandatory for properties with federally backed mortgages in FEMA-designated Special Flood Hazard Areas (SFHAs). However, manufactured homes are frequently financed with chattel loans (personal property loans secured by the home but not the land), which are exempt from the mandatory purchase requirement. As a result, NFIP take-up among manufactured homeowners is substantially lower than among site-built homeowners in comparable flood zones.
@@ -209,7 +209,7 @@ The institutional point is important, but the wording makes the chattel-loan cha
 
 ### 10. Post-Reform Cohorts Are Reduced-Form Exposure Effects
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The coefficients $\beta_{k}$ capture the manufactured-home-specific vintage profile relative to the 1992 reference bin. Post-1994 coefficients are the treatment effects.
@@ -225,7 +225,7 @@ The text first labels post-1994 coefficients as treatment effects, then explains
 
 ### 11. Annual Price Data Cannot Identify Anticipation
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Prices diverge sharply in 1994, with treated states experiencing a $5000 increase that stabilizes by 1995 and persists through the end of the sample. The price effect is economically large, corresponding to an 13% increase in the price.
@@ -239,7 +239,7 @@ The annual event study can show that the break occurs in the implementation year
 
 ### 12. Persistent Premium Does Not Identify The Cost Structure
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The immediacy of the effect is consistent with the regulation raising production costs: manufacturers anticipated the July 1994 effective date and adjusted pricing accordingly. The persistence of the premium through 2000 suggests that the regulation caused persistently higher variable costs rather than a one-time fixed cost to redesign models and re-arrange production lines.
@@ -253,7 +253,7 @@ A persistent price premium is consistent with higher marginal production costs, 
 
 ### 13. Null Placements Do Not Pin Down Demand Elasticity
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Figure 3 shows the corresponding event study for log placements. There is no detectable effect on the quantity of manufactured homes shipped to treated states. The point estimates are small and imprecise, centered around zero, and statistically insignificant throughout the post-period. This null result on quantities, combined with the positive price effect, is consistent with two possibilities: either demand for MH is relatively inelastic, so that the price change had little effect on equilibrium quantities; or the demand curve simultaneously shifted outwards due to the increased value of the improved construction, offsetting the higher price.
@@ -265,7 +265,7 @@ The placement result should be described as imprecise evidence on quantities, no
 
 ### 14. Tract Controls Do Not Rule Out Within-Tract Exposure Differences
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Table 4 compares the two specifications. The tract-level estimates are very similar in magnitude to the county-level baseline, with modestly wider confidence intervals reflecting the smaller sample sizes within tracts. The agreement across geographic controls supports the identifying assumption that vintage effects are not confounded by within-county variation in flood exposure.
@@ -277,7 +277,7 @@ The robustness exercise is useful, but the final sentence overstates what tract-
 
 ### 15. Elevation Timing Needs To Be Tied To The Affected Cohorts
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The one composition shift that works in the direction of the main result is the elevated-building share, which rises by 5 percentage points for post-1998 construction vintages. Elevation is plausibly part of the treatment channel—the HUD Code encouraged improved siting and installation practices—rather than a confound. Primary-residence share is essentially unchanged across vintages.
@@ -289,7 +289,7 @@ The timing matters here. The reform is interpreted as affecting post-1994 constr
 
 ### 16. Policy Panel Denominator Is Ambiguous In Zero-Claim Cells
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > For the policy analysis, I construct a balanced panel at the county $\times$ loss-period $\times$ housing-type $\times$ construction-period level, including cells with zero claims. Each cell reports the total number of unique policies which were active at any time during the loss-period along with the average policy characteristics.
@@ -301,7 +301,7 @@ The phrase "including cells with zero claims" needs one more distinction. Cells 
 
 ### 17. Policy Tables Need A Clearly Defined Time Dimension
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Fixed-effects  |   |   |   |   |   |   |   |
@@ -323,7 +323,7 @@ Table 3 uses policy characteristics, but the fixed-effect and clustering labels 
 
 ### 18. NFIP Take-Up Specification Inherits Undefined Loss-Period Notation
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Notes: Coefficients from Equation (2) estimated on the cell-level panel. Column (1) estimates a PPML model with total policies as the outcome. Source: OpenFEMA policy data.
@@ -335,7 +335,7 @@ The appendix says the policy-count PPML is estimated from Equation (2), but Equa
 
 ### 19. Table 4 Omits The Clustering Level
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Table 4: Building Damage - Robustness
@@ -373,7 +373,7 @@ Table 4 reports standard errors and significance stars but does not state the cl
 
 ### 20. Reference Year Should Be Omitted In The Price Event Study
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > $\log(P_{st})=\alpha_{s}+\gamma_{t}+\sum_{k}\beta_{k}(\mathbf{1}[\text{year}=k]\times\text{Treated}_{s})+\varepsilon_{st}$ (1)
@@ -387,7 +387,7 @@ The text says the coefficients are relative to 1993, but the equation does not s
 
 ### 21. Damage-Share Effects Are Percentage Points, Not Percent
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > Table 2 presents supplementary outcomes on insurance payments and damage to the building’s contents. Column (3) shows effects on building damage as a share of its assessed value. Conditional on filing a claim, post-1994 manufactured homes tend to experience damage that is between 6% and 9% less as a proportion of their value than site-built homes of the same vintage. While the HUD wind standard raised prices, it decreased both absolute and relative flood damages. Contents damage and payments decline by roughly $2,000 and $1,000, respectively, consistent with improved the structural integrity.
@@ -399,7 +399,7 @@ Column (3) is reported as damage as a percentage of assessed value, so coefficie
 
 ### 22. Table 1 Damage Units Are Mislabeled
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > |  Claim outcomes (1994–2023)  |   |   |
@@ -416,7 +416,7 @@ The entries appear to be in thousands of dollars, not dollars. Table 2 reports a
 
 ### 23. Theory Prediction About Insurance Demand Is Too Strong
 
-**Status**: [Pending]
+**Status**: [Addressed]
 
 **Quote**:
 > The damage estimates in the main text condition on filing a claim and do not speak to whether the HUD code reform affected NFIP take-up. Standard theory predicts that self-protection and insurance are substitutes: households facing lower expected losses should demand less coverage (Ehrlich and Becker, 1972). This appendix examines whether the reform affected the number of NFIP policies held by manufactured homeowners.

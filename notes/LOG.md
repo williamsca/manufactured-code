@@ -4,6 +4,224 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk B — Review quick fixes (2026-08-12)
+
+**Base commit:** 9e13e4b (uncommitted at time of writing). Note: a peer
+session was working Chunk C in the same working tree; that chunk's changes
+to `databuild-mhs.R`/`estimate-mhs.R` and its `specs.md` §11 / LOG entry are
+**not** part of this chunk's diff. Chunk B touched `paper.Rmd`,
+`program/estimate/estimate-nfip.R` (one dict label),
+`program/descriptives/estimate-sumstats-nfip.R`, the review file, `TODO.md`,
+and `notes/specs.md` §3.
+
+### What was done
+
+Text, notation, and units batch from the review — comments 1, 3-5, 7-15,
+20-23 — plus the panel-structure clarifications, 16-18. 21 of 23 detailed
+comments are now `[Addressed]`; comment 2 (conservative-bias language) is
+assigned to Chunk F and comment 6 was already closed.
+
+**Notation (1, 20).** Eq. (2) gains the common construction-vintage term
+`\lambda_{\nu_i}` and an explicit `k \neq 1992`, with prose describing
+`\beta_k` as MH-specific deviations from the common vintage profile. This
+is a notation fix only: `period_constr` has been in the estimating formula
+since Chunk A. Eq. (1) gains `k \neq 1993` plus a sentence on why the
+reference interaction must be dropped.
+
+**Damage shares in percentage points (21).** The outcome is
+`100 x damage / assessed value`, so coefficients are percentage-point
+changes in that ratio. The old text reported "between 1% and 22% less,"
+built from `abs()` of the event-study min and max — but the max is now
+**+0.8** (one post-1994 share coefficient is positive), so that range was
+both mislabeled and directionally misleading. Replaced with the static
+estimate, `-12.8 pp (SE 4.4)`, consistent with Chunk C1's decision to make
+the static ATT the headline. New scalars `bldg_shr_static`,
+`bldg_shr_static_se` in the setup chunk; `bldg_shr_lo`/`_hi`/`_avg` retired.
+
+**Panel structure (16-18).** The Data section now states that the balanced
+panel is built over tract-periods with positive policy exposure; that
+policy records begin in 2009 so the policy panel is three five-year
+calendar periods (2009-2013, 2014-2018, 2019-2023); that zero-claim cells
+with at least one active policy are kept and contribute a zero to the claim
+rate; and that zero-policy cells are dropped from the weighted cell-level
+regressions and appear only in the take-up PPML. The `v_dict` entry for
+`period_loss` changed from "Loss period" to **"Calendar period"**, so the
+policy tables no longer label a policy-year bin as a loss period; the
+composition and take-up table notes now spell out the panel dimensions and
+the FE substitution relative to Eq. (2).
+
+**Units (22).** Table 1's damage rows relabeled `(\$000s)` and given one
+decimal (integers in $000s were rounding away real precision), with the
+scale stated in the table note.
+
+**Softened claims (11-15).** Anticipation, cost-structure, and demand-
+elasticity readings all reworded to what the estimates can support; the
+elevation paragraph now says explicitly that the elevated-building share
+rises only in the latest vintages and so cannot explain the 1994-96 bins;
+the (still commented-out) tract-FE robustness paragraph no longer claims to
+rule out within-tract exposure differences, and its table note now states
+the clustering level (19).
+
+**Institutional wording (7-9).** "Applied uniformly to all manufactured
+homes nationwide" replaced with national administration + zone-varying
+intensity, which is also what the cost design actually exploits;
+"impact-rated windows" replaced with the wind-pressure/components-and-
+cladding language; the chattel-loan exemption recast as a lending-channel
+statement rather than a categorical class exemption.
+
+**Conclusion and abstract (3-5).** The conclusion now states the pieces
+separately (building damage, contents damage, total per event, PV benefit)
+and draws the insured-claimant boundary explicitly. "Cost-effective tool"
+became "can generate meaningful disaster-loss reductions." The abstract's
+"recovers a substantial share of the upfront cost" is now the actual
+number: the insured flood channel recovers ~21% (`bcr_pct`), with the
+omitted channels named as unmeasured.
+
+### What changed in outputs
+
+- `paper.pdf` rebuilt. No estimates moved except through the relabeling:
+  `policy-composition.tex`, `take-up.tex`, `robustness.tex` FE rows now read
+  "County-Calendar period"; `sumstats-nfip.tex` damage rows relabeled and
+  carry a decimal.
+- No scalar values changed. The paper now cites
+  `building_damage_share_static`/`_se` instead of the share event study's
+  min/max/avg.
+
+### Verified
+
+- `make test` — all fake-data tests pass.
+- `Rscript program/estimate/estimate-nfip.R`, then
+  `estimate-sumstats-nfip.R`, then `rmarkdown::render('paper.Rmd')` — clean,
+  no missing-scalar failures. One pre-existing LaTeX "float too large"
+  warning, unchanged.
+
+### Open questions for check-in
+
+1. **Damage-share magnitude.** The static share effect is -12.8 pp against
+   a dependent-variable mean of 24.8% — a ~52% proportional decline, much
+   larger than the ~10% implied by the dollar outcomes (-3.7 on a mean of
+   35.3). The share denominator (`building_value`) is itself a composition
+   variable that moves after 1994, so the two are not measuring the same
+   thing. I wrote the text to avoid asserting the proportional figure.
+   Worth a look in Chunk D, which owns the damage-share-vs-dollars split.
+2. **Welfare inputs still use event-study averages.** `delta_building`
+   (4.80) and `delta_contents` (3.05) in `welfare-scalars.csv` come from
+   `*_avg`, not the static ATT (3.68 / 4.06) that Chunk C1 made the
+   headline. The conclusion I rewrote reports the welfare numbers, so the
+   paper currently quotes two different building-damage effects in two
+   places. Chunk G should reconcile; flagging now because it is visible in
+   the conclusion.
+3. **`databuild-nfip.R` vintage window.** An uncommitted edit was in the
+   working tree at the start of this session (`year_min` 1984→1986,
+   `year_max` 1999→2001), neither mine nor Chunk C's; Colin confirmed it
+   should be discarded, and it is reverted. Separately, the file's
+   `year_min` fought `project-params.R`'s `MIN_YEAR_CONSTR = 1983L` — the
+   databuild filter binds, so the 1983 pre-period Chunk C1 bought was never
+   actually in `nfip-claims.Rds`. Set `year_min <- 1983L` to match. **This
+   only takes effect when `make data` is rerun with `$DATA_PATH` set**,
+   which has not happened since Chunk A; until then the estimates still
+   run on a 1984-start sample. Better still would be sourcing the constants
+   from `project-params.R` so the two cannot drift again — not done here to
+   keep the diff inside Chunk B's scope.
+4. **`est_rob_list` / `est_geo_rob` lack the `period_constr` FE** (they run
+   `| geo^period_loss + mh`), the same omission Chunk A fixed in Tables 3-4,
+   and they use `period_loss` where the main claim spec uses `year_loss`.
+   Out of scope here; Chunk F owns those columns.
+
+---
+
+## Chunk C — Cost side: wind-zone dose-response (2026-08-12)
+
+**Base commit:** 9e13e4b (uncommitted at time of writing; see diff)
+
+### What was done
+
+Confined to `program/import/databuild-mhs.R` and
+`program/estimate/estimate-mhs.R`, per assignment. Full detail in
+`notes/specs.md` §11.
+
+1. Built `treated_intensity`: state-level MH-stock-weighted share of a
+   state's 1980-2000 MH stock sitting in a Zone II/III county
+   (`ecfr-windzone.csv` × `census2000-mh-county-vintage.Rds`), replacing
+   the diluted binary `treated`. Written to
+   `derived/mhs-windzone-intensity.Rds`; state table exported as
+   `output/descriptives/windzone-intensity.tex` (not yet wired into
+   `paper.Rmd`).
+2. Re-estimated the price event study with `treated_intensity` in place
+   of `treated`, and separately with the binary spec restricted to the
+   three high-intensity treated states (FL, LA, MA) vs. zone I controls.
+3. **Result: the gradient is steep.** Implied fully-treated price effect
+   from the continuous spec is ~$8,116 (`price_effect_dose_level`) vs.
+   ~$4,194 from the binary spec (`price_effect_level`) — a ratio of
+   ~1.94 (`dose_binary_ratio`). The high-intensity-restricted binary
+   estimate is ~$6,520, in between. Per the interpretation TODO
+   specified in advance: this means the true per-unit compliance cost is
+   larger than the $5,000 headline implies, which worsens the
+   benefit-cost ratio — reported as-is, not reframed.
+
+### What changed in outputs
+
+New rows in `output/results/mhs-scalars.csv`
+(`price_effect_dose_level`, `price_effect_hi_level`,
+`dose_binary_ratio`); new plots
+`output/event-study/es-mhs-avg_sales_price-{dose,hi}.pdf`; new table
+`output/descriptives/windzone-intensity.tex`; new derived file
+`derived/mhs-windzone-intensity.Rds`. No existing MHS scalar changed
+value — `treated`/binary spec untouched.
+
+### What was verified
+
+- `make test` passes unmodified (`test-mhs-price-did.R` only exercises
+  the binary spec).
+- `databuild-mhs.R` could not be executed end-to-end this session
+  (`$DATA_PATH` unavailable — a pre-existing, unrelated `dt_state`
+  crosswalk read blocks any run regardless of this chunk's changes). The
+  intensity construction was verified by replicating it standalone
+  against the checked-in `derived/*.Rds` files: reproduces the dilution
+  memo's state-level numbers exactly (FL 96.6%, LA 63.6%, MA 46.3%, ...,
+  pooled 29.7%, vs. the memo's FL 97%/LA 64%/MA 46%/pooled 30%).
+  `estimate-mhs.R` was then run end-to-end against a patched copy of
+  `sample-mhs.Rds` carrying the new columns (output above); the
+  patched file was discarded afterward, `derived/sample-mhs.Rds` is
+  unmodified.
+- Both scripts parse cleanly (`parse()`); ran the full patched pipeline
+  without errors or warnings other than an expected single-point
+  `geom_line()` note for a state with one intensity value.
+
+### Not done in this chunk (left for review / next chunk)
+
+- Benefit-side companion (dose-response on NFIP damages using
+  `treated_wz3`) — out of scope per the task assignment (`estimate-nfip.R`
+  untouched).
+- §3280.305 institutional-text correction — checked against the current
+  `paper.Rmd`: the Institutional Background section already describes
+  the 1994 rule correctly as amending the "Construction and Safety
+  Standards" (a design/manufacturing requirement), not an installation
+  standard, so no paper-text change was needed. Did not independently
+  verify the eCFR effective date for Part 3285 installation standards
+  against source, since no paper claim currently depends on it.
+- New scalars/table are not yet cited in `paper.Rmd` or `notes/specs.md`'s
+  interpretation folded into the Results/Discussion prose — that write-up
+  (and the welfare-table consequence, since the $5,000 compliance cost
+  feeds Chunk G) is left for Colin's review or a follow-on chunk.
+- No fake-data test added for the dose-response spec.
+
+### Open questions
+
+- Should `price_effect_dose_level` (or the high-intensity-restricted
+  estimate) replace `price_effect_level` as the paper's headline
+  compliance cost, given the steep gradient? This changes the $5,000
+  figure cited throughout the abstract/intro/discussion and the Chunk G
+  welfare table's BCR. Flagging for Colin rather than deciding
+  unilaterally, per TODO's "report whichever obtains; do not condition
+  the framing on the sign."
+- `dt_state` (unused, dead crosswalk read in `databuild-mhs.R`, present
+  before this chunk) blocks any real end-to-end run without
+  `$DATA_PATH`. Worth deleting independent of this chunk if confirmed
+  unused.
+
+---
+
 ## Chunk C1 — Fix specifications (2026-08-12)
 
 **Base commit:** 7209775

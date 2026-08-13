@@ -82,7 +82,10 @@ v_dict <- c(
     "statefp" = "State",
     "countyfp" = "County",
     "tractfp" = "Census tract",
-    "period_loss" = "Loss period",
+    # Cell panels bin calendar years into 5-year periods and assign both
+    # policy records and claims to them, so "loss period" mislabels the
+    # policy-composition and take-up tables (review comments 17-18).
+    "period_loss" = "Calendar period",
     "year_loss" = "Loss year",
     "mh" = "MH",
     "period_constr" = "$\\nu_i$"

@@ -21,7 +21,7 @@ data_path <- Sys.getenv("DATA_PATH")
 if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
 
 # vintage filtering
-year_min <- 1984L
+year_min <- 1983L
 year_max <- 1999L
 
 dt_cpi <- fread(here("derived", "cpi-bls.csv"))
