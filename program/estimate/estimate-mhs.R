@@ -7,6 +7,7 @@ library(here)
 library(data.table)
 library(fixest)
 library(ggplot2)
+library(kableExtra)
 
 data_path <- Sys.getenv("DATA_PATH")
 
@@ -38,6 +39,70 @@ est_q <- feols(fmla_q, data = dt, cluster = ~statefp)
 
 etable(est_p, digits = 3)
 etable(est_q, digits = 3)
+
+# Chunk C: wind-zone dose-response ----
+# The binary `treated` above codes a state as treated if it contains any
+# Zone II/III county, which badly dilutes the design: pooled across
+# treated states only ~30% of the 1980-2000 MH stock actually sits in a
+# Zone II/III county (range: FL 97% down to VA 3%; see
+# derived/mhs-windzone-intensity.Rds). `treated_intensity` replaces the
+# binary indicator with the MH-stock-weighted share of a state's stock in
+# Zone II/III, so beta_k is directly comparable to the binary spec's
+# coefficient: it is the implied price effect of moving a state from 0%
+# to 100% zone II/III MH stock.
+fmla_p_dose <- as.formula(paste0(
+    s_out_p, " ~ i(year, treated_intensity, ref = 1993) | statefp + year"
+))
+est_p_dose <- feols(fmla_p_dose, data = dt, cluster = ~statefp)
+etable(est_p_dose, digits = 3)
+
+# Binary spec, restricted to the three high-intensity treated states
+# (FL, LA, MA) vs. the zone I controls, so any dilution from partially
+# treated states (e.g. GA at 6% intensity) cannot attenuate the estimate.
+dt_hi <- dt[high_intensity == TRUE | treated == FALSE]
+est_p_hi <- feols(fmla_p, data = dt_hi, cluster = ~statefp)
+etable(est_p_hi, digits = 3)
+
+# Static (single-coefficient) comparison table: binary vs. continuous
+# treatment, same outcome, same sample/FE/clustering, so the two columns
+# differ only in how "treated" is coded. Collapses the event study's
+# per-year interactions to one post-1994 coefficient, the same
+# simplification `post_mh` makes for the NFIP claim spec.
+dt[, post1994 := as.numeric(year >= 1994)]
+dt[, post_treated      := post1994 * treated]
+dt[, post_treated_dose := post1994 * treated_intensity]
+
+fmla_static_bin  <- avg_sales_price ~ post_treated      | statefp + year
+fmla_static_dose <- avg_sales_price ~ post_treated_dose | statefp + year
+
+est_static_bin  <- feols(fmla_static_bin,  data = dt, cluster = ~statefp)
+est_static_dose <- feols(fmla_static_dose, data = dt, cluster = ~statefp)
+
+dict_static <- c(
+    "post_treated"      = "Post 1994 x Treated",
+    "post_treated_dose" = "Post 1994 x Treated",
+    "avg_sales_price"   = "Average sales price (\\$)",
+    "statefp"           = "State",
+    "year"              = "Year"
+)
+
+etable(
+    list(est_static_bin, est_static_dose),
+    dict = dict_static,
+    headers = list("Treatment" = list("Binary" = 1, "Continuous intensity" = 1)),
+    fitstat = c("n", "r2", "my"), digits = 3
+)
+
+dir.create(here("output", "event-study"), showWarnings = FALSE, recursive = TRUE)
+etable(
+    list(est_static_bin, est_static_dose),
+    dict = dict_static,
+    headers = list("Treatment" = list("Binary" = 1, "Continuous intensity" = 1)),
+    tex = TRUE, se.below = FALSE,
+    file = here("output", "event-study", "mhs-dose-response-static.tex"),
+    fitstat = c("n", "r2", "my"),
+    digits = 2, digits.stats = 2, replace = TRUE
+)
 
 # plots ----
 v_palette <- c("#0072B2", "#D55E00", "#009E73", "#F0E442")
@@ -124,6 +189,12 @@ for (out in v_out_q) {
             path = here("output", "event-study", paste0("es-mhs-", out, ".pdf")))
 }
 
+# Chunk C dose-response plots ----
+plot_es(est_p_dose, "avg_sales_price", yscale = 1000,
+        path = here("output", "event-study", "es-mhs-avg_sales_price-dose.pdf"))
+plot_es(est_p_hi, "avg_sales_price", yscale = 1000,
+        path = here("output", "event-study", "es-mhs-avg_sales_price-hi.pdf"))
+
 # Export key scalars ----
 dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
 
@@ -139,12 +210,62 @@ avg_price_treated_pre <- dt[treated == TRUE & year < 1994,
     weighted.mean(avg_sales_price, placements, na.rm = TRUE) / 1000]
 price_effect_pct <- price_effect_level / avg_price_treated_pre * 100
 
+# Chunk C dose-response scalars ----
+# `price_effect_dose_level` is the implied price effect of moving a state
+# from 0% to 100% Zone II/III MH stock (fully comparable to
+# `price_effect_level`'s binary treated/control contrast). A flat
+# gradient (dose ~ binary) supports regional production standardization;
+# a steep gradient (dose >> binary) means the true per-unit compliance
+# cost is larger than the binary design implies.
+ct_price_dose <- as.data.table(
+    coeftable(est_p_dose[lhs = "avg_sales_price"][[1]]),
+    keep.rownames = TRUE)
+ct_price_dose[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+ct_price_dose <- ct_price_dose[grepl(":treated_intensity$", rn)]
+price_effect_dose_level <- ct_price_dose[year >= 1994, mean(Estimate) / 1000]
+
+ct_price_hi <- as.data.table(
+    coeftable(est_p_hi[lhs = "avg_sales_price"][[1]]),
+    keep.rownames = TRUE)
+ct_price_hi[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+ct_price_hi <- ct_price_hi[grepl(":treated$", rn)]
+price_effect_hi_level <- ct_price_hi[year >= 1994, mean(Estimate) / 1000]
+
+dose_binary_ratio <- price_effect_dose_level / price_effect_level
+
 fwrite(
     data.table(
         statistic = c("price_effect_level", "price_effect_1994",
-                      "avg_price_treated_pre", "price_effect_pct"),
+                      "avg_price_treated_pre", "price_effect_pct",
+                      "price_effect_dose_level", "price_effect_hi_level",
+                      "dose_binary_ratio"),
         value     = c(price_effect_level, price_effect_1994,
-                      avg_price_treated_pre, price_effect_pct)
+                      avg_price_treated_pre, price_effect_pct,
+                      price_effect_dose_level, price_effect_hi_level,
+                      dose_binary_ratio)
     ),
     here("output", "results", "mhs-scalars.csv")
 )
+
+# Appendix table: state-level MH-stock-weighted wind zone intensity ----
+dt_int <- readRDS(here("derived", "mhs-windzone-intensity.Rds"))
+dt_int <- merge(dt_int, unique(dt[, .(statefp, state_name)]), by = "statefp")
+dt_int <- dt_int[mh_stock_wz23 > 0]
+setorder(dt_int, -treated_intensity)
+
+dt_int_tab <- dt_int[, .(
+    "State"                  = state_name,
+    "MH stock (1980-2000)"   = formatC(mh_stock, format = "f", digits = 0, big.mark = ","),
+    "MH stock in WZ II/III"  = formatC(mh_stock_wz23, format = "f", digits = 0, big.mark = ","),
+    "Intensity"              = paste0(formatC(treated_intensity * 100, format = "f", digits = 1), "\\%")
+)]
+
+dir.create(here("output", "descriptives"), showWarnings = FALSE, recursive = TRUE)
+kbl(
+    dt_int_tab,
+    format   = "latex",
+    booktabs = TRUE,
+    escape   = FALSE,
+    align    = c("l", "r", "r", "r")
+) |>
+(\(x) writeLines(as.character(x), here("output", "descriptives", "windzone-intensity.tex")))()

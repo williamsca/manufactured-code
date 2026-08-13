@@ -130,6 +130,98 @@ omitted channels named as unmeasured.
 
 ---
 
+## Chunk C — Cost side: wind-zone dose-response (2026-08-12)
+
+**Base commit:** 9e13e4b (uncommitted at time of writing; see diff)
+
+### What was done
+
+Confined to `program/import/databuild-mhs.R` and
+`program/estimate/estimate-mhs.R`, per assignment. Full detail in
+`notes/specs.md` §11.
+
+1. Built `treated_intensity`: state-level MH-stock-weighted share of a
+   state's 1980-2000 MH stock sitting in a Zone II/III county
+   (`ecfr-windzone.csv` × `census2000-mh-county-vintage.Rds`), replacing
+   the diluted binary `treated`. Written to
+   `derived/mhs-windzone-intensity.Rds`; state table exported as
+   `output/descriptives/windzone-intensity.tex` (not yet wired into
+   `paper.Rmd`).
+2. Re-estimated the price event study with `treated_intensity` in place
+   of `treated`, and separately with the binary spec restricted to the
+   three high-intensity treated states (FL, LA, MA) vs. zone I controls.
+3. **Result: the gradient is steep.** Implied fully-treated price effect
+   from the continuous spec is ~$8,116 (`price_effect_dose_level`) vs.
+   ~$4,194 from the binary spec (`price_effect_level`) — a ratio of
+   ~1.94 (`dose_binary_ratio`). The high-intensity-restricted binary
+   estimate is ~$6,520, in between. Per the interpretation TODO
+   specified in advance: this means the true per-unit compliance cost is
+   larger than the $5,000 headline implies, which worsens the
+   benefit-cost ratio — reported as-is, not reframed.
+
+### What changed in outputs
+
+New rows in `output/results/mhs-scalars.csv`
+(`price_effect_dose_level`, `price_effect_hi_level`,
+`dose_binary_ratio`); new plots
+`output/event-study/es-mhs-avg_sales_price-{dose,hi}.pdf`; new table
+`output/descriptives/windzone-intensity.tex`; new derived file
+`derived/mhs-windzone-intensity.Rds`. No existing MHS scalar changed
+value — `treated`/binary spec untouched.
+
+### What was verified
+
+- `make test` passes unmodified (`test-mhs-price-did.R` only exercises
+  the binary spec).
+- `databuild-mhs.R` could not be executed end-to-end this session
+  (`$DATA_PATH` unavailable — a pre-existing, unrelated `dt_state`
+  crosswalk read blocks any run regardless of this chunk's changes). The
+  intensity construction was verified by replicating it standalone
+  against the checked-in `derived/*.Rds` files: reproduces the dilution
+  memo's state-level numbers exactly (FL 96.6%, LA 63.6%, MA 46.3%, ...,
+  pooled 29.7%, vs. the memo's FL 97%/LA 64%/MA 46%/pooled 30%).
+  `estimate-mhs.R` was then run end-to-end against a patched copy of
+  `sample-mhs.Rds` carrying the new columns (output above); the
+  patched file was discarded afterward, `derived/sample-mhs.Rds` is
+  unmodified.
+- Both scripts parse cleanly (`parse()`); ran the full patched pipeline
+  without errors or warnings other than an expected single-point
+  `geom_line()` note for a state with one intensity value.
+
+### Not done in this chunk (left for review / next chunk)
+
+- Benefit-side companion (dose-response on NFIP damages using
+  `treated_wz3`) — out of scope per the task assignment (`estimate-nfip.R`
+  untouched).
+- §3280.305 institutional-text correction — checked against the current
+  `paper.Rmd`: the Institutional Background section already describes
+  the 1994 rule correctly as amending the "Construction and Safety
+  Standards" (a design/manufacturing requirement), not an installation
+  standard, so no paper-text change was needed. Did not independently
+  verify the eCFR effective date for Part 3285 installation standards
+  against source, since no paper claim currently depends on it.
+- New scalars/table are not yet cited in `paper.Rmd` or `notes/specs.md`'s
+  interpretation folded into the Results/Discussion prose — that write-up
+  (and the welfare-table consequence, since the $5,000 compliance cost
+  feeds Chunk G) is left for Colin's review or a follow-on chunk.
+- No fake-data test added for the dose-response spec.
+
+### Open questions
+
+- Should `price_effect_dose_level` (or the high-intensity-restricted
+  estimate) replace `price_effect_level` as the paper's headline
+  compliance cost, given the steep gradient? This changes the $5,000
+  figure cited throughout the abstract/intro/discussion and the Chunk G
+  welfare table's BCR. Flagging for Colin rather than deciding
+  unilaterally, per TODO's "report whichever obtains; do not condition
+  the framing on the sign."
+- `dt_state` (unused, dead crosswalk read in `databuild-mhs.R`, present
+  before this chunk) blocks any real end-to-end run without
+  `$DATA_PATH`. Worth deleting independent of this chunk if confirmed
+  unused.
+
+---
+
 ## Chunk C1 — Fix specifications (2026-08-12)
 
 **Base commit:** 7209775

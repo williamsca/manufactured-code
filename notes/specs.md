@@ -15,7 +15,7 @@ Last verified: 2026-08-12, against commit at the top of `notes/LOG.md` (Chunk C1
 - **Weights:** none
 - **Clustering:** by `statefp`
 - **Treated:** states containing HUD wind zone II or III counties (binary; see
-  §4 for the Chunk C continuous-intensity replacement, when landed)
+  §11 for the Chunk C continuous-intensity replacement)
 - **Outputs:** `output/event-study/es-mhs-*.pdf`, `output/results/mhs-scalars.csv`
 
 ## 2. NFIP claim-level event study (Eq. 2) — main result
@@ -344,3 +344,76 @@ chunk: `make estimates && make test && make paper.pdf` from a fresh
 `+ Controls` robustness columns (`fmla_rob_b`, `fmla_rob_d`) were not
 relabeled as a decomposition in this chunk — text-only change, deferred to
 whichever chunk writes up that section (constrains Chunk F).
+
+## 11. Chunk C — wind-zone dose-response, cost side (2026-08-12)
+
+Addresses the dilution problem in §1's binary `treated`: pooled across
+treated states, only ~30% of the 1980-2000 MH stock actually sits in a
+Zone II/III county (range: FL 97% down to VA 3%). Confined to
+`program/import/databuild-mhs.R` and `program/estimate/estimate-mhs.R`;
+the benefit-side companion (`treated_wz3` dose-response on NFIP damages)
+and the §3280.305 institutional-text correction are **not** part of this
+chunk and remain open in `TODO.md`.
+
+- **Intensity construction** (`databuild-mhs.R`): `treated_intensity` is
+  the MH-stock-weighted share of a state's 1980-2000 MH stock (summed
+  across all four vintage bins of `census2000-mh-county-vintage.Rds`)
+  sitting in a county classified Zone II or III by
+  `derived/ecfr-windzone.csv`. 35 counties have no eCFR match (AK, HI,
+  NYC boroughs, and a handful of renamed/consolidated FIPS codes, e.g.
+  46113, 51515, 51560) — following the `statefp == 36` NA fallback
+  already used in `databuild-nfip.R`, these default to Zone I. Written to
+  `derived/mhs-windzone-intensity.Rds` (state-level: `mh_stock`,
+  `mh_stock_wz23`, `treated_intensity`) and merged onto the state-year
+  panel by `statefp`; states with no eCFR-matched WZ2/3 county at all get
+  `treated_intensity = 0` by construction. `high_intensity` flags the
+  three states used for the restricted-binary comparison: FL, LA, MA
+  (statefp 12, 22, 25) — the same three the TODO's dilution memo (see
+  `TODO.md` DONE, 2026-08-11) identified as having intensity well above
+  the rest of the treated group (97%/64%/46% vs. ≤25% for every other
+  treated state).
+- **Continuous-intensity spec** (`estimate-mhs.R`):
+  `c(price outcomes) ~ i(year, treated_intensity, ref = 1993) | statefp + year`,
+  same sample/clustering as §1. `treated_intensity` is scaled 0-1, so
+  `beta_k` is directly comparable to the binary spec's coefficient: the
+  implied price effect of moving a state from 0% to 100% Zone II/III MH
+  stock.
+- **High-intensity-restricted binary spec**: original binary spec (§1),
+  sample restricted to `high_intensity == TRUE | treated == FALSE` (FL/LA/MA
+  vs. the zone I controls; all other treated states dropped).
+- **Result:** `price_effect_dose_level` (implied fully-treated effect,
+  continuous spec) ≈ **$8,116**, vs. `price_effect_level` (binary, §1) ≈
+  **$4,194** — `dose_binary_ratio` ≈ **1.94**. The high-intensity-restricted
+  binary estimate (`price_effect_hi_level`) ≈ **$6,520**, between the two.
+  **The gradient is steep, not flat**: per the interpretation TODO laid
+  out in advance, this means the true per-unit compliance cost is
+  substantially larger than the binary $5,000 headline implies, which
+  *worsens* the benefit-cost ratio in Chunk G's welfare table. This
+  finding is reported as-is, per TODO's "do not condition the framing on
+  the sign." All three scalars land in `output/results/mhs-scalars.csv`;
+  event-study plots at `output/event-study/es-mhs-avg_sales_price-dose.pdf`
+  and `-hi.pdf`.
+- **Appendix table**: state-level intensity table
+  (`output/descriptives/windzone-intensity.tex`, state / MH stock / MH
+  stock in WZ II-III / intensity, sorted descending, states with zero
+  WZ2/3 stock omitted) — not yet wired into `paper.Rmd`.
+- **Not yet done:** these new scalars/table are not cited anywhere in
+  `paper.Rmd` yet (no hard-coded numbers were added — this is scaffolding
+  for whoever writes up the Results/Discussion consequences of the steep
+  gradient, likely Chunk C's own write-up pass or Chunk G's welfare
+  table). `make test` was not extended with a dose-response fake-data
+  test — the existing `test-mhs-price-did.R` only checks the binary spec
+  and still passes unmodified since `treated` is untouched.
+- **Verification:** `databuild-mhs.R` could not be executed end-to-end in
+  this session (`$DATA_PATH` unavailable, per §7's standing caveat — the
+  unrelated `dt_state <- fread(file.path(data_path, "crosswalk",
+  "states.txt"))` read, dead code even before this chunk, blocks a full
+  run). The intensity construction and merge logic were verified instead
+  by replicating them standalone against the checked-in `derived/*.Rds`
+  files and confirming the state-level intensities reproduce the
+  dilution memo's numbers exactly (FL 96.6%, LA 63.6%, MA 46.3%, SC
+  24.8%, MS 17.0%, NC 13.9%, ME 11.5%, AL 8.8%, TX 8.6%, GA 5.8%, VA
+  2.6%, pooled 29.7%), then patching a copy of `derived/sample-mhs.Rds`
+  with the new columns to run `estimate-mhs.R` end-to-end (output above).
+  `program/import/databuild-mhs.R` itself was read-verified line-by-line
+  against this replication but not executed with real `$DATA_PATH`.
