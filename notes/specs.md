@@ -74,6 +74,23 @@ Last verified: 2026-08-12, against commit at the top of `notes/LOG.md` (Chunk C1
   `geo × period_loss × mh × period_constr` cells (`dt_cell`), or to
   `geo × period_loss × mh × period_constr` including zero-policy cells for
   the Poisson take-up spec (`dt_pois`)
+- **Panel definition (documented in the paper, Chunk B, review comments
+  16-18):** the balanced panel is built at
+  `tractfp × period_loss × mh × year_constr` in `databuild-nfip.R`, over the
+  grid of tract-periods with positive policy exposure (`period_loss >= 2009`,
+  since OpenFEMA policy records begin in 2009), then aggregated to `geo` in
+  estimation. `period_loss` is a **five-year calendar-period bin** (2009-2013,
+  2014-2018, 2019-2023 for the policy panel); both policy records and claims
+  are assigned to it by calendar year, so a single index serves both. It is
+  therefore labeled **"Calendar period"** in the `v_dict` (changed from
+  "Loss period" in Chunk B — the old label described the claim side only and
+  mislabeled the policy-composition and take-up tables).
+  - Cells with **zero claims but ≥1 active policy** are retained and
+    contribute a zero to `claim_rate`.
+  - Cells with **zero active policies** have undefined per-policy averages and
+    claim rate; `dt_cell` filters them out (`policies_n > 0`), so they leave
+    the weighted composition/claim-rate regressions. `dt_pois` keeps them,
+    since the take-up PPML models the policy count itself.
 - **Spec (take-up, PPML):** `c(policies_n, claims_n) ~ i(period_constr, mh, ref = 1993) | geo^period_loss + mh + period_constr`
 - **Spec (policy composition, OLS):** `c(repl_cost_ppol, ...) ~ i(period_constr, mh, ref = 1993) | geo^period_loss + mh + period_constr`
 - **Weights:** cell-level OLS specs (composition, MH-share, claim-rate) are

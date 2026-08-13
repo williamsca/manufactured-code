@@ -73,8 +73,8 @@ v_pol_labels <- c(
 v_claim_vars <- c("total_claims", "avg_bldg_damage", "avg_cont_damage")
 v_claim_labels <- c(
     "Total claims",
-    "Building damage (\\$)",
-    "Contents damage (\\$)"
+    "Building damage (\\$000s)",
+    "Contents damage (\\$000s)"
 )
 
 pol_wide[,   variable := factor(variable, levels = v_pol_vars)]
@@ -94,9 +94,11 @@ fmt_pol <- function(x, var) {
     }
 }
 
+# Damage variables are stored in thousands of 2000 dollars; keep a decimal
+# so the $000s scale is not rounded away (review comment 22).
 fmt_claim <- function(x, var) {
     if (var %in% c("avg_bldg_damage", "avg_cont_damage")) {
-        formatC(x, format = "f", digits = 0, big.mark = ",")
+        formatC(x, format = "f", digits = 1, big.mark = ",")
     } else {
         formatC(x, format = "f", digits = 0, big.mark = ",")
     }
