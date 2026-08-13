@@ -2,6 +2,7 @@
 #
 # Inputs:  $DATA_PATH/derived/fema.duckdb
 #          derived/ecfr-windzone.csv
+#          derived/stock-county-vintage.Rds (run program/import/impute-stock.R first)
 # Outputs: derived/nfip-claims.Rds   (claim-level, filtered + renamed)
 #          derived/nfip-balanced.Rds (tractfp × period_loss × mh × year_constr;
 #                                     grid from policy data, 2009+)
@@ -282,33 +283,24 @@ dt_balanced[, treated_wz3 := (wind_zone == 3L)]
 dt_balanced$wind_zone <- NULL
 
 # ---------------------------------------------------------------------------
-# 5.5. Merge SF building permits (county × construction year) ----
+# 5.5. Merge housing-stock denominator (county × construction year × MH) ----
 #
-#   permits_sf_n is normalized to per-tract units so it is comparable to
-#   the policy count, which is already at tract level.
+#   homes_n is a COUNTY-level stock (derived/stock-county-vintage.Rds, built
+#   by program/import/impute-stock.R), merged onto the tract-keyed balanced
+#   panel by (countyfp, year_constr, mh). It is therefore identical across
+#   every tract in a county for a given year_constr x mh -- do not sum it
+#   when aggregating tracts up to county in estimation (that would multiply
+#   it by the tract count); take a distinct county-level value first. This
+#   replaces the old policies_ppermit denominator (single-family building
+#   permits, wrong housing type and badly non-random BPS coverage -- see
+#   TODO.md Chunk E and notes/specs.md).
 # ---------------------------------------------------------------------------
 
-dt_perm <- readRDS(here("derived", "permits-co.Rds"))
-dt_perm[, countyfp := formatC(as.integer(countyfp), width = 5, flag = "0")]
-
-# unique tracts per county per construction year in the balanced panel
-dt_tracts <- dt_balanced[, .(n_tracts = uniqueN(tractfp)), by = .(countyfp, year_constr)]
-
-dt_perm_merge <- merge(
-    dt_perm[
-        between(year, year_min, year_max),
-        .(countyfp, year_constr = year, permits_sf_n = permits_sf)
-    ],
-    dt_tracts,
-    by = c("countyfp", "year_constr"),
-    all.x = TRUE
-)
-dt_perm_merge[n_tracts > 0L, permits_sf_n := as.numeric(permits_sf_n / n_tracts)]
-dt_perm_merge[, n_tracts := NULL]
+dt_stock <- readRDS(here("derived", "stock-county-vintage.Rds"))
 
 dt_balanced <- merge(
-    dt_balanced, dt_perm_merge,
-    by = c("countyfp", "year_constr"),
+    dt_balanced, dt_stock,
+    by = c("countyfp", "year_constr", "mh"),
     all.x = TRUE
 )
 

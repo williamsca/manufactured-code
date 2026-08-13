@@ -43,6 +43,7 @@ data:
 	Rscript program/import/import-bps.R
 	Rscript program/import/import-mhs.R
 	Rscript program/import/databuild-mhs.R
+	Rscript program/import/impute-stock.R
 	Rscript program/import/databuild-nfip.R
 	Rscript program/import/databuild-welfare.R
 

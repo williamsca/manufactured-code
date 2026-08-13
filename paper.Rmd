@@ -79,6 +79,17 @@ nfip_sav_m     <- paste0("$", round(get_welf("nfip_savings_total") / 1000),
                           " million")
 n_mh_claims    <- format(as.integer(get_ss("total_claims_mh")), big.mark = ",")
 mh_claim_pct   <- round(get_ss("mh_claim_share") * 100, 1)
+
+# Take-up per housing-unit stock (Chunk E). OLS coefficients on
+# policies_per_1k_homes / claims_per_1k_homes (homes_n-weighted, clustered
+# by county) are already LEVEL differences per 1,000 homes; report signed
+# (direction matters here).
+signed_fmt <- function(x, digits = 1) {
+    paste0(if (x >= 0) "+" else "-",
+           formatC(abs(round(x, digits)), format = "f", digits = digits))
+}
+ppl_home_per1k <- signed_fmt(get_nfip("policies_per_1k_homes_avg"), 1)
+clm_home_per1k <- signed_fmt(get_nfip("claims_per_1k_homes_avg"), 2)
 ```
 
 \begin{abstract}
@@ -373,20 +384,24 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 
 # NFIP Take-Up {#appendix-take-up}
 
-The damage estimates in the main text condition on filing a claim and do not speak to whether the HUD code reform affected NFIP take-up. In standard models, self-protection can reduce the private value of insurance when coverage is costly, so the reform could in principle lower voluntary NFIP demand \citep{ehrlich_market_1972}. The sign is not general: it depends on premium loading, mandatory purchase rules, borrowing constraints, and basis risk, and under actuarially fair full insurance a lower loss probability does not by itself imply lower optimal coverage. This appendix examines whether the reform affected the number of NFIP policies held by manufactured homeowners.
+The damage estimates in the main text condition on filing a claim and do not speak to whether the HUD code reform affected NFIP take-up. In standard models, self-protection can reduce the private value of insurance when coverage is costly, so the reform could in principle lower voluntary NFIP demand \citep{ehrlich_market_1972}. The sign is not general: it depends on premium loading, mandatory purchase rules, borrowing constraints, and basis risk, and under actuarially fair full insurance a lower loss probability does not by itself imply lower optimal coverage. This appendix examines whether the reform affected the rate at which manufactured homeowners hold NFIP policies and file claims, relative to the stock of homes of that vintage and type -- not just the raw count of policies, which mechanically tracks how many homes of a given vintage exist.
 
-Table \ref{tab:take-up} reports estimates from a PPML model of total policy counts by housing type and construction vintage. Raw policy counts increase for post-1994 manufactured homes relative to site-built homes. However, this result is difficult to interpret as a change in take-up rates because the ratio of manufactured home shipments to single-family building permits rose sharply after 1994 nationwide. The NFIP data do not include a denominator for the total housing stock, so the raw count increase may simply reflect more manufactured homes in later vintage bins rather than a higher propensity to insure. I therefore focus the main text on damage outcomes where identification does not require observing the universe of homes.
+The raw policy count is not interpretable as a take-up rate on its own, since it moves with both take-up and the underlying number of homes of that vintage. An earlier version of this table divided policy counts by county single-family building-permit counts, but that denominator is the wrong housing type (permits for site-built construction, applied to manufactured and site-built rows alike) and undercounts non-randomly: median BPS coverage of the site-built stock falls from 0.70 in low-MH counties to 0.20 in high-MH counties, exactly where manufactured housing concentrates. I instead construct `homes_n`, an imputed stock of homes by county, construction year, and housing type. Levels come from the 2000 Census, which counts a mobile home as a housing unit regardless of titling, so there is no chattel-titling gap; within a Census vintage bin, the annual split uses Survey of Manufactured Housing state-year placements (for MH) and BPS county-year single-family permits, falling back to the state permit share where a county reports none (for site-built homes). These annual sources are used only to divide a Census-anchored bin total across years, so their own level bias cancels out of the ratio; construction year 1994 itself is dropped from the imputation as an ambiguous mix of pre- and post-reform units, given the code's July effective date and production/installation lags.
+
+Table \ref{tab:take-up} reports OLS estimates of `policies_per_1k_homes` and `claims_per_1k_homes` directly, weighted by `homes_n` (a handful of cells have imputed stock well under one home, mostly in the already-flagged 1994 construction-year bin, and would otherwise dominate an unweighted fit) and clustered by county, pooling all three policy periods (2009-2023). An earliest-period-only (2009-2013) restriction, meant to limit exposure to differential attrition of the stock between the 2000 Census and the policy data, was checked and dropped from the table: its point estimates were extremely similar to the pooled column and added no information. The pooled post-1994 average coefficient is `r ppl_home_per1k` policies and `r clm_home_per1k` claims per 1,000 homes, both relative to site-built homes of the same vintage -- small in magnitude and, unlike the raw policy count, not mechanically explained by more manufactured homes existing in later cohorts. The 1994 vintage bin (built from a single, ambiguous construction year rather than the full two-year bin -- see the stock-construction note above) is the most volatile point in every specification and drives most of the pooled average; the 1996 and 1998 bins are small and closer to zero. I read this as no clear evidence of a first-order shift in take-up or claim frequency at the extensive margin, in contrast to the sizable damage-severity effect in the main text. This decomposes the benefit side into two margins with different welfare interpretations: the claims-per-home (extensive/insurability) margin reported here, and the payment-conditional-on-a-claim (intensive) margin reported in the main damage-outcome tables, which does not require this stock denominator at all.
 
 \begin{table}[htbp]
   \centering
-  \caption{NFIP Take-Up}\label{tab:take-up}
+  \caption{NFIP Take-Up per Housing-Unit Stock}\label{tab:take-up}
   \begin{threeparttable}
     \input{output/event-study/countyfp/take-up.tex}
     \begin{tablenotes}
-      \item Notes: Column (1) estimates a PPML model with the total number of active policies as the outcome. The policy panel is indexed by county, calendar period (five-year bins covering 2009--2023), housing type, and construction-vintage bin; the specification replaces the county $\times$ loss-year fixed effect in Equation \eqref{eq:event-study-benefit} with a county $\times$ calendar-period fixed effect and retains the common vintage and housing-type fixed effects. Cells with zero active policies are retained here, unlike in the weighted cell-level regressions. Source: OpenFEMA policy data.
+      \item Notes: OLS models of policies (or claims) per 1,000 homes, weighted by $\mathrm{homes\_n}$ (an imputed county $\times$ construction-year $\times$ housing-type stock of homes, see text) and clustered by county. The policy panel is indexed by county, calendar period (five-year bins covering 2009--2023), housing type, and construction-vintage bin; the specification replaces the county $\times$ loss-year fixed effect in Equation \eqref{eq:event-study-benefit} with a county $\times$ calendar-period fixed effect and retains the common vintage and housing-type fixed effects. Source: OpenFEMA policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
+
+**Caveat: the stock denominator is a 2000 snapshot, the policy data are not.** `homes_n` is fixed as of the 2000 Census, while the policy periods run from 2009 to 2023 -- 9 to 23 years later. If pre- and post-1994 manufactured homes attrite (are demolished, relocated, or converted) at different rates over that gap, the true denominator drifts away from the Census-fixed one asymmetrically by vintage, and the bias grows with the gap. An earlier version of this table reported the 2009--2013 calendar period separately, as the closest snapshot to 2000 and so the least exposed to this drift; its point estimates were extremely similar to the pooled 2009--2023 column, so it was dropped from the table without evidence that attrition is materially distorting the pooled estimate. The ACS's continuously updated housing-vintage tables could in principle bound the drift directly, but cannot substitute for `homes_n`: ACS year-built categories are decade bins that cannot isolate 1994 even in principle, and tract-level manufactured-home counts carry very large margins of error. Bounding the 2014--2023 estimates against the ACS decade series is left for future work.
 
 # Wind-Zone Treatment Intensity by State {#appendix-windzone-intensity}
 
