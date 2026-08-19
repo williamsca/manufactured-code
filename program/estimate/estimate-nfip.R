@@ -105,7 +105,7 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 # ---------------------------------------------------------------------------
 
 # --- balanced panel ---
-dt <- readRDS(here("derived", "nfip-balanced.Rds"))
+dt <- readRDS(here("derived", "nfip-balanced.Rds"))f
 dt <- dt[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 dt[, geo := get(agg_geo)]
 dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
