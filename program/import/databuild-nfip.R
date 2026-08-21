@@ -1,6 +1,8 @@
 # Build NFIP claim-level data and balanced panel, querying directly from DuckDB
+# against research-database's curated parquet
 #
-# Inputs:  $DATA_PATH/derived/fema.duckdb
+# Inputs:  fema_nfip_claims, fema_nfip_policies (research-database, pinned
+#          to NFIP_VERSION in project-params.R)
 #          derived/ecfr-windzone.csv
 # Outputs: derived/nfip-claims.Rds   (claim-level, filtered + renamed)
 #          derived/nfip-balanced.Rds (tractfp × period_loss × mh × year_constr;
@@ -16,9 +18,7 @@ library(duckdb)
 library(data.table)
 
 source(here("program", "import", "project-params.R"))
-
-data_path <- Sys.getenv("DATA_PATH")
-if (nchar(data_path) == 0) stop("DATA_PATH environment variable is not set.")
+source(here("program", "import", "rd-client.R"))
 
 # vintage filtering
 year_min <- 1983L
@@ -28,9 +28,11 @@ dt_cpi <- fread(here("derived", "cpi-bls.csv"))
 dt_cpi <- dt_cpi[, .(cpi = mean(cpi)), by = year]
 dt_cpi[, cpi := cpi / cpi[year == DISCOUNT_YEAR]]
 
-drv <- duckdb(file.path(data_path, "derived", "fema.duckdb"), read_only = TRUE)
-con <- dbConnect(drv)
+con <- rd_con()
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
+
+glob_claims   <- rd_path("fema_nfip_claims", version = NFIP_VERSION)
+glob_policies <- rd_path("fema_nfip_policies", version = NFIP_VERSION)
 
 # ---------------------------------------------------------------------------
 # 1. Claims ----
@@ -38,44 +40,44 @@ on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
 sql_claims <- "
 SELECT
-    countyCode                         AS countyfp,
-    censusTract                        AS tractfp,
-    censusBlockGroupFips               AS bgfp,
-    yearOfLoss                         AS year_loss,
-    YEAR(originalConstructionDate)     AS year_constr,
-    CASE WHEN numberOfFloorsInTheInsuredBuilding = 5 THEN 1 ELSE 0 END AS mh,
-    CAST(netBuildingPaymentAmount      AS DOUBLE) AS net_building_pmt,
-    CAST(buildingDamageAmount          AS DOUBLE) AS building_damage,
-    CAST(buildingPropertyValue         AS DOUBLE) AS building_value,
-    CAST(contentsDamageAmount          AS DOUBLE) AS contents_damage,
-    CAST(netContentsPaymentAmount      AS DOUBLE) AS net_contents_pmt,
-    CAST(contentsPropertyValue         AS DOUBLE) AS contents_value,
-    CAST(totalBuildingInsuranceCoverage AS DOUBLE) AS building_covg,
-    CAST(totalContentsInsuranceCoverage AS DOUBLE) AS contents_covg,
-    CAST(waterDepth AS DOUBLE)                     AS water_depth,
-    CASE WHEN elevatedBuildingIndicator THEN 1 ELSE 0 END AS elevated,
-    CAST(buildingReplacementCost AS DOUBLE)        AS building_repl_cost,
+    countyfp,
+    tractfp,
+    year_of_loss                       AS year_loss,
+    YEAR(original_construction_date)   AS year_constr,
+    CASE WHEN number_of_floors_in_the_insured_building = 5 THEN 1 ELSE 0 END AS mh,
+    CAST(net_building_payment_amount      AS DOUBLE) AS net_building_pmt,
+    CAST(building_damage_amount           AS DOUBLE) AS building_damage,
+    CAST(building_property_value          AS DOUBLE) AS building_value,
+    CAST(contents_damage_amount           AS DOUBLE) AS contents_damage,
+    CAST(net_contents_payment_amount      AS DOUBLE) AS net_contents_pmt,
+    CAST(contents_property_value          AS DOUBLE) AS contents_value,
+    CAST(total_building_insurance_coverage AS DOUBLE) AS building_covg,
+    CAST(total_contents_insurance_coverage AS DOUBLE) AS contents_covg,
+    CAST(water_depth AS DOUBLE)                       AS water_depth,
+    CASE WHEN elevated_building_indicator THEN 1 ELSE 0 END AS elevated,
+    CAST(building_replacement_cost AS DOUBLE)         AS building_repl_cost,
     CASE
-        WHEN ratedFloodZone IS NOT NULL
-            AND regexp_matches(ratedFloodZone, '^(A|V|AR)')
+        WHEN rated_flood_zone IS NOT NULL
+            AND regexp_matches(rated_flood_zone, '^(A|V|AR)')
         THEN 1 ELSE 0
-    END                                            AS sfha,
-    CASE WHEN primaryResidenceIndicator THEN 1 ELSE 0 END AS primary_res,
-    occupancyType                                  AS occupancy_type
-FROM nfip_claims
-WHERE numberOfFloorsInTheInsuredBuilding IN (1, 2, 3, 5)
-    AND yearOfLoss               IS NOT NULL
-    AND yearOfLoss               >= %d
-    AND yearOfLoss               <= %d
-    AND originalConstructionDate IS NOT NULL
-    AND countyCode               IS NOT NULL
-    AND censusTract              IS NOT NULL
+    END                                                AS sfha,
+    CASE WHEN primary_residence_indicator THEN 1 ELSE 0 END AS primary_res,
+    occupancy_type
+FROM read_parquet('%s')
+WHERE number_of_floors_in_the_insured_building IN (1, 2, 3, 5)
+    AND year_of_loss               IS NOT NULL
+    AND year_of_loss               >= %d
+    AND year_of_loss               <= %d
+    AND original_construction_date IS NOT NULL
+    AND countyfp                   IS NOT NULL
+    AND tractfp                    IS NOT NULL
     AND state IS NOT NULL
     AND state NOT IN ('AS', 'GU', 'VI', 'PR', 'AK', 'HI')
-    AND TRY_CAST(LEFT(censusTract, 2) AS INT) <= 56
+    AND TRY_CAST(LEFT(tractfp, 2) AS INT) <= 56
 "
 
-dt_claims <- as.data.table(dbGetQuery(con, sprintf(sql_claims, MIN_YEAR_LOSS, MAX_YEAR_LOSS)))
+dt_claims <- as.data.table(dbGetQuery(
+    con, sprintf(sql_claims, glob_claims, MIN_YEAR_LOSS, MAX_YEAR_LOSS)))
 
 dt_claims <- merge(
     dt_claims,
@@ -113,6 +115,10 @@ dt_claims[, .(
     pct_post1994 = mean(year_constr >= 1994L, na.rm = TRUE)
 ), by = .(mh)] |> print()
 
+# a filtered parquet scan returns rows in an arbitrary (row-group-parallel)
+# order; pin one so saveRDS() output is stable across reruns (UPDATE.md §2.2)
+setorder(dt_claims, year_loss, countyfp, tractfp, year_constr)
+
 saveRDS(dt_claims, here("derived", "nfip-claims.Rds"))
 message(sprintf("Saved %d claims to derived/nfip-claims.Rds", nrow(dt_claims)))
 
@@ -128,34 +134,34 @@ message(sprintf("Saved %d claims to derived/nfip-claims.Rds", nrow(dt_claims)))
 sql_policies <- sprintf("
 WITH filtered AS (
     SELECT
-        censusTract                                                       AS tractfp,
-        YEAR(originalConstructionDate)                                    AS year_constr,
-        CASE WHEN numberOfFloorsInInsuredBuilding = 5 THEN 1 ELSE 0 END  AS mh,
-        YEAR(policyEffectiveDate
-             + CAST((policyTerminationDate - policyEffectiveDate) / 2 AS INTEGER)) AS year,
-        CAST(buildingReplacementCost AS DOUBLE)                           AS repl_cost,
-        CAST(policyCost              AS DOUBLE)                           AS policy_cost,
-        CAST(totalBuildingInsuranceCoverage AS DOUBLE)                    AS building_policy_covg,
-        CAST(totalContentsInsuranceCoverage AS DOUBLE)                    AS contents_policy_covg,
-        CASE WHEN elevatedBuildingIndicator THEN 1 ELSE 0 END             AS elevated_policy,
-        CASE WHEN primaryResidenceIndicator THEN 1 ELSE 0 END             AS primary_res_policy,
-        CASE WHEN mandatoryPurchaseFlag THEN 1 ELSE 0 END                 AS mandatory_purchase_policy,
+        tractfp,
+        YEAR(original_construction_date)                                 AS year_constr,
+        CASE WHEN number_of_floors_in_insured_building = 5 THEN 1 ELSE 0 END AS mh,
+        YEAR(policy_effective_date
+             + CAST((policy_termination_date - policy_effective_date) / 2 AS INTEGER)) AS year,
+        CAST(building_replacement_cost AS DOUBLE)                         AS repl_cost,
+        CAST(policy_cost               AS DOUBLE)                         AS policy_cost,
+        CAST(total_building_insurance_coverage AS DOUBLE)                 AS building_policy_covg,
+        CAST(total_contents_insurance_coverage AS DOUBLE)                 AS contents_policy_covg,
+        CASE WHEN elevated_building_indicator THEN 1 ELSE 0 END           AS elevated_policy,
+        CASE WHEN primary_residence_indicator THEN 1 ELSE 0 END          AS primary_res_policy,
+        CASE WHEN mandatory_purchase_flag THEN 1 ELSE 0 END               AS mandatory_purchase_policy,
         CASE
-            WHEN ratedFloodZone IS NOT NULL
-                AND regexp_matches(ratedFloodZone, '^(A|V|AR)')
+            WHEN rated_flood_zone IS NOT NULL
+                AND regexp_matches(rated_flood_zone, '^(A|V|AR)')
             THEN 1 ELSE 0
         END                                                               AS sfha_policy
-    FROM nfip_policies
-    WHERE numberOfFloorsInInsuredBuilding IN (1, 2, 3, 5)
-        AND originalConstructionDate IS NOT NULL
-        AND policyEffectiveDate      IS NOT NULL
-        AND policyTerminationDate    IS NOT NULL
-        AND policyEffectiveDate      <  policyTerminationDate
-        AND propertyState IS NOT NULL
-        AND propertyState NOT IN ('AS', 'GU', 'VI', 'PR', 'AK', 'HI')
-        AND countyCode  IS NOT NULL
-        AND censusTract IS NOT NULL
-        AND YEAR(originalConstructionDate) BETWEEN %d AND %d
+    FROM read_parquet('%s')
+    WHERE number_of_floors_in_insured_building IN (1, 2, 3, 5)
+        AND original_construction_date IS NOT NULL
+        AND policy_effective_date      IS NOT NULL
+        AND policy_termination_date    IS NOT NULL
+        AND policy_effective_date      <  policy_termination_date
+        AND property_state IS NOT NULL
+        AND property_state NOT IN ('AS', 'GU', 'VI', 'PR', 'AK', 'HI')
+        AND countyfp IS NOT NULL
+        AND tractfp  IS NOT NULL
+        AND YEAR(original_construction_date) BETWEEN %d AND %d
 )
 SELECT
     tractfp,
@@ -174,7 +180,7 @@ SELECT
 FROM filtered
 WHERE year BETWEEN %d AND %d
 GROUP BY tractfp, year, mh, year_constr
-", year_min, year_max, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
+", glob_policies, year_min, year_max, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
 
 dt_pol <- as.data.table(dbGetQuery(con, sql_policies))
 
@@ -288,8 +294,7 @@ dt_balanced$wind_zone <- NULL
 #   the policy count, which is already at tract level.
 # ---------------------------------------------------------------------------
 
-dt_perm <- readRDS(here("derived", "permits-co.Rds"))
-dt_perm[, countyfp := formatC(as.integer(countyfp), width = 5, flag = "0")]
+dt_perm <- rd_read("census_bps")
 
 # unique tracts per county per construction year in the balanced panel
 dt_tracts <- dt_balanced[, .(n_tracts = uniqueN(tractfp)), by = .(countyfp, year_constr)]
