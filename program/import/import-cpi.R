@@ -1,32 +1,23 @@
-# This script imports CPI data from the Bureau of Labor Statistics
+# This script imports CPI data from research-database's bls_cpi dataset
+# (BLS Public Data API, CPI-U U.S. city average all items, not seasonally
+# adjusted). Reads the native 1982-84=100 index -- rebasing to
+# DISCOUNT_YEAR is this project's own downstream step (databuild-mhs.R,
+# databuild-nfip.R), not something to duplicate here.
 
 rm(list = ls())
 library(here)
 library(data.table)
-library(readxl)
-library(lubridate)
 
-data_path <- Sys.getenv("DATA_PATH")
+source(here("program", "import", "rd-client.R"))
 
 # import ----
-dt <- as.data.table(read_xlsx(
-    file.path(data_path, "crosswalk", "bls-cpi",
-    "SeriesReport-20250912131731_9e879e.xlsx"),
-    skip = 10
-))
+dt <- rd_read("bls_cpi", cols = c("year", "month", "date", "cpi_u_nsa_1982_84"))
+setnames(dt, "cpi_u_nsa_1982_84", "cpi")
 
 # clean ----
-dt <- melt(
-    dt,
-    id.vars = c("Year"), variable.name = "month", value.name = "cpi"
-)
-
-dt <- dt[!month %in% c("Annual", "HALF1", "HALF2")]
-
-dt[, date := ymd(paste0(Year, "-", month, "-01"))]
+dt <- dt[!is.na(cpi)]
 dt[, month := NULL]
 
-setnames(dt, "Year", "year")
 setorder(dt, year, date)
 
 # export ----

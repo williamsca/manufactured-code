@@ -28,8 +28,10 @@ paper.html: paper.md
 # current." Run order and per-stage runtimes are documented in
 # notes/specs.md.
 #
-# `data` requires the raw FEMA/Census/MHS source files and $DATA_PATH
-# (see .Renviron); it is not runnable without access to that raw data.
+# `data` requires $RD_HOME (a research-database checkout), a populated
+# $RD_CACHE or AWS credentials to fill it, a Census API key, and network
+# access to eCFR (see .Renviron and program/import/UPDATE.md §4). $DATA_PATH
+# is no longer needed anywhere in this layer.
 # `estimates` and `test` only need the derived/*.Rds files already checked
 # into this working copy and have no external data dependency.
 # ---------------------------------------------------------------------------
@@ -40,8 +42,6 @@ data:
 	Rscript program/import/import-cpi.R
 	Rscript program/import/import-ecfr-windzone.R
 	Rscript program/import/import-census.R
-	Rscript program/import/import-bps.R
-	Rscript program/import/import-mhs.R
 	Rscript program/import/databuild-mhs.R
 	Rscript program/import/databuild-nfip.R
 	Rscript program/import/databuild-welfare.R

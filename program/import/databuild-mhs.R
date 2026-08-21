@@ -4,11 +4,9 @@
 rm(list = ls())
 library(here)
 library(data.table)
-library(stringr)
 
 source(here("program", "import", "project-params.R"))
-
-data_path <- Sys.getenv("DATA_PATH")
+source(here("program", "import", "rd-client.R"))
 
 year_min <- 1985L
 year_max <- 2003L
@@ -49,11 +47,8 @@ dt_intensity[, treated_intensity := mh_stock_wz23 / mh_stock]
 
 saveRDS(dt_intensity, here("derived", "mhs-windzone-intensity.Rds"))
 
-# state crosswalk
-dt_state <- fread(
-    file.path(data_path, "crosswalk", "states.txt"),
-    keepLeadingZeros = TRUE
-)
+# state names (census_mhs_state_year carries no state_name of its own)
+dt_state <- rd_read("geo_state")[, .(statefp, state_name = name)]
 
 # CPI
 dt_cpi <- fread(here("derived", "cpi-bls.csv"))
@@ -62,15 +57,15 @@ dt_cpi <- dt_cpi[, .(cpi = mean(cpi)), by = year]
 dt_cpi[, cpi := cpi / cpi[year == DISCOUNT_YEAR]]
 
 # MHS sample
-dt <- readRDS(here("derived", "mhs-state-year.Rds"))
-dt <- dt[
-    !state_name %in% c("Alaska", "Hawaii") &
-    year %between% c(year_min, year_max)]
+dt <- merge(rd_read("census_mhs_state_year"), dt_state, by = "statefp")
+dt <- dt[!statefp %in% c("02", "15") & year %between% c(year_min, year_max)]
+
+stopifnot(all(dt$survey_era == "pre_2014"))
+dt[, survey_era := NULL]
 
 # merge ----
 
 # treatment status
-dt[, statefp := str_pad(statefp, width = 2, pad = "0")]
 dt <- merge(dt, dt_treat, by = "statefp", all.x = TRUE)
 
 stopifnot(!anyNA(dt$wind_zone))
@@ -93,12 +88,8 @@ dt <- merge(dt, dt_cpi[, .(year, cpi)], by = "year", all.x = TRUE)
 stopifnot(!anyNA(dt$cpi))
 
 # BPS single-family permits aggregated to state-year
-dt_perm <- readRDS(here("derived", "permits-co.Rds"))
-dt_perm[, statefp := formatC(as.integer(statefp), width = 2, flag = "0")]
-dt_perm_state <- dt_perm[,
-    .(permits_sf = sum(permits_sf, na.rm = TRUE)),
-    by = .(statefp, year)
-]
+dt_perm_state <- rd_read("census_bps")[
+    , .(permits_sf = sum(permits_sf, na.rm = TRUE)), by = .(statefp, year)]
 dt <- merge(dt, dt_perm_state, by = c("statefp", "year"), all.x = TRUE)
 
 # define outcomes ----

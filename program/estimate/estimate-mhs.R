@@ -9,8 +9,6 @@ library(fixest)
 library(ggplot2)
 library(kableExtra)
 
-data_path <- Sys.getenv("DATA_PATH")
-
 # import ----
 
 dt <- readRDS(here("derived", "sample-mhs.Rds"))
