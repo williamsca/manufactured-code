@@ -4,7 +4,7 @@
 #
 # Notes on known gaps:
 #   - "Princess Anne" (VA, WZ2): consolidated into Virginia Beach in 1963;
-#     no 2021 census entry. Mapped here to Virginia Beach's pid6.
+#     no current census entry. Mapped here to Virginia Beach.
 #   - Alaska "coastal regions" (WZ3): defined by the ANSI/ASCE 7-88 isotach
 #     map, not by county boundaries. NOT INCLUDED.
 #   - Florida WZ2: eCFR specifies "all counties except WZ3"; expanded here
@@ -15,12 +15,10 @@
 rm(list = ls())
 library(here)
 library(data.table)
-library(readxl)
 library(rvest)
 library(stringr)
 
-readRenviron(here(".Renviron"))
-data_path <- Sys.getenv("DATA_PATH")
+source(here("program", "import", "rd-client.R"))
 
 # =====================================================================
 # 1. Download and parse 24 CFR § 3280.305 wind zone county lists
@@ -100,27 +98,17 @@ dt_ecfr <- rbindlist(list(dt_wz2, dt_wz3))
 dt_ecfr <- dt_ecfr[!(state == "Florida" & wind_zone == 2)]
 
 # =====================================================================
-# 2. Load the census Government Units crosswalk
+# 2. Load the research-database county reference (replaces the census
+#    Government Units crosswalk, which required $DATA_PATH)
 # =====================================================================
 
-xwalk_path <- file.path(
-  data_path, "crosswalk", "census-govt-units", "2021",
-  "Govt_Units_2021_Final.xlsx"
-)
+dt_county <- rd_read("geo_county", is_current = TRUE)[
+  , .(countyfp, name, statefp)]
 
-dt_xwalk <- as.data.table(read_excel(xwalk_path, sheet = "General Purpose"))
-setnames(dt_xwalk, names(dt_xwalk), tolower(names(dt_xwalk)))
-setnames(dt_xwalk,
-  old = c("census_id_pid6", "unit_name", "unit_type",
-          "state", "fips_state", "fips_county", "county"),
-  new = c("id_pid6", "unit_name", "unit_type",
-          "state_abbrev", "fips_state", "fips_county", "county_field")
-)
-dt_xwalk[, id_pid6 := as.character(id_pid6)]
-dt_xwalk <- dt_xwalk[is_active == "Y"]
+dt_states <- rd_read("geo_state")[, .(statefp, stusab, state_name = name)]
 
-# state name <-> abbreviation crosswalk
-dt_states <- fread(file.path(data_path, "crosswalk", "states.txt"))
+dt_county <- merge(dt_county, dt_states[, .(statefp, stusab)], by = "statefp")
+setnames(dt_county, "stusab", "state_abbrev")
 
 # =====================================================================
 # 3. Normalize names for matching
@@ -129,36 +117,34 @@ dt_states <- fread(file.path(data_path, "crosswalk", "states.txt"))
 norm <- function(x) {
   x |>
     str_to_upper() |>
-    # Remove leading unit-type prefix
+    # Remove leading unit-type prefix (COG-file-style names)
     str_remove("^(COUNTY OF|PARISH OF|CITY OF|TOWN OF|CITY-PARISH OF|CONSOLIDATED GOVERNMENT OF)\\s+") |>
     # City-parish names take the form "CityName-CountyName" (e.g.
     # "BATON ROUGE-EAST BATON ROUGE"): keep the county part
     str_replace("^[A-Z][A-Z ]*-(EAST |WEST |NORTH |SOUTH )", "\\1") |>
+    # Remove trailing unit-type suffix (geo_county-style names)
+    str_remove("\\s+(CITY AND BOROUGH|CENSUS AREA|MUNICIPALITY|COUNTY|PARISH|BOROUGH|CITY)$") |>
     str_remove_all("[.\\-']") |>
     str_squish()
 }
 
 # Corrections for eCFR names that differ from census unit names after
-# normalization (spelling differences, consolidations, renames)
+# normalization (spelling differences, renames)
 ecfr_corrections <- c(
   "VERMILLION"  = "VERMILION",   # LA WZ2 (census: "VERMILION")
   "LA FOURCHE"  = "LAFOURCHE",   # LA WZ3 (census: "LAFOURCHE")
   "TERRABONNE"  = "TERREBONNE",  # LA WZ3 (census: "TERREBONNE")
-  "ORLEANS"     = "NEW ORLEANS", # LA WZ3 (consolidated as City of New Orleans)
   "DADE"        = "MIAMIDADE"    # FL WZ3 (renamed Miami-Dade in 1997)
 )
+# "ORLEANS" needed no correction against the old COG file's "NEW ORLEANS"
+# unit name; geo_county's "Orleans Parish" normalizes straight to "ORLEANS",
+# so that correction is dropped (program/import/UPDATE.md §5.4).
 
-dt_xwalk[, countyfp := paste0(
-  str_pad(fips_state,  2, pad = "0"),
-  str_pad(fips_county, 3, pad = "0")
-)]
-dt_xwalk[, name_norm := norm(unit_name)]
-dt_xwalk <- dt_xwalk[, .(
-  id_pid6, unit_name, name_norm, state_abbrev, countyfp, unit_type)]
+dt_county[, name_norm := norm(name)]
 
 dt_ecfr[, name_norm    := norm(name_ecfr)]
 dt_ecfr <- merge(
-  dt_ecfr, dt_states[, .(state_abbrev = state, state = state_name)],
+  dt_ecfr, dt_states[, .(state_abbrev = stusab, state = state_name)],
   by = "state", all.x = TRUE
 )
 
@@ -170,50 +156,54 @@ dt_ecfr[
 ]
 
 # Princess Anne (VA) was consolidated into Virginia Beach in 1963 and has no
-# 2021 census entry; omit it from the crosswalk (documented in script header)
+# current census entry; omit it from the crosswalk (documented in script header)
 dt_ecfr <- dt_ecfr[name_ecfr != "Princess Anne"]
 
 # =====================================================================
-# 5. Merge with census crosswalk to get id_pid6
+# 4. Merge with census county reference to get countyfp
 # =====================================================================
 
 dt_merged <- merge(
   dt_ecfr,
-  dt_xwalk,
+  dt_county,
   by = c("state_abbrev", "name_norm"),
   all = TRUE
 )
 
-# check unmatched entries
-unmatched <- dt_merged[is.na(id_pid6)]
+# check unmatched entries (only entries that came from the eCFR side)
+unmatched <- dt_merged[is.na(countyfp)]
 if (nrow(unmatched) > 0L) {
   warning(
     "Unmatched eCFR entries (check spellings or crosswalk):\n",
     paste(unmatched[, paste0("  ", state_abbrev, ": ", name_ecfr)], collapse = "\n")
   )
 }
+# drop unmatched eCFR entries so they don't form a spurious NA-countyfp
+# group at the final collapse below
+dt_merged <- dt_merged[!is.na(countyfp)]
 
-stopifnot(uniqueN(dt_merged$id_pid6) == nrow(dt_merged[!is.na(id_pid6)]))
+stopifnot(uniqueN(dt_merged$countyfp) == nrow(dt_merged))
 
 dt_merged[
-  state_abbrev == "FL" & unit_type == "1 - COUNTY" & is.na(wind_zone),
+  statefp == "12" & is.na(wind_zone),
   wind_zone := 2
 ]
 
-dt_merged[state_abbrev == "HI", wind_zone := 3]
+dt_merged[statefp == "15", wind_zone := 3]
 
 dt_merged[is.na(wind_zone), wind_zone := 1]
 
 # exclude AK (only coastal regions in WZ3)
-dt_merged <- dt_merged[!state_abbrev == "AK"]
+dt_merged <- dt_merged[!statefp == "02"]
 
-# collapse by county: take maximimum wind zone of all jurisdictions
-# in the county
+# collapse by county: matching is already at county grain (geo_county is
+# one row per county, unlike the old jurisdiction-level COG file), so this
+# is now a safety net rather than a real collapse across sub-county units
 dt_final <- dt_merged[, .(wind_zone = max(wind_zone)),
   by = .(countyfp)]
 
 # =====================================================================
-# 6. Assemble and validate final crosswalk
+# 5. Assemble and validate final crosswalk
 # =====================================================================
 
 setorder(dt_final, wind_zone, countyfp)
@@ -226,6 +216,6 @@ cat(sprintf(
 ))
 
 # =====================================================================
-# 7. Save
+# 6. Save
 # =====================================================================
 fwrite(dt_final, here("derived", "ecfr-windzone.csv"))

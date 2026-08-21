@@ -279,8 +279,6 @@ for (col in c(v_pol_count, v_pol_amt)) {
 # county in the eCFR crosswalk
 dt_balanced <- merge(dt_balanced, dt_treat, by = "countyfp")
 
-# NYC boroughs: consolidated city-county government not in COG crosswalk
-dt_balanced[is.na(wind_zone) & statefp == "36", wind_zone := 1L]
 stopifnot(nrow(dt_balanced[is.na(wind_zone)]) == 0L)
 
 dt_balanced[, treated     := (wind_zone >= 2L)]

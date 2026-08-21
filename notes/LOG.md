@@ -4,6 +4,118 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk D — Migrate program/import/ onto research-database (2026-08-21)
+
+**Base commit:** 8219921. Full plan: `program/import/UPDATE.md`. Three
+commits, per the plan's bisectable sequencing: BPS/MHS plumbing, NFIP onto
+curated parquet, wind-zone crosswalk onto `geo_county`. CPI (§6.1) is
+deliberately deferred — `$DATA_PATH` survives for that one file only.
+
+**Environment note — no baseline to diff against.** This session's checkout
+has no `derived/` directory and no `$DATA_PATH` access at all (unlike the
+prior verification chunk's sandbox, which at least had an empty mount).
+`UPDATE.md` §7's gate ("snapshot the baseline first, diff old vs new
+`derived/*`") could not be executed as written — there is no old `derived/`
+to diff against in this environment. What was verified instead: every
+migrated script runs end-to-end against the real `research-database` cache
+(pulled from S3 the first time); output row counts for the NFIP claims/
+policy panel match `UPDATE.md`'s own stated verified benchmarks exactly
+(1,842,522 claims, 25,798 MH, 68,107 tracts); `rd_check_id()` passes on
+every `countyfp`/`tractfp`/`statefp` column produced; key uniqueness holds
+on every panel artifact's declared key; cross-field consistency holds
+(`countyfp`/`statefp` recomputed from `tractfp` match the merged columns
+exactly); and the full downstream chain (`make test`, `estimate-mhs.R`,
+`estimate-nfip.R`, `estimate-welfare.R`, `plot-mhs.R`, `plot-nfip.R`) runs
+against the migrated `derived/*` without error. A real baseline diff still
+needs to happen on a machine that has both this migration and the old
+`$DATA_PATH` tree, before the headline numbers in `paper.Rmd` are updated.
+
+**Update (same day):** `CENSUS_API_KEY` was added to `.Renviron` after the
+above was written; `import-census.R` was re-run for real (3,141 counties,
+8,779,228 total MH units from H030; 12,564 county x vintage cells, 4,395,673
+MH units from HCT006), and `databuild-mhs.R`/`databuild-welfare.R` were
+re-run against the real `census2000-mh-county-vintage.Rds` (welfare build:
+24 of 11,696 county x vintage cells missing a Census MH count, a real and
+expected small gap, not an error). Re-checked: key uniqueness and
+`rd_check_id()` conformance still hold on both rebuilt artifacts.
+
+**Update (same day): CPI resolved, §6.1 closed via option 1.** `research-database`
+gained a real `bls_cpi` dataset (commit `71d9cdf`: `program/bls/download.R` +
+`import.R`, pulling CUUR0000SA0/CUSR0000SA0 from the BLS Public Data API,
+1913-01 through 2026-07). `import-cpi.R` now reads `bls_cpi` via `rd_read()`
+instead of the `$DATA_PATH` workbook, taking `cpi_u_nsa_1982_84` (BLS's native
+1982-84=100 index, one NA row dropped: 2025-10, a real appropriations-lapse
+gap outside every window this project uses) rather than the catalog's own
+2000-rebased column — the project's downstream `cpi / cpi[year ==
+DISCOUNT_YEAR]` step in `databuild-mhs.R`/`databuild-nfip.R` still does its
+own rebase, per §6.1's "indices are data, deflation is a function" principle;
+the two are mathematically equivalent after that rebase, so the column choice
+is about keeping the raw/rebase split honest, not about the numbers.
+`$DATA_PATH` is no longer referenced anywhere in `program/import/`; `Makefile`'s
+comment updated accordingly.
+
+Re-ran `databuild-mhs.R`, `databuild-nfip.R`, and `databuild-welfare.R`
+against the real deflator. Row counts are unchanged from the CPI-stub run
+(expected — CPI only rescales dollar columns), `cpi[year == 2000] == 1`
+exactly in `sample-mhs.Rds`, and all uniqueness/`rd_check_id()` checks still
+pass. `make test` and `estimate-mhs.R`/`estimate-nfip.R`/`estimate-welfare.R`
+all re-ran clean against real dollar figures (e.g. MHS `Dep. Var. mean`
+recomputed from $35,279.7 under the flat-CPI stub to $41,515.7 under the real
+deflator — expect this kind of change, this is the CPI stub finally coming
+out). **`derived/` is now built entirely from real sources** (BPS, MHS,
+Census, NFIP, wind-zone crosswalk, CPI) for the first time in this session —
+no synthetic stand-ins remain. A real baseline diff against a pre-migration
+`derived/` still has not been done (no such baseline exists in any
+environment this session had access to); that is still the outstanding gate
+before `paper.Rmd`'s headline numbers get updated.
+
+**Noticed in passing, not touched (out of scope):** `program/estimate/estimate-mhs.R:12`
+reads `Sys.getenv("DATA_PATH")` into `data_path` but never uses it — dead code,
+same pattern as the `dt_state` dead read this chunk removed from
+`databuild-mhs.R`. Outside `program/import/`, so left alone.
+
+**Chunk 1 — BPS/MHS plumbing.** `import-bps.R` and `import-mhs.R` deleted;
+`databuild-mhs.R` reads `census_bps`/`census_mhs_state_year` via `rd_read()`
+and joins `geo_state` for `state_name` (no longer carried by
+`census_mhs_state_year`); asserts `survey_era == "pre_2014"` for the
+1985-2003 window, then drops the column so `sample-mhs.Rds`'s column set is
+unchanged. `permits-co.Rds`/`mhs-state-year.Rds` are retired.
+
+**Chunk 2 — NFIP onto curated parquet.** `databuild-nfip.R` queries
+`fema_nfip_claims`/`fema_nfip_policies` (pinned `NFIP_VERSION =
+"v2026-08-15"` in `project-params.R`) via `rd_con()`/`rd_path()` instead of
+`$DATA_PATH/derived/fema.duckdb`. This is a v2 -> v3 OpenFEMA vintage change,
+not just a rename — expect headline NFIP estimates to move once a real
+baseline diff is run. `nfip-claims.Rds` row order is now pinned with
+`setorder()` since a filtered parquet scan does not preserve file order.
+
+**Chunk 3 — wind-zone crosswalk onto `geo_county`.** `import-ecfr-windzone.R`
+now matches eCFR county names against `rd_read("geo_county")` (filtered to
+`is_current == TRUE`) + `geo_state`, instead of
+`Govt_Units_2021_Final.xlsx`. `norm()` gained suffix-stripping for
+`geo_county`'s naming convention (" County", " Parish", " City", " Borough",
+" Census Area", " Municipality", " City and Borough"); the `"ORLEANS" =
+"NEW ORLEANS"` correction was dropped (Orleans Parish now matches directly);
+the other three spelling corrections (Vermillion, La Fourche, Terrabonne)
+and the Dade->Miami-Dade rename survive. Result: 3,206 counties (144 WZ2, 30
+WZ3) — every US county except AK resolves, so the per-jurisdiction
+`max(wind_zone)` collapse is now a no-op safety net rather than a real
+collapse. Confirmed the `statefp == "36"` NYC-borough fallback in
+`databuild-nfip.R` is dead (all five boroughs resolve to wind_zone 1 through
+the normal path) and removed it in this chunk, as the plan specified.
+
+**Observed, not fixed — out of scope for this chunk.** 238 of 5,957,310
+`nfip-balanced.Rds` rows (0.004%) carry `statefp == "72"` (Puerto Rico).
+These come entirely from the policies leg: unlike the claims query, the
+original (pre-migration) policies SQL never had the
+`TRY_CAST(LEFT(tractfp,2) AS INT) <= 56` guard, only a `propertyState NOT
+IN (...)` filter — so a policy whose self-reported `propertyState` disagrees
+with its tract's actual state slips through. This asymmetry predates the
+migration and was preserved as-is (not part of `UPDATE.md`'s scope); flagging
+for a future chunk.
+
+---
+
 ## Chunk B — Review quick fixes (2026-08-12)
 
 **Base commit:** 9e13e4b (uncommitted at time of writing). Note: a peer
