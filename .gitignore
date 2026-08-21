@@ -10,6 +10,8 @@ paper.pdf
 slides.pdf
 *.pdf
 
+.gitignore
+
 # History files
 .Rhistory
 .Rapp.history
