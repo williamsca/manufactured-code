@@ -4,6 +4,75 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Geographic coverage safeguards, and closing a second silent leak (2026-08-24)
+
+Follow-up to the CT incident below, per Colin's request: turn the specific
+CT fix into a general safeguard against the same failure mode (a default
+inner-join merge against a geographic crosswalk silently drops rows instead
+of producing a catchable NA), and confirmed Colin wants the sample's
+existing scope (continental US, i.e. AK and HI both excluded, matching
+`paper.Rmd`'s "I restrict both samples to the continental US") kept as-is
+rather than expanded to include Hawaii.
+
+**New `program/import/geo-coverage-checks.R`**, sourced by `databuild-nfip.R`,
+`databuild-mhs.R`, `estimate-nfip.R`. `EXCLUDED_STATEFP <- c("02", "15")`
+(AK, HI) documents the sample's own intentional exclusions. Two checks:
+- `assert_geo_coverage()`: zero tolerance -- fails loudly if any row outside
+  `EXCLUDED_STATEFP` has an NA in the crosswalk column after a merge. For
+  merges that should have complete coverage (wind zone).
+- `assert_geo_coverage_any()`: per-FIPS-code tolerance -- fails only if a
+  whole county has *no* non-NA rows at all, tolerating documented
+  within-county sparsity (e.g. impute-stock.R's dropped 1994 construction
+  year) while still catching a wholesale per-county drop. Takes an
+  `allow_fips` list for individually-justified, commented exceptions --
+  never a blanket suppression.
+
+**Applied:**
+- `databuild-nfip.R`'s wind-zone merge (the actual CT bug site): changed
+  from a default inner join to `all.x = TRUE` + `assert_geo_coverage()`,
+  replacing a `stopifnot(!anyNA(wind_zone))` that could never fire after an
+  inner join (nothing to catch) with one that actually can.
+- `databuild-nfip.R`'s housing-stock merge: added `assert_geo_coverage_any()`,
+  allow-listing Broomfield County, CO (08014, created 2001, predates the
+  Census 2000 stock by construction, not by gap).
+- `databuild-mhs.R`'s wind-zone merge: swapped its already-correct
+  `all.x = TRUE` + bare `stopifnot(!anyNA(...))` for the shared, more
+  informative check (same behavior, consistent messaging).
+- `estimate-nfip.R`'s Chunk D mechanism-decomposition wind-zone merge:
+  same swap.
+
+**Running the new stock-coverage check immediately caught a second, real,
+pre-existing leak** (distinct from the CT bug -- not a crosswalk-coverage
+gap, a sample-scope leak): 5 territory counties (Northern Mariana Islands
+69110; Puerto Rico 72057/72113/72127/72145) were present in
+`nfip-balanced.Rds` despite the SQL's `property_state NOT IN (...)` filter.
+This is exactly the asymmetry already flagged and deferred in this log's
+2026-08-21 entry: the policies SQL, unlike the claims SQL, had no
+`tractfp`-derived guard, so a policy whose self-reported `property_state`
+disagreed with its actual tract geography slipped through. Fixed by adding
+the same `TRY_CAST(LEFT(tractfp, 2) AS INT) <= 56` guard the claims query
+already had, and adding 'MP' (Northern Mariana Islands) to the
+`property_state` exclusion list for defense in depth. `nfip-balanced.Rds`
+shrank by 306 rows (7 tracts) as a result -- immaterial to any headline
+number (territories were never in scope), but it closes a real gap, not
+just an observed-and-parked one.
+
+**Verified.** `make test` (4/4). Full pipeline re-run end to end;
+`databuild-mhs.R`, `databuild-nfip.R`, `databuild-welfare.R`,
+`estimate-mhs.R`, `estimate-nfip.R` all clean. `building_damage_static`
+unchanged at -3.6397 (territory leakage was immaterial to any in-scope
+estimate).
+
+**Open question.** The two coverage checks are applied at the specific
+merge sites known to have failed. Other crosswalk merges in the pipeline
+(Census 2000 stock levels, BPS/MHS shares in `impute-stock.R`) already use
+`all.x = TRUE` with their own explicit `stopifnot()`s and were not
+retrofitted onto the shared helper, since they were not implicated in
+either incident -- worth a pass if a third instance of this pattern
+surfaces.
+
+---
+
 ## Merge verification: chunk-b-review-fixes onto research-database, and a live CT bug (2026-08-24)
 
 **What was done.** After merging `chunk-b-review-fixes` (Chunk D/E) onto

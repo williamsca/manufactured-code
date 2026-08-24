@@ -7,6 +7,7 @@ library(data.table)
 
 source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
+source(here("program", "import", "geo-coverage-checks.R"))
 
 year_min <- 1985L
 year_max <- 2003L
@@ -65,7 +66,7 @@ dt[, survey_era := NULL]
 # treatment status
 dt <- merge(dt, dt_treat, by = "statefp", all.x = TRUE)
 
-stopifnot(!anyNA(dt$wind_zone))
+assert_geo_coverage(dt, "wind_zone", "statefp", "databuild-mhs.R: MHS panel x ecfr_wind_zone")
 
 dt[, treated := (wind_zone >= 2)]
 dt[, treated_wz3 := (wind_zone == 3)]

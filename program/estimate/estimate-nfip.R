@@ -31,6 +31,7 @@ agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
 source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
+source(here("program", "import", "geo-coverage-checks.R"))
 
 if (!agg_geo %in% c("countyfp", "tractfp", "statefp")) {
     stop("agg_geo must be one of 'countyfp', 'tractfp', or 'statefp'.")
@@ -544,7 +545,9 @@ etable(
 # and was for a gap that no longer exists.
 dt_wz <- rd_read("ecfr_wind_zone", version = ECFR_WIND_ZONE_VERSION)
 dt_claims_est <- merge(dt_claims_est, dt_wz, by = "countyfp", all.x = TRUE)
-stopifnot(nrow(dt_claims_est[is.na(wind_zone)]) == 0L)
+assert_geo_coverage(
+    dt_claims_est, "wind_zone", "countyfp",
+    "estimate-nfip.R: mechanism-split claims x ecfr_wind_zone")
 dt_claims_est[, treated_wz3 := as.integer(wind_zone == 3L)]
 
 # --- sample splits: elevation, SFHA, wind-zone-3 exposure ---

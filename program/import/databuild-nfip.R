@@ -20,6 +20,7 @@ library(data.table)
 
 source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
+source(here("program", "import", "geo-coverage-checks.R"))
 
 # vintage filtering
 year_min <- 1983L
@@ -159,9 +160,10 @@ WITH filtered AS (
         AND policy_termination_date    IS NOT NULL
         AND policy_effective_date      <  policy_termination_date
         AND property_state IS NOT NULL
-        AND property_state NOT IN ('AS', 'GU', 'VI', 'PR', 'AK', 'HI')
+        AND property_state NOT IN ('AS', 'GU', 'MP', 'VI', 'PR', 'AK', 'HI')
         AND countyfp IS NOT NULL
         AND tractfp  IS NOT NULL
+        AND TRY_CAST(LEFT(tractfp, 2) AS INT) <= 56
         AND YEAR(original_construction_date) BETWEEN %d AND %d
 )
 SELECT
@@ -276,11 +278,17 @@ for (col in c(v_pol_count, v_pol_amt)) {
 # 5. Merge treatment ----
 # ---------------------------------------------------------------------------
 
-# NB: drops a handful of tracts with policies but no matching
-# county in the eCFR crosswalk
-dt_balanced <- merge(dt_balanced, dt_treat, by = "countyfp")
+# LEFT join, not the default inner join: an inner join silently drops any
+# tract whose county has no crosswalk match, and the old
+# stopifnot(!anyNA(wind_zone)) after an inner join could never fail (a
+# dropped row leaves no NA to catch). This is exactly how Connecticut's
+# pre-2022 county FIPS silently vanished from the sample with no error on
+# 2026-08-24 (notes/LOG.md) -- assert_geo_coverage() below is the fix.
+dt_balanced <- merge(dt_balanced, dt_treat, by = "countyfp", all.x = TRUE)
 
-stopifnot(nrow(dt_balanced[is.na(wind_zone)]) == 0L)
+assert_geo_coverage(
+    dt_balanced, "wind_zone", "countyfp",
+    "databuild-nfip.R: balanced panel x ecfr_wind_zone")
 
 dt_balanced[, treated     := (wind_zone >= 2L)]
 dt_balanced[, treated_wz3 := (wind_zone == 3L)]
@@ -307,6 +315,19 @@ dt_balanced <- merge(
     by = c("countyfp", "year_constr", "mh"),
     all.x = TRUE
 )
+
+# Some homes_n sparsity is expected and documented (impute-stock.R drops
+# construction year 1994), so this does not assert zero NAs the way the
+# wind-zone merge above does. It does assert every in-scope county has SOME
+# non-NA homes_n, catching a wholesale per-county drop (the CT failure
+# mode) while tolerating the within-county sparsity. Broomfield County, CO
+# (08014) is allow-listed: created in 2001, so it predates the Census 2000
+# stock entirely and has no homes_n by construction, not by gap -- see
+# notes/specs.md Sec 12.
+assert_geo_coverage_any(
+    dt_balanced, "homes_n", "countyfp", "countyfp",
+    "databuild-nfip.R: balanced panel x stock-county-vintage",
+    allow_fips = "08014")
 
 # ---------------------------------------------------------------------------
 # 6. Derived outcomes ----
