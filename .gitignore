@@ -10,6 +10,8 @@ paper.pdf
 slides.pdf
 *.pdf
 
+.vscode
+
 .gitignore
 
 # History files
