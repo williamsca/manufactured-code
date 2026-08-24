@@ -4,6 +4,74 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Merge verification: chunk-b-review-fixes onto research-database, and a live CT bug (2026-08-24)
+
+**What was done.** After merging `chunk-b-review-fixes` (Chunk D/E) onto
+`main`'s research-database migration (merge commit, see git log), actually
+ran the full pipeline in this sandbox (`RD_HOME`/`RD_CACHE` were present and
+already populated -- earlier claiming otherwise in this session was wrong,
+corrected after the user asked) rather than resting on `make test` alone.
+
+**Found a live data-loss bug, not introduced by this merge.** `databuild-nfip.R`'s
+inner join of the balanced panel onto `ecfr_wind_zone` (research-database,
+pinned `ECFR_WIND_ZONE_VERSION`) silently dropped every Connecticut row
+(17,717 claims, ~1% of the full sample) with no error: `ecfr_wind_zone`'s
+import script filtered `geo_county` to `is_current == TRUE`, and Connecticut
+retired its 8 counties for 9 planning regions in 2022, so none of the
+pre-2022 county FIPS that NFIP claims/policies actually carry had a match.
+An inner join on a coverage gap produces no NA, so `databuild-nfip.R`'s own
+`stopifnot(!anyNA(wind_zone))` didn't catch it. The merged-in Chunk D
+mechanism-decomposition block in `estimate-nfip.R` *did* crash on this (it
+does a left join + assert against a since-orphaned local
+`derived/ecfr-windzone.csv`, left over from the deleted
+`import-ecfr-windzone.R`), which is what surfaced the issue.
+
+**Fixed upstream, in `research-database` (commit `15f43b2`, fast-forwarded
+to `main`, then re-run to overwrite the pinned `v2026-08-24` curated
+version in place -- a same-snapshot logic fix, not a new eCFR amendment,
+per Colin's call).** `program/ecfr/wind-zones/import.R` now builds its
+county universe from all of `geo_county`, not just `is_current == TRUE`.
+None of the newly-included historical FIPS codes (CT, plus scattered ones
+in AK/MI/NM/SD/VA) are ever named in the eCFR Wind Zone II/III listings, so
+they all fall through to the existing WZ1 residual rule -- verified WZ2/WZ3
+counts are unchanged (144/30) before and after, only WZ1 grew (3,032→3,046;
+3,206→3,220 counties total). Also fixed `estimate-nfip.R`'s Chunk D block
+to read `rd_read("ecfr_wind_zone", version = ECFR_WIND_ZONE_VERSION)`
+directly instead of the stale local CSV, and dropped its NYC-borough
+fallback after confirming every countyfp in `nfip-claims.Rds` now matches
+directly (0 unmatched, checked explicitly).
+
+**What changed in outputs.** `nfip-balanced.Rds` grew from 5,957,310 to
+6,023,134 rows (+727 tracts, all Connecticut) once CT could match. Headline
+numbers moved negligibly: `building_damage_static` -3.640 (SE 1.658,
+unchanged to 3 decimals from pre-fix), `price_effect_level` $4,194
+(unchanged -- MHS treatment is state-level and CT already resolved to
+untreated/Zone I either way), mechanism-split Zone III -6.434 vs. the
+previously-recorded -6.57 (small movement, CT is Zone I so this is exactly
+the kind of shift a coverage fix should produce and no more). Connecticut
+remains a Zone I control state throughout, so this is a sample-completeness
+fix, not a treatment-definition change.
+
+**Verified.** `make test` (4/4, unchanged). Full pipeline re-run end to end
+in this sandbox: `databuild-mhs.R`, `databuild-nfip.R`, `databuild-welfare.R`,
+`impute-stock.R`, `estimate-mhs.R`, `estimate-nfip.R`, `estimate-welfare.R`,
+all descriptive/plot scripts except `map.R` (fails on a missing `tigris`
+package in this sandbox, pre-existing and unrelated -- `map.R` untouched by
+either branch). `paper.pdf` could not be rendered in this sandbox (pandoc
+1.12.3.1, predates the `--extract-media` flag `rmarkdown` now emits) -- an
+environment gap, not a content issue; every number `paper.Rmd` would pull
+in was independently verified against the regenerated scalar CSVs above.
+
+**Open questions.** Whether other research-database-curated crosswalks this
+project depends on (`geo_county` itself, `census_bps`, etc.) have similar
+current-vintage-only gaps against this project's historical data is not
+checked beyond `ecfr_wind_zone` -- worth a pass if another silent-drop
+surfaces. The `research-database` fix widened coverage nationally (not just
+CT), so other research-database consumers with historical data may have had
+the same silent gap; worth flagging to whoever else uses that repo.
+
+---
+
 ## Chunk D — Migrate program/import/ onto research-database (2026-08-21)
 
 **Base commit:** 8219921. Full plan: `program/import/UPDATE.md`. Three

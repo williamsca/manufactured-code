@@ -30,6 +30,7 @@ BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
 agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
 source(here("program", "import", "project-params.R"))
+source(here("program", "import", "rd-client.R"))
 
 if (!agg_geo %in% c("countyfp", "tractfp", "statefp")) {
     stop("agg_geo must be one of 'countyfp', 'tractfp', or 'statefp'.")
@@ -533,14 +534,16 @@ etable(
 
 # --- wind-zone exposure (coordinate with Chunk C) ---
 # Reuse the same eCFR crosswalk as the Chunk C cost-side dose-response
-# (`derived/ecfr-windzone.csv`) rather than an independently defined
-# coastal/hurricane county list, so the benefit-side split lines up with
-# the cost-side treatment definition. NYC boroughs get the same Zone I
-# fallback used in `databuild-nfip.R` (consolidated city-county government
-# not in the eCFR crosswalk).
-dt_wz <- fread(here("derived", "ecfr-windzone.csv"), keepLeadingZeros = TRUE)
+# (`ecfr_wind_zone`, research-database) rather than an independently defined
+# coastal/hurricane county list, so the benefit-side split lines up with the
+# cost-side treatment definition. No NYC-borough fallback needed: verified
+# 2026-08-24 that every countyfp in nfip-claims.Rds, including all five NYC
+# boroughs, matches directly once ecfr_wind_zone covers geo_county's
+# historical rows as well as current ones (see research-database's
+# program/ecfr/wind-zones/import.R) -- the old fallback predates that fix
+# and was for a gap that no longer exists.
+dt_wz <- rd_read("ecfr_wind_zone", version = ECFR_WIND_ZONE_VERSION)
 dt_claims_est <- merge(dt_claims_est, dt_wz, by = "countyfp", all.x = TRUE)
-dt_claims_est[is.na(wind_zone) & substr(countyfp, 1L, 2L) == "36", wind_zone := 1L]
 stopifnot(nrow(dt_claims_est[is.na(wind_zone)]) == 0L)
 dt_claims_est[, treated_wz3 := as.integer(wind_zone == 3L)]
 
