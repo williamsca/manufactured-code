@@ -54,6 +54,15 @@ fmla_p_dose <- as.formula(paste0(
 est_p_dose <- feols(fmla_p_dose, data = dt, cluster = ~statefp)
 etable(est_p_dose, digits = 3)
 
+# Same substitution on the quantity side: does the placements event study
+# also steepen under continuous intensity, or does it stay flat/null like
+# the binary version?
+fmla_q_dose <- as.formula(paste0(
+    s_out_q, " ~ i(year, treated_intensity, ref = 1993) | statefp + year"
+))
+est_q_dose <- feols(fmla_q_dose, data = dt, cluster = ~statefp)
+etable(est_q_dose, digits = 3)
+
 # Binary spec, restricted to the three high-intensity treated states
 # (FL, LA, MA) vs. the zone I controls, so any dilution from partially
 # treated states (e.g. GA at 6% intensity) cannot attenuate the estimate.
@@ -192,6 +201,8 @@ plot_es(est_p_dose, "avg_sales_price", yscale = 1000,
         path = here("output", "event-study", "es-mhs-avg_sales_price-dose.pdf"))
 plot_es(est_p_hi, "avg_sales_price", yscale = 1000,
         path = here("output", "event-study", "es-mhs-avg_sales_price-hi.pdf"))
+plot_es(est_q_dose, "placements_ln",
+        path = here("output", "event-study", "es-mhs-placements_ln-dose.pdf"))
 
 # Export key scalars ----
 dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
@@ -231,16 +242,27 @@ price_effect_hi_level <- ct_price_hi[year >= 1994, mean(Estimate) / 1000]
 
 dose_binary_ratio <- price_effect_dose_level / price_effect_level
 
+# Quantity-side dose-response scalar, same construction as
+# `price_effect_dose_level`: average of the post-1994 treated_intensity
+# interactions, i.e. the implied log-placements effect of moving a state
+# from 0% to 100% Zone II/III MH stock.
+ct_placements_dose <- as.data.table(
+    coeftable(est_q_dose[lhs = "placements_ln"][[1]]),
+    keep.rownames = TRUE)
+ct_placements_dose[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+ct_placements_dose <- ct_placements_dose[grepl(":treated_intensity$", rn)]
+placements_effect_dose_level <- ct_placements_dose[year >= 1994, mean(Estimate)]
+
 fwrite(
     data.table(
         statistic = c("price_effect_level", "price_effect_1994",
                       "avg_price_treated_pre", "price_effect_pct",
                       "price_effect_dose_level", "price_effect_hi_level",
-                      "dose_binary_ratio"),
+                      "dose_binary_ratio", "placements_effect_dose_level"),
         value     = c(price_effect_level, price_effect_1994,
                       avg_price_treated_pre, price_effect_pct,
                       price_effect_dose_level, price_effect_hi_level,
-                      dose_binary_ratio)
+                      dose_binary_ratio, placements_effect_dose_level)
     ),
     here("output", "results", "mhs-scalars.csv")
 )

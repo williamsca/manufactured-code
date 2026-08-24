@@ -4,7 +4,7 @@ Source of truth for every table/figure in `paper.Rmd`/`slides.tex`. Paper text
 is checked against this file, not against memory. Update in the same commit
 as any spec change (see `TODO.md` PROCESS).
 
-Last verified: 2026-08-12, against commit at the top of `notes/LOG.md` (Chunk C1).
+Last verified: 2026-08-13, against commit at the top of `notes/LOG.md` (Chunk E).
 
 ## 1. MHS price/quantity event study (Eq. 1)
 
@@ -99,9 +99,9 @@ Last verified: 2026-08-12, against commit at the top of `notes/LOG.md` (Chunk C1
 - **Outputs:** `output/event-study/countyfp/take-up.tex` (Table
   `tab:take-up`, appendix), `output/event-study/countyfp/policy-composition.tex`
   (Table `tab:composition`)
-- **Known issue (Chunk E):** `policies_ppermit` (policies ÷ single-family
-  building permits) is the wrong take-up denominator — see TODO Chunk E.
-  The take-up table currently reports raw PPML counts, not a rate.
+- **Fixed (Chunk E, 2026-08-13):** `policies_ppermit` (policies ÷
+  single-family building permits) was the wrong take-up denominator —
+  replaced by a `homes_n`-offset PPML. See §12.
 - **Fixed 2026-08-11:** both specs were missing the `period_constr` FE even
   though both tables' notes claim estimation from Equation (2) (which
   includes it). Without it, `i(period_constr, mh)` — which only creates
@@ -417,3 +417,111 @@ chunk and remain open in `TODO.md`.
   with the new columns to run `estimate-mhs.R` end-to-end (output above).
   `program/import/databuild-mhs.R` itself was read-verified line-by-line
   against this replication but not executed with real `$DATA_PATH`.
+
+## 12. Take-up housing-stock denominator, `homes_n` (Chunk E, 2026-08-13)
+
+Replaces `policies_ppermit` (§3's old "known issue") throughout.
+
+- **Script:** `program/import/impute-stock.R` (new) builds
+  `derived/stock-county-vintage.Rds`, keyed `countyfp x year_constr x mh`,
+  `homes_n`. Reads `census_mhs_state_year`, `census_mhs_national_year`, and
+  `census_bps` via `rd_read()` (research-database; see
+  `program/import/UPDATE.md`) rather than the project's own local
+  `derived/*.Rds` artifacts — ported onto the curated source at merge time
+  (2026-08-24), after this chunk was originally written against
+  `$DATA_PATH`-derived `derived/mhs-state-year.Rds` / `derived/permits-co.Rds`.
+- **Levels:** Census 2000 (`census2000-mh-county-vintage.Rds`), `mh_units`
+  for MH, `total_units - mh_units` for site-built, by county x vintage bin
+  (`1980_1989`, `1990_1994`, `1995_1998`, `1999_2000`).
+- **Within-bin year allocation:** MHS state-year `placements`
+  (`census_mhs_state_year`) for MH, broadcast to every county in the state
+  (MHS has no county detail); BPS county-year `permits_sf`
+  (`census_bps`) for site-built, falling back to the state's permit
+  shares where a county has zero/missing permits in the bin. Both sources
+  are used only to split a Census-anchored bin TOTAL across years, so their
+  own level bias (BPS undercounts non-permitting rural counties; MHS is a
+  state series) does not enter the resulting ratio.
+- **Years covered: 1984-1999.** 1980-1983 dropped from the `1980_1989` bin
+  (no source distinguishes them from 1984+ within that bin). **1994 dropped
+  by default** from the `1990_1994` bin (ambiguous pre/post reform given the
+  July effective date and production/installation lags) — a `period_constr`
+  bin whose only `year_constr` member is 1994 is `NA`, not silently 0.
+- **Validation (run inside the script, `stopifnot`):** uniqueness on
+  `(countyfp, year_constr, mh)`; no negative/missing `homes_n`; adding-up
+  (allocated years sum exactly, tolerance 1e-6, to the Census bin total);
+  stability (county share of state MH stock correlates 0.86-0.95 across all
+  pairs of the 4 Census bins); benchmark (national MH stock 1986-1999,
+  imputed, = 3,608,146 vs. cumulative MHS shipments 1986-1999 = 3,799,500,
+  ratio 0.95).
+- **Merge into the balanced panel** (`databuild-nfip.R`, replacing the old
+  section-5.5 per-tract permit-split block): `stock-county-vintage.Rds`
+  merged onto `nfip-balanced.Rds` by `(countyfp, year_constr, mh)`.
+  `homes_n` is therefore a COUNTY-level value duplicated across every tract
+  row for a given county/year/type — this is intentional (see script
+  comment); it is NOT re-divided by tract count, unlike the old
+  `permits_sf_n`.
+- **Aggregation in estimation** (`estimate-nfip.R`): `dt_homes_cell` takes
+  a DISTINCT `(countyfp, year_constr, mh, homes_n)` value before summing
+  across `year_constr` into `period_constr` bins — summing the raw
+  tract-duplicated column would inflate by the tract count. Only defined
+  when `agg_geo == "countyfp"` (the stock has no finer geography); `NA` at
+  `tractfp`/`statefp` aggregation, and the per-home specs are skipped there
+  (raw-count `est_pois_es` covers that case).
+- **Take-up spec (updated 2026-08-13, twice, same day as the rest of Chunk
+  E):** `c(policies_per_1k_homes, claims_per_1k_homes) ~ i(period_constr, mh, ref = ref_period) | geo^period_loss + mh + period_constr`,
+  **OLS**, `weights = ~homes_n`, `cluster = ~geo` (county, since `geo ==
+  countyfp` under the default `agg_geo`). Outcomes are `1000 * policies_n /
+  homes_n` and `1000 * claims_n / homes_n` (rescaled from a first pass that
+  used the raw `policies_n / homes_n` ratio, per Colin's request — same
+  regression, coefficients just ×1000 for readability). Originally a PPML
+  with `offset = ~log(homes_n)`; swapped to OLS directly on the ratio
+  outcomes per Colin's request. Unweighted OLS was tried first and
+  rejected: a handful of cells (mostly the flagged, partial-stock 1994
+  bin) have imputed `homes_n` well under 1, producing ratios in the tens
+  of thousands (per 1,000 homes) that dominate an unweighted fit;
+  weighting by `homes_n` (same logic as the `policies_n` weights already
+  used for the composition/claim-rate cell regressions) fixes this.
+  Pooled across all three policy periods only (2009-2023) — an
+  earliest-period-only (2009-2013) restriction was tried and dropped from
+  the table: point estimates were extremely similar to the pooled column
+  and added no information (see caveat below).
+- **Decomposition:** claim frequency (claims per home, extensive/
+  insurability margin, this section) vs. payment conditional on a claim
+  (the existing damage-outcome tables/`est_claim_es`, intensive margin, no
+  stock denominator needed) — different welfare interpretations per the
+  review notes.
+- **Result:** pooled post-1994 average coefficient (across the 1994, 1996,
+  1998 `period_constr` bins) is -126.6 policies and -0.11 claims per 1,000
+  homes, relative to site-built homes of the same vintage — small, and
+  largely driven by the volatile 1994 bin (built from the single,
+  ambiguous 1994 construction year rather than a full two-year bin; see
+  the stock-imputation note above); the 1996/1998 coefficients are small
+  and closer to zero. Read as no clear extensive-margin take-up/
+  claim-frequency shift, in contrast to the earlier PPML-offset version of
+  this table (log rate ratios ≈ +7%/+22%) — the sign/magnitude are NOT
+  robust to the OLS-vs-PPML choice, and this OLS version is what is
+  currently in the paper.
+- **Outputs:** `derived/stock-county-vintage.Rds`,
+  `output/event-study/countyfp/take-up.tex` (Table `tab:take-up`, retitled
+  "NFIP Take-Up per Housing-Unit Stock," 2 columns: policies and claims per
+  1,000 homes, pooled sample only), `policies_per_1k_homes_{avg,min,max}`
+  / `claims_per_1k_homes_{avg,min,max}` rows (level differences, not log
+  rate ratios) in `output/results/nfip-scalars.csv`.
+- **Caveat, in the paper (`paper.Rmd` appendix), not just here:** `homes_n`
+  is fixed as of the 2000 Census; the policy periods run 2009-2023, 9-23
+  years later, so differential attrition of the pre-/post-1994 MH stock
+  over that gap biases the denominator asymmetrically by vintage, growing
+  with the gap. An earliest-period-only (2009-2013) column was checked as
+  a partial mitigation and dropped (see above) since it didn't move the
+  point estimates. ACS's continuous housing-vintage series could in
+  principle bound this drift directly but was **not implemented this
+  chunk** (no `import-acs.R` exists in this repo; out of scope for the
+  "all inputs already on disk" chunk budget) — noted as a caveat in the
+  paper text and as an open item in `notes/LOG.md`, not built.
+- **Not covered by this chunk:** `make data`'s `databuild-nfip.R` step
+  (the real, non-patched run against `fema.duckdb`) — no `$DATA_PATH`
+  access in this sandbox, same standing limitation as every prior chunk
+  (§7). Verified instead by patching a copy of the existing
+  `nfip-balanced.Rds` with the new merge and running `estimate-nfip.R`
+  end-to-end against it (same technique Chunk C used for
+  `databuild-mhs.R`/`sample-mhs.Rds`); full detail in `notes/LOG.md`.

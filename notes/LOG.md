@@ -138,6 +138,250 @@ for a future chunk.
 
 ---
 
+**Merge note (2026-08-24):** this session's "Chunk D" label collides with
+TODO.md's actual Chunk D (mechanism decomposition, still `[ ]` unstarted as
+of this merge) — this entry is an infra migration done directly on `main`,
+not lettered in TODO.md's plan. Left as originally written rather than
+renamed, to avoid rewriting another session's log; flagging so the collision
+doesn't read as the mechanism-decomposition chunk being done. The entry
+below (Chunk E, 2026-08-13) predates this one and was merged in from
+`chunk-b-review-fixes`; its base commit (73ebd07) predates this session's
+research-database migration, so `impute-stock.R` and `databuild-nfip.R`'s
+stock merge were written against the old `$DATA_PATH`-based import layer —
+see the merge commit for how that was reconciled onto `rd_read()`.
+
+---
+
+## Chunk E — Housing-stock denominator and the take-up margin (2026-08-13)
+
+**Base commit:** 73ebd07 (Chunk C committed). Note: a peer session was
+working Chunk D (mechanism decomposition) in the same working tree
+concurrently — its uncommitted `estimate-nfip.R` additions (insurance-
+accounting outcomes, sample splits) were already on disk when this chunk
+started and are left untouched; this chunk's edits are additive to a
+different part of the same file. Diff review should distinguish the two by
+section header (`# mechanism decomposition (Chunk D)` vs. the take-up
+blocks below).
+
+### What was done
+
+Replaced `policies_ppermit` (policies ÷ single-family building permits —
+wrong housing type, and BPS coverage of the site-built stock falls from a
+median 0.70 in low-MH counties to 0.20 in high-MH counties, exactly where
+MH concentrate) with `policies_per_home` / a `homes_n`-offset PPML, per
+TODO.md Chunk E.
+
+- **New `program/import/impute-stock.R`.** Builds
+  `derived/stock-county-vintage.Rds` (`countyfp x year_constr x mh`,
+  `homes_n`), covering construction years 1984-1999. Levels from Census
+  2000 (`mh_units`, `total_units - mh_units`); within a Census vintage bin,
+  annual allocation uses MHS state-year placements (MH, broadcast to every
+  county in the state) and BPS county-year single-family permits
+  (site-built), falling back to the state permit share where a county
+  reports zero/missing permits in the bin. 1980-1983 dropped (no source
+  distinguishes them within the `1980_1989` bin); 1994 dropped by default
+  (ambiguous pre/post given the July effective date and
+  production/installation lags), per TODO's explicit instruction.
+  Standalone validation (script prints/asserts all of these; no
+  `$DATA_PATH` needed since every input is already in `derived/`):
+  - Adding-up: allocated years sum exactly to the Census bin total
+    (`stopifnot`, tolerance 1e-6).
+  - Uniqueness on `(countyfp, year_constr, mh)`; no negative/missing
+    `homes_n`.
+  - Stability: county share of state MH stock correlates 0.86-0.95 across
+    all pairs of the four Census vintage bins.
+  - Benchmark: national MH stock 1986-1999 (imputed, summed) = 3,608,146
+    vs. cumulative MHS national shipments over the same years = 3,799,500;
+    ratio 0.95 — sensible (2000-Census stock is somewhat below cumulative
+    shipments, consistent with attrition/relocation-out-of-state between
+    construction and the 2000 snapshot).
+- **`databuild-nfip.R`.** Retired the section-5.5 per-tract permit-split
+  block (`permits_sf_n`, normalized by `n_tracts`). Replaced with a merge
+  of `stock-county-vintage.Rds` onto the balanced panel by
+  `(countyfp, year_constr, mh)` — `homes_n` is therefore a COUNTY-level
+  value duplicated across every tract row for a given county/year/type, by
+  design (per TODO: do not re-divide by tract count; the ratio is formed
+  after policies are re-aggregated to county in estimation). Verified
+  standalone by merging the new stock onto the existing (pre-Chunk-E)
+  `nfip-balanced.Rds`: 6.3% of rows get `homes_n = NA`, essentially all of
+  it the dropped 1994 construction year; exactly one county (`08014`,
+  Broomfield CO, created in 2001) is absent from the Census-2000-anchored
+  stock entirely and gets NA for all years. `databuild-nfip.R` itself could
+  not be run end-to-end — no `$DATA_PATH` access in this sandbox, same
+  standing limitation as Chunks A/C/C1.
+- **`estimate-nfip.R`.** Added a `dt_homes_cell` aggregation
+  (`countyfp x period_constr x mh`) that takes a DISTINCT county-level
+  `homes_n` before summing across `year_constr` into `period_constr` bins —
+  summing the raw tract-duplicated column would have inflated it by the
+  tract count. A `period_constr` bin whose only `year_constr` member is the
+  dropped 1994 (or otherwise fully missing) stays `NA` rather than
+  silently becoming a 0-home bin. Merge or NA-fill is conditional on
+  `agg_geo == "countyfp"` — the stock has no finer geography, so a
+  `tractfp`/`statefp` run leaves `homes_n` undefined and skips the
+  per-home specs.
+  - `policies_per_home`, `claims_per_home` added to `dt_cell` (OLS-ready
+    ratios).
+  - Take-up `Table \ref{tab:take-up}` now reports a PPML with
+    `offset = ~log(homes_n)` rather than modelling raw counts — coefficients
+    are log rate ratios in the per-home rate. Two outcomes (policies,
+    claims) decompose the benefit into claim frequency (extensive/
+    insurability margin) vs. payment conditional on a claim (the existing
+    damage-outcome tables, intensive margin, no stock denominator needed).
+  - Added a 2009-2013-only restricted column pair (least exposed to
+    Census-2000-to-policy-snapshot attrition; see caveats below) alongside
+    the pooled 2009-2023 columns — 4 columns total in `take-up.tex`.
+  - New scalar exports to `nfip-scalars.csv`:
+    `policies_per_home_logrr_{avg,min,max}`,
+    `claims_per_home_logrr_{avg,min,max}` (log rate ratios, exponentiated
+    in `paper.Rmd` to a percent change).
+  - Raw-count `est_pois_es` (no offset) kept for the `tractfp`/`statefp`
+    case and as the direct predecessor comparison.
+- **`paper.Rmd` take-up appendix rewritten** (review target 2) — replaced
+  the "uninterpretable, no denominator" passage with the `homes_n`
+  construction, the rate-ratio results (`r ppl_home_pct` ≈ 7% higher
+  policies-per-home, `r clm_home_pct` ≈ 22% higher claims-per-home,
+  post-1994 MH vs. site-built), and a new caveat paragraph on the
+  Census-2000-vs.-2009-2023-policy-data time gap (why the 2009-2013 column
+  is reported separately; ACS noted as a conceptual bound but NOT
+  implemented — no ACS import script or data exists in this repo, and
+  building one was out of this chunk's scope; left as a TODO). Table
+  retitled "NFIP Take-Up per Housing-Unit Stock."
+- **`Makefile`**: `impute-stock.R` added to the `data` target, before
+  `databuild-nfip.R` (which now depends on its output).
+- **New test** `program/tests/test-take-up-imputation.R`: simulates a
+  panel where `homes_n` grows differentially by MH status across vintage
+  bins (mimicking the real MH stock) and a known post-1994 MH log rate
+  ratio in the per-home policy rate. Confirms the `offset = ~log(homes_n)`
+  PPML recovers the true rate ratio with a flat pre-trend, and confirms
+  that dropping the offset produces a spurious pre-trend (the differential
+  stock-growth trend has nowhere else to go) — the same failure mode that
+  made `policies_ppermit` uninterpretable.
+
+### What changed in outputs
+
+- `output/event-study/countyfp/take-up.tex`: 2 columns → 4 columns;
+  coefficients are now log rate ratios (offset PPML), not raw-count PPML
+  coefficients — not comparable to the pre-Chunk-E table by column
+  position.
+- `output/results/nfip-scalars.csv`: 6 new rows (`policies_per_home_logrr_*`,
+  `claims_per_home_logrr_*`).
+- `paper.Rmd` take-up appendix: substantially rewritten (see above); this
+  is the change review target 2 asked for.
+- `derived/stock-county-vintage.Rds`: new file (94,230 rows, 3,141
+  counties, years 1984-1999). Not committed (`derived/` is gitignored
+  project-wide, consistent with every other `derived/*.Rds`).
+
+### Verified
+
+- `impute-stock.R` run standalone end-to-end (no `$DATA_PATH` needed) —
+  adding-up, uniqueness, non-negativity, stability, and benchmark checks
+  all pass (see above).
+- `databuild-nfip.R`'s new merge logic verified standalone by patching a
+  copy of the existing `nfip-balanced.Rds` with the merge from
+  `stock-county-vintage.Rds` (same technique Chunk C used for
+  `databuild-mhs.R`) — confirmed exactly one distinct `homes_n` value per
+  `(countyfp, year_constr, mh)`, and that the NA pattern is limited to the
+  dropped 1994 year plus the one post-2000 county.
+- `estimate-nfip.R` run end-to-end against the patched `nfip-balanced.Rds`
+  — no errors, `take-up.tex` and the new scalar rows produced.
+- `Rscript program/tests/run-tests.R` (`make test`) — all four test files
+  pass, including the new `test-take-up-imputation.R`.
+- `rmarkdown::render('paper.Rmd')` from a deleted `paper.pdf` — clean
+  render, no missing-scalar errors; take-up appendix renders with the
+  expected ≈7%/≈22% figures.
+- `make data` (raw import layer, i.e. `databuild-nfip.R` against a real
+  `fema.duckdb`) still not verified in this sandbox — same standing
+  limitation noted in every prior chunk's log (§7 in `notes/specs.md`).
+
+### Open questions for check-in
+
+1. **1994 handling.** Dropped from the stock imputation entirely (per
+   TODO's explicit default), which leaves the `period_constr` bin covering
+   1994-1995 (`BIN_CONSTR_YEAR = 2`) representing only 1995's stock. This
+   is documented but is a real approximation — flag if you'd rather
+   interpolate 1994 (e.g., half-weight) instead of dropping it outright.
+2. **ACS bounding not built.** TODO asked for the caveat to bound
+   differential attrition using the ACS decade series; I wrote the caveat
+   into the paper but did not build an ACS import (no `import-acs.R`
+   exists, and the chunk header's "all inputs already on disk" did not
+   hold for this specific ask). The 2009-2013-only column is a cheaper
+   partial substitute (uses only data already in the repo) but is not a
+   real bound. Worth a follow-up chunk if the referee pushes on this.
+3. **Broomfield County, CO (08014)** has no Census-2000-era stock (county
+   didn't exist yet) and so gets `homes_n = NA` for all years in the
+   balanced panel — a single-county omission from the take-up specs, not
+   flagged anywhere else. Immaterial to any headline number but noting for
+   completeness.
+4. Confirm the concurrent-Chunk-D coexistence in `estimate-nfip.R` is
+   fine to leave interleaved rather than sequenced — I did not touch or
+   reorder Chunk D's additions.
+
+### Follow-up, same day: PPML → OLS take-up spec (Colin's request)
+
+Swapped the take-up spec from PPML with a `log(homes_n)` offset to OLS
+directly on `policies_per_home`/`claims_per_home`, clustered by county, per
+Colin's request. Unweighted OLS was tried first and rejected on inspection
+— a handful of near-zero-`homes_n` cells (mostly the volatile 1994 bin)
+produced `policies_per_home` ratios as high as 48 and dominated the fit;
+added `weights = ~homes_n` (same rationale as the existing `policies_n`
+weights on the composition/claim-rate cell regressions), which fixed it.
+`test-take-up-imputation.R` rewritten to match: now simulates a DGP with a
+small share of near-zero-stock cells and confirms the homes_n-weighted OLS
+recovers the true level effect while the unweighted version is distorted
+by the outlier cells.
+
+**Substantive change worth flagging:** the OLS result is materially
+different from the PPML-offset version, not just rescaled — pooled
+post-1994 coefficients are small and slightly negative (-12.7 policies,
+-0.11 claims, per 100/1,000 homes respectively) versus the PPML version's
+positive ≈+7%/+22% log rate ratios, and the OLS result is substantially
+driven by the volatile 1994 bin. Paper text (take-up appendix, `paper.Rmd`)
+and `notes/specs.md` §12 updated to describe this as "no clear extensive-
+margin take-up shift" rather than the previous "genuine take-up increase"
+framing. `nfip-scalars.csv` rows renamed `policies_per_home_{avg,min,max}`
+/ `claims_per_home_{avg,min,max}` (level differences, not log rate ratios
+— the `_logrr_` suffix no longer applies). Also fixed a Unicode minus sign
+(`−`) in the new `paper.Rmd` formatting helper that broke `pdflatex`.
+Re-verified: `make test` (4/4 pass) and a clean `paper.pdf` render from
+scratch.
+
+### Follow-up 2, same day: rescale to per 1,000 homes; drop the 2009-2013 columns (Colin's request)
+
+Two more changes to the same take-up table, both requested directly:
+
+- **Outcome rescaled** from raw `policies_per_home`/`claims_per_home`
+  ratios to `policies_per_1k_homes`/`claims_per_1k_homes`
+  (`1000 * policies_n / homes_n`, `1000 * claims_n / homes_n`) — same
+  regression, coefficients just ×1000 for readability. `nfip-scalars.csv`
+  rows renamed again to `policies_per_1k_homes_{avg,min,max}` /
+  `claims_per_1k_homes_{avg,min,max}`.
+- **Dropped the 2009-2013-only columns (3)-(4)** from `take-up.tex` — I had
+  checked and confirmed before dropping that their point estimates were
+  extremely similar to the pooled 2009-2023 column, so this matches
+  Colin's read; the `est_home_ols_early` model and its fitting code were
+  removed from `estimate-nfip.R` entirely rather than just left out of the
+  `etable()` call, since nothing else used it. Table is now 2 columns
+  (policies and claims per 1,000 homes, pooled sample).
+- `paper.Rmd`: updated the in-text pooled-average figures
+  (-126.6 policies, -0.11 claims, per 1,000 homes), the table notes (were
+  still describing the old PPML-offset spec — a leftover from the
+  Follow-up-1 edit that I'd missed), and the time-gap caveat paragraph
+  (now describes the 2009-2013 restriction in the past tense, as something
+  checked and found not to matter, rather than as an ongoing robustness
+  column).
+- Hit one new LaTeX break: a literal `` `homes_n` `` (backtick-quoted,
+  Pandoc markdown) inside the `\tablenotes` block doesn't get converted
+  there since that whole block is raw LaTeX passed through unprocessed —
+  the underscore in the raw text then reads as a LaTeX math-mode escape
+  and fails to compile. Fixed by switching to `$\mathrm{homes\_n}$`,
+  matching how the rest of the document already escapes this identifier in
+  LaTeX contexts (e.g. the wind-zone appendix).
+- Re-verified: `make test` (4/4 pass, `test-take-up-imputation.R`
+  unaffected since it tests the weighting logic, not the ×1000 scale or
+  column count) and a clean `paper.pdf` render from scratch.
+
+---
+
 ## Chunk B — Review quick fixes (2026-08-12)
 
 **Base commit:** 9e13e4b (uncommitted at time of writing). Note: a peer

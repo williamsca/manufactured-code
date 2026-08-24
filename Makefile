@@ -42,6 +42,7 @@ data:
 	Rscript program/import/import-cpi.R
 	Rscript program/import/import-census.R
 	Rscript program/import/databuild-mhs.R
+	Rscript program/import/impute-stock.R
 	Rscript program/import/databuild-nfip.R
 	Rscript program/import/databuild-welfare.R
 

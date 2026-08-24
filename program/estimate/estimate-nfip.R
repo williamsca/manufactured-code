@@ -71,7 +71,9 @@ v_dict <- c(
     "sfha" = "SFHA",
     "primary_res_share" = "Primary res.",
     "mandatory_purchase_share" = "Mandatory",
-    "policies_ppermit" = "Policies per SF permit",
+    "policies_per_1k_homes" = "Policies per 1,000 homes",
+    "claims_per_1k_homes" = "Claims per 1,000 homes",
+    "homes_n" = "Homes (stock)",
     "building_damage_share" = "Bldg. dmg. share (%)",
     "net_building_pmt_share" = "Bldg. pmt. share (%)",
     "contents_damage_share" = "Contents dmg. share (%)",
@@ -88,7 +90,11 @@ v_dict <- c(
     "period_loss" = "Calendar period",
     "year_loss" = "Loss year",
     "mh" = "MH",
-    "period_constr" = "$\\nu_i$"
+    "period_constr" = "$\\nu_i$",
+    "capped_pmt" = "Capped payment (=1)",
+    "pmt_covg_ratio" = "Payment / coverage",
+    "damage_repl_ratio" = "Damage / repl. cost",
+    "zero_pmt" = "Zero/small payment (=1)"
 )
 
 setFixest_dict(v_dict, reset = TRUE)
@@ -103,6 +109,24 @@ dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 dt <- dt[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 dt[, geo := get(agg_geo)]
 dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
+
+# Housing-stock take-up denominator (Chunk E). homes_n arrives on `dt` as a
+# COUNTY-level value duplicated across every tract row for a given
+# (countyfp, year_constr, mh) -- take a distinct county x year_constr x mh
+# value before summing across year_constr into period_constr bins, or
+# tract-level duplication would inflate the total. Only defined when
+# agg_geo == "countyfp": the stock (derived/stock-county-vintage.Rds, from
+# program/import/impute-stock.R) has no finer geographic detail, so at
+# tractfp/statefp aggregation homes_n is left NA and the per-home specs
+# below are skipped for that run.
+dt_homes_cell <- unique(dt[, .(countyfp, year_constr, mh, homes_n)])
+dt_homes_cell[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
+# a period_constr bin whose year_constr members are ALL missing stock (e.g.
+# the ambiguous 1994 construction year, dropped in impute-stock.R) must stay
+# NA, not silently become a 0-home bin via na.rm sum over nothing
+dt_homes_cell <- dt_homes_cell[
+    , .(homes_n = if (all(is.na(homes_n))) NA_real_ else sum(homes_n, na.rm = TRUE)),
+    by = .(countyfp, period_constr, mh)]
 
 # MH-share panel at the requested aggregation geography
 dt_share_cell <- dt[
@@ -123,8 +147,7 @@ v_raw <- c("claims_n", "policies_n",
            "repl_cost_tot", "policy_cost_tot",
            "building_policy_covg_tot", "contents_policy_covg_tot",
            "elevated_policy_n", "sfha_policy_n",
-           "primary_res_policy_n", "mandatory_purchase_policy_n",
-           "permits_sf_n")
+           "primary_res_policy_n", "mandatory_purchase_policy_n")
 
 dt_cell <- dt[
     !is.na(policies_n) & policies_n > 0L,
@@ -169,21 +192,40 @@ dt_cell[, (v_ppol) := lapply(
 dt_cell[, claim_rate := fifelse(
     policies_n > 0L, claims_n / policies_n, NA_real_)]
 
-# policies per SF permit
-dt_cell[, policies_ppermit := fifelse(
-    !is.na(permits_sf_n) & permits_sf_n > 0, policies_n /
-    permits_sf_n, NA_real_)]
 dt_cell[, post_mh := as.integer(period_constr >= 1994L) * mh]
 
 dt_cell[, net_building_pmt_tot_ln := log(net_building_pmt_tot)]
 
+if (agg_geo == "countyfp") {
+    dt_cell <- merge(
+        dt_cell, dt_homes_cell,
+        by.x = c("geo", "period_constr", "mh"),
+        by.y = c("countyfp", "period_constr", "mh"),
+        all.x = TRUE
+    )
+} else {
+    dt_cell[, homes_n := NA_real_]
+}
+dt_cell[, policies_per_1k_homes := fifelse(
+    !is.na(homes_n) & homes_n > 0, 1000 * policies_n / homes_n, NA_real_)]
+dt_cell[, claims_per_1k_homes := fifelse(
+    !is.na(homes_n) & homes_n > 0, 1000 * claims_n / homes_n, NA_real_)]
+
 # Poisson panel: aggregate all cells (including zero-policy) to period_constr
 dt_pois <- dt[, .(claims_n    = sum(claims_n,    na.rm = TRUE),
-                  policies_n  = sum(policies_n,  na.rm = TRUE),
-                  permits_sf_n = sum(permits_sf_n, na.rm = TRUE)),
+                  policies_n  = sum(policies_n,  na.rm = TRUE)),
     by = .(geo, period_loss, mh, period_constr)]
-dt_pois[, policies_ppermit := fifelse(
-    !is.na(permits_sf_n) & permits_sf_n > 0, policies_n / permits_sf_n, NA_real_)]
+
+if (agg_geo == "countyfp") {
+    dt_pois <- merge(
+        dt_pois, dt_homes_cell,
+        by.x = c("geo", "period_constr", "mh"),
+        by.y = c("countyfp", "period_constr", "mh"),
+        all.x = TRUE
+    )
+} else {
+    dt_pois[, homes_n := NA_real_]
+}
 
 # --- claim-level data ---
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
@@ -228,7 +270,7 @@ v_pclaim <- grep("_share$", v_claim, invert = TRUE, value = TRUE)
 v_pclaim <- paste0(v_pclaim, "_pclaim")
 s_pclaim <- paste0(
     "c(", paste0(v_pclaim, collapse = ", "),
-    ", claim_rate", # ", ", "policies_ppermit",
+    ", claim_rate",
     ", ", paste0(v_ppol, collapse = ", "),
     ")")
 
@@ -338,7 +380,9 @@ etable(est_share_es, fitstat = c("n", "r2", "wr2", "my"))
 
 iplot(est_share_es)
 
-# count event study (Poisson)
+# count event study (Poisson), raw counts -- retained for comparability with
+# the pre-Chunk-E table and because it is still the right model wherever
+# agg_geo != "countyfp" (homes_n is undefined there, see above)
 fmla_out_es <- as.formula(paste0(
     "c(policies_n, claims_n)", " ~ i(period_constr, mh, ref = ref_period)",
     " | geo^period_loss + mh + period_constr"
@@ -351,16 +395,48 @@ etable(est_pois_es)
 
 iplot(est_pois_es)
 
-# OLS: policies per SF permit (ratio outcome, not count)
-est_ppermit_es <- feols(
-    policies_ppermit ~ i(period_constr, mh, ref = ref_period) |
-        geo^period_loss + mh + period_constr,
-    data = dt_pois[!is.na(permits_sf_n) & permits_sf_n > 0],
-    lean = TRUE, weights = ~permits_sf_n,
+# Take-up per housing-unit stock (Chunk E): OLS on the ratio outcomes
+# themselves (policies_per_1k_homes, claims_per_1k_homes), clustered by
+# county (geo == countyfp under the default agg_geo), replacing the
+# policies-per-SF-permit ratio (wrong housing type, badly non-random BPS
+# coverage -- see TODO.md Chunk E). Decomposes the take-up margin into claim
+# frequency (claims per home, extensive/insurability margin) versus payment
+# conditional on a claim (the damage-severity specs above, `est_claim_es`),
+# which the review notes have different welfare interpretations.
+#
+# Weighted by homes_n: a handful of cells have imputed stock well under 1
+# home (thin county x period x mh cells, mostly the already-flagged 1994
+# bin), producing policies_per_1k_homes ratios in the tens of thousands
+# that would otherwise dominate an unweighted fit. Same logic as the
+# policies_n weights already used for the composition/claim-rate cell
+# regressions above.
+#
+# Pooled across all three policy periods (2009-2023) only -- an
+# earliest-period-only (2009-2013) restriction was checked and dropped:
+# point estimates were extremely similar to the pooled column, so it added
+# a column without adding information. See notes/specs.md for the caveat
+# on the Census-2000-vs-policy-data time gap this restriction was meant to
+# address.
+dt_home_cell <- dt_cell[!is.na(homes_n) & homes_n > 0]
+
+fmla_home_ols <- as.formula(paste0(
+    "c(policies_per_1k_homes, claims_per_1k_homes)",
+    " ~ i(period_constr, mh, ref = ref_period)",
+    " | geo^period_loss + mh + period_constr"
+))
+
+est_home_ols <- feols(
+    fmla_home_ols, data = dt_home_cell, cluster = ~geo,
+    weights = ~homes_n, lean = TRUE
 )
+etable(est_home_ols, fitstat = c("n", "r2", "my"))
+iplot(est_home_ols[lhs = "policies_per_1k_homes"])
 
 etable(
-    list("PPML" = est_pois_es[lhs = "policies_n"][[1]]), # "OLS"  = est_ppermit_es
+    list(
+        "Policies per 1,000 homes" = est_home_ols[lhs = "policies_per_1k_homes"][[1]],
+        "Claims per 1,000 homes"   = est_home_ols[lhs = "claims_per_1k_homes"][[1]]
+    ),
     digits = 2, digits.stats = 2, fitstat = c("n", "r2", "my"),
     tex = TRUE, replace = TRUE,
     file = file.path(out_dir, "take-up.tex"))
@@ -443,6 +519,68 @@ etable(
     file = file.path(out_dir, "claims-outcomes-static.tex"),
     fitstat = c("n", "r2", "my"),
     digits = 2, digits.stats = 2, replace = TRUE
+)
+
+# ---------------------------------------------------------------------------
+# mechanism decomposition (Chunk D) ----
+# ---------------------------------------------------------------------------
+# Same static spec as `fmla_static` (post_mh, same FE/clustering), applied
+# to sample splits that speak to physical damage to the structure -- the
+# project's actual object of interest. (Insurance-accounting outcomes were
+# also estimated here; see "Superseded" at the end of the script -- Colin's
+# call 2026-08-13 was that they're second-order to the damage question and
+# not worth a paper table, but the code is kept for reference.)
+
+# --- wind-zone exposure (coordinate with Chunk C) ---
+# Reuse the same eCFR crosswalk as the Chunk C cost-side dose-response
+# (`derived/ecfr-windzone.csv`) rather than an independently defined
+# coastal/hurricane county list, so the benefit-side split lines up with
+# the cost-side treatment definition. NYC boroughs get the same Zone I
+# fallback used in `databuild-nfip.R` (consolidated city-county government
+# not in the eCFR crosswalk).
+dt_wz <- fread(here("derived", "ecfr-windzone.csv"), keepLeadingZeros = TRUE)
+dt_claims_est <- merge(dt_claims_est, dt_wz, by = "countyfp", all.x = TRUE)
+dt_claims_est[is.na(wind_zone) & substr(countyfp, 1L, 2L) == "36", wind_zone := 1L]
+stopifnot(nrow(dt_claims_est[is.na(wind_zone)]) == 0L)
+dt_claims_est[, treated_wz3 := as.integer(wind_zone == 3L)]
+
+# --- sample splits: elevation, SFHA, wind-zone-3 exposure ---
+# Elevation (comment 15): elevated_share only rises post-1998 (see
+# tab:composition), so it cannot mechanically explain the 1994-96 bins;
+# splitting on elevated status checks whether the pooled effect is a
+# composition shift (more elevated homes selecting in) rather than a
+# resilience effect operating on non-elevated construction.
+# SFHA (review target 3): splits the mandatory-purchase population from
+# the voluntary-market population.
+# Wind-zone-3 (coordinate with Chunk C): a benefit-side companion to the
+# cost-side dose-response — Zone III MH should show a larger post-1994
+# improvement than Zone I/II if the wind channel, not just general
+# construction-quality upgrading, is doing the work.
+fmla_mech <- building_damage ~ post_mh | geo^year_loss + mh + post1994
+
+est_mech_split <- list(
+    "Not elevated" = feols(fmla_mech,
+        data = dt_claims_est[elevated == 0L], cluster = ~countyfp),
+    "Elevated"     = feols(fmla_mech,
+        data = dt_claims_est[elevated == 1L], cluster = ~countyfp),
+    "Non-SFHA"     = feols(fmla_mech,
+        data = dt_claims_est[sfha == 0L], cluster = ~countyfp),
+    "SFHA"         = feols(fmla_mech,
+        data = dt_claims_est[sfha == 1L], cluster = ~countyfp),
+    "Zone I-II"    = feols(fmla_mech,
+        data = dt_claims_est[treated_wz3 == 0L], cluster = ~countyfp),
+    "Zone III"     = feols(fmla_mech,
+        data = dt_claims_est[treated_wz3 == 1L], cluster = ~countyfp)
+)
+etable(est_mech_split, fitstat = c("n", "r2", "my"))
+
+etable(
+    est_mech_split,
+    tex = TRUE, se.below = FALSE,
+    file = file.path(out_dir, "mechanism-splits.tex"),
+    fitstat = c("n", "r2", "my"),
+    digits = 2, digits.stats = 2, replace = TRUE,
+    depvar = FALSE
 )
 
 # plots ----
@@ -623,6 +761,12 @@ stc_cont_dmg <- extract_static(est_static, "contents_damage")
 stc_net_cont <- extract_static(est_static, "net_contents_pmt")
 stc_bldg_shr <- extract_static(est_static, "building_damage_share")
 
+# take-up per housing-unit stock (Chunk E): OLS coefficients on the ratio
+# outcomes themselves, so these are LEVEL differences in policies (or
+# claims) per 1,000 homes, not log rate ratios
+eff_ppl_home <- extract_post_stats(est_home_ols, "policies_per_1k_homes", 1)
+eff_clm_home <- extract_post_stats(est_home_ols, "claims_per_1k_homes",   1)
+
 fwrite(
     data.table(
         statistic = c(
@@ -646,7 +790,11 @@ fwrite(
             "net_contents_pmt_static",   "net_contents_pmt_static_se",
             "net_contents_pmt_static_t",
             "building_damage_share_static", "building_damage_share_static_se",
-            "building_damage_share_static_t"
+            "building_damage_share_static_t",
+            "policies_per_1k_homes_avg", "policies_per_1k_homes_min",
+            "policies_per_1k_homes_max",
+            "claims_per_1k_homes_avg",   "claims_per_1k_homes_min",
+            "claims_per_1k_homes_max"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -659,8 +807,45 @@ fwrite(
             stc_net_bldg$est, stc_net_bldg$se, stc_net_bldg$t,
             stc_cont_dmg$est, stc_cont_dmg$se, stc_cont_dmg$t,
             stc_net_cont$est, stc_net_cont$se, stc_net_cont$t,
-            stc_bldg_shr$est, stc_bldg_shr$se, stc_bldg_shr$t
+            stc_bldg_shr$est, stc_bldg_shr$se, stc_bldg_shr$t,
+            eff_ppl_home$avg, eff_ppl_home$min, eff_ppl_home$max,
+            eff_clm_home$avg, eff_clm_home$min, eff_clm_home$max
         )
     ),
     here("output", "results", "nfip-scalars.csv")
 )
+
+# ---------------------------------------------------------------------------
+# Superseded ----
+# ---------------------------------------------------------------------------
+# Insurance-accounting outcomes (Chunk D). Checks whether payments are muted
+# by coverage caps/deductibles rather than by lower physical damage.
+# Colin's call (2026-08-13): second-order to the paper's actual question --
+# how much MH damage itself changed -- so console-only, no .tex export.
+dt_claims_est[, capped_pmt := fifelse(
+    !is.na(building_covg) & building_covg > 0,
+    as.integer(net_building_pmt >= building_covg), NA_integer_)]
+dt_claims_est[, pmt_covg_ratio := fifelse(
+    !is.na(building_covg) & building_covg > 0,
+    net_building_pmt / building_covg, NA_real_)]
+dt_claims_est[, damage_repl_ratio := fifelse(
+    !is.na(building_repl_cost) & building_repl_cost > 0,
+    building_damage / building_repl_cost, NA_real_)]
+dt_claims_est[, zero_pmt := as.integer(net_building_pmt <= 0)]
+
+s_insacct <- "c(capped_pmt, pmt_covg_ratio, damage_repl_ratio, zero_pmt)"
+
+fmla_insacct_static <- as.formula(paste0(
+    s_insacct, " ~ post_mh | geo^year_loss + mh + post1994"
+))
+est_insacct_static <- feols(
+    fmla_insacct_static, data = dt_claims_est, cluster = ~countyfp)
+etable(est_insacct_static, fitstat = c("n", "r2", "my"))
+
+fmla_insacct_es <- as.formula(paste0(
+    s_insacct, " ~ i(period_constr, mh, ref = ref_period)",
+    " | geo^year_loss + mh + period_constr"
+))
+est_insacct_es <- feols(
+    fmla_insacct_es, data = dt_claims_est, cluster = ~countyfp)
+etable(est_insacct_es, fitstat = c("n", "r2", "my"))
