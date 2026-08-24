@@ -1,9 +1,9 @@
 # Build NFIP claim-level data and balanced panel, querying directly from DuckDB
 # against research-database's curated parquet
 #
-# Inputs:  fema_nfip_claims, fema_nfip_policies (research-database, pinned
-#          to NFIP_VERSION in project-params.R)
-#          derived/ecfr-windzone.csv
+# Inputs:  fema_nfip_claims, fema_nfip_policies, ecfr_wind_zone
+#          (research-database, pinned to NFIP_VERSION / ECFR_WIND_ZONE_VERSION
+#          in project-params.R)
 # Outputs: derived/nfip-claims.Rds   (claim-level, filtered + renamed)
 #          derived/nfip-balanced.Rds (tractfp × period_loss × mh × year_constr;
 #                                     grid from policy data, 2009+)
@@ -228,7 +228,7 @@ dt_pol_period <- dt_pol[, .(
 # 3. Aggregate claims to panel key ----
 # ---------------------------------------------------------------------------
 
-dt_treat <- fread(here("derived", "ecfr-windzone.csv"), keepLeadingZeros = TRUE)
+dt_treat <- rd_read("ecfr_wind_zone", version = ECFR_WIND_ZONE_VERSION)
 
 v_dmg <- c("net_building_pmt", "building_damage", "building_value",
            "contents_value",   "net_contents_pmt", "contents_damage",

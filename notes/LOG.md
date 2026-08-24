@@ -104,6 +104,28 @@ collapse. Confirmed the `statefp == "36"` NYC-borough fallback in
 `databuild-nfip.R` is dead (all five boroughs resolve to wind_zone 1 through
 the normal path) and removed it in this chunk, as the plan specified.
 
+**Update (2026-08-24): wind-zone crosswalk promoted upstream, §5.4/§6.3
+closed.** `research-database` gained a real `ecfr_wind_zone` dataset
+(commit `d954f1e`: `program/ecfr/wind-zones/download.R` + `import.R`,
+`catalog/datasets/ecfr_wind_zone.yml`) — `import-ecfr-windzone.R`'s eCFR
+scrape and `geo_county` matching logic from this chunk, ported essentially
+verbatim onto the download/import split `principles.md` requires there.
+`import-ecfr-windzone.R` is deleted here; `databuild-mhs.R` and
+`databuild-nfip.R` now read `rd_read("ecfr_wind_zone", version =
+ECFR_WIND_ZONE_VERSION)` (pinned `"v2026-08-24"` in `project-params.R`,
+same rationale as `NFIP_VERSION`) instead of `fread("derived/ecfr-windzone.csv")`;
+the `Makefile`'s `data:` target no longer runs the old script.
+
+Verified as a true no-op: `rd_read("ecfr_wind_zone")` against the same eCFR
+snapshot matches the old `derived/ecfr-windzone.csv` exactly — 3,206
+counties, zero countyfp added or dropped, zero `wind_zone` values changed.
+Re-ran `databuild-mhs.R` and `databuild-nfip.R`; `mhs-windzone-intensity.Rds`,
+`sample-mhs.Rds`, `nfip-claims.Rds`, and `nfip-balanced.Rds` are all
+`identical()` to their pre-swap versions (byte-for-byte, not just
+`all.equal`). `make test` passes. §6.3's "keep the scrape local" call is
+superseded by this — the wind-zone map is shared infrastructure now that a
+second consumer (this project asked for it) exists.
+
 **Observed, not fixed — out of scope for this chunk.** 238 of 5,957,310
 `nfip-balanced.Rds` rows (0.004%) carry `statefp == "72"` (Puerto Rico).
 These come entirely from the policies leg: unlike the claims query, the

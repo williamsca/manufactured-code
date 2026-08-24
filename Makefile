@@ -40,7 +40,6 @@ paper.html: paper.md
 
 data:
 	Rscript program/import/import-cpi.R
-	Rscript program/import/import-ecfr-windzone.R
 	Rscript program/import/import-census.R
 	Rscript program/import/databuild-mhs.R
 	Rscript program/import/databuild-nfip.R

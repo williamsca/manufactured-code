@@ -13,11 +13,9 @@ year_max <- 2003L
 
 # import ----
 
-# wind zone classification
-dt_wz <- fread(
-    here("derived", "ecfr-windzone.csv"),
-    keepLeadingZeros = TRUE
-)
+# wind zone classification (research-database curated crosswalk, replaces
+# the local eCFR scrape - see program/import/UPDATE.md §5.4/§6.3)
+dt_wz <- rd_read("ecfr_wind_zone", version = ECFR_WIND_ZONE_VERSION)
 
 dt_treat <- copy(dt_wz)
 dt_treat[, statefp := substr(countyfp, 1, 2)]
@@ -28,10 +26,9 @@ dt_treat <- dt_treat[, .(wind_zone = max(wind_zone)), by = .(statefp)]
 # 1980-2000 MH stock sitting in a Zone II/III county. Binary `treated`
 # above is diluted (e.g. GA has one WZ2/3 county but is coded fully
 # treated); this recovers within-treated-group variation in how much of
-# the state's MH stock the reform actually bound on. A handful of
-# counties (AK, HI, NYC boroughs, renamed/consolidated FIPS codes) have
-# no eCFR match; following the `statefp == 36` fallback in
-# databuild-nfip.R, unmatched counties default to Zone I.
+# the state's MH stock the reform actually bound on. AK is not in
+# ecfr_wind_zone at all (see its catalog notes); any renamed/consolidated
+# FIPS code with no match there defaults to Zone I.
 dt_stock <- readRDS(here("derived", "census2000-mh-county-vintage.Rds"))
 dt_stock <- dt_stock[, .(mh_stock = sum(mh_units)), by = countyfp]
 

@@ -11,3 +11,10 @@ MAX_YEAR_CONSTR <- 1999L
 # numbers don't silently move when a newer snapshot lands in the cache/S3;
 # bump deliberately and re-run databuild-nfip.R. See program/import/UPDATE.md §5.5.
 NFIP_VERSION <- "v2026-08-15"
+
+# research-database curated snapshot of ecfr_wind_zone (24 CFR 3280.305 HUD
+# wind zone crosswalk, formerly built locally by import-ecfr-windzone.R -
+# see program/import/UPDATE.md §5.4/§6.3). Pinned for the same reason as
+# NFIP_VERSION: this crosswalk defines treatment for both the MHS and NFIP
+# designs, so an eCFR amendment must not silently move it.
+ECFR_WIND_ZONE_VERSION <- "v2026-08-24"
