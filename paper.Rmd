@@ -46,6 +46,38 @@ fmt_pct <- function(x, digits = 0) {
 price_eff      <- fmt_d(get_mhs("price_effect_level"))
 price_pct      <- fmt_pct(get_mhs("price_effect_pct"))
 avg_price_tr   <- fmt_d(get_mhs("avg_price_treated_pre"))
+# Fixed-weight price index: basket definition, sample coverage, the
+# composition decomposition, and the split by home size.
+wt_single      <- formatC(get_mhs("base_wt_single"), format = "f", digits = 2)
+wt_double      <- formatC(get_mhs("base_wt_double"), format = "f", digits = 2)
+idx_base       <- fmt_d(get_mhs("idx_base_1993") / 1000)
+avg_p_single   <- fmt_d(get_mhs("mean_price_single"))
+avg_p_double   <- fmt_d(get_mhs("mean_price_double"))
+price_ratio    <- formatC(get_mhs("price_ratio_double_single"),
+                          format = "f", digits = 1)
+n_index        <- format(as.integer(get_mhs("n_index")), big.mark = ",")
+n_raw          <- format(as.integer(get_mhs("n_raw")), big.mark = ",")
+price_eff_raw     <- fmt_d(get_mhs("price_effect_raw_level"))
+price_eff_raw_cmn <- fmt_d(get_mhs("price_effect_raw_cmn_level"))
+price_eff_comp    <- fmt_d(get_mhs("price_effect_comp_level"))
+share_dbl_eff  <- formatC(get_mhs("share_double_effect") * 100,
+                          format = "f", digits = 2)
+price_eff_single <- fmt_d(get_mhs("price_effect_single_level"))
+price_eff_double <- fmt_d(get_mhs("price_effect_double_level"))
+# Quantity side. Estimated on the same index sample as the price effects,
+# so the two are read off one panel. Reported in log points: the static
+# post-1994 coefficient, its standard error, and the implied 95% interval.
+fmt_lp <- function(x, digits = 2) {
+    paste0(if (x >= 0) "" else "-",
+           formatC(abs(x), format = "f", digits = digits))
+}
+plc_eff    <- fmt_lp(get_mhs("placements_effect_static"))
+plc_se     <- fmt_lp(get_mhs("placements_effect_static_se"))
+plc_ci_lo  <- fmt_lp(get_mhs("placements_effect_static") -
+                     1.96 * get_mhs("placements_effect_static_se"))
+plc_ci_hi  <- fmt_lp(get_mhs("placements_effect_static") +
+                     1.96 * get_mhs("placements_effect_static_se"))
+n_plc      <- format(as.integer(get_mhs("n_placements")), big.mark = ",")
 # Headline ATT: static post_mh coefficient (single precisely-estimated
 # number), not the average of the event study's eleven noisy period_constr
 # x mh coefficients. The event study (bldg_dmg_evt_avg) is retained for
@@ -108,13 +140,13 @@ Government mandates for costly adaptation may be justified if private take-up is
 
 I estimate both the direct cost of compliance, in the form of additional construction costs; and the direct benefits, in reduced flood damage. My results indicate that benefits from the single channel of flood damage reduction do not outweigh the considerable cost of the reform. However, it is possible that accounting for other benefits, such as the insurance value and non-flooding damages, would yield a positive private benefit-cost ratio.
 
-On the cost side, I use the Census Bureau's Manufactured Housing Survey to estimate a difference-in-differences comparing manufactured home prices in states with HUD wind zones II and III (treated) to zone I states (control), before and after 1994. Prices in treated states rose by `r price_eff`, an increase of roughly `r price_pct` on an average of `r avg_price_tr` in treated states. There is no detectable effect on placements, though point estimates are imprecise. Taking the point estimates at face value, a price increase with no change in quantity is consistent with a world where households value the HUD-mandated improvements roughly at cost.
+On the cost side, I use the Census Bureau's Manufactured Housing Survey to estimate a difference-in-differences comparing manufactured home prices in states with HUD wind zones II and III (treated) to zone I states (control), before and after 1994. Prices in treated states rose by `r price_eff`, an increase of roughly `r price_pct` on an average of `r avg_price_tr` in treated states. There is no detectable effect on placements, though point estimates are imprecise. A price increase without an accompanying decline in quantity is consistent with a world where households value the HUD-mandated improvements roughly at cost.
 
 On the benefit side, I use flood insurance claim and policy data from the National Flood Insurance Program (NFIP) to estimate the effect of the HUD standard on flood damage. My identification strategy exploits two sources of variation: MH versus site-built housing, and post-1994 versus pre-1994 construction vintage. County by flood-loss-period fixed effects ensure comparisons are made only between homes exposed to the same floods in the same location. This is a double-difference in vintage and housing type: the site-built comparison group absorbs secular changes in construction quality and storm severity, isolating the manufactured-home-specific break at 1994.
 
 Post-1994 manufactured homes experience `r bldg_dmg_eff` lower building damage per claim relative to pre-1994 manufactured homes, compared to the same vintage difference for site-built homes. The event study shows flat pre-trends and a sharp break at 1994 that grows slightly with later construction cohorts, consistent with delays between the manufacture and installation of MH. I also find that damage as a share of the building's assessed value declines by approximately `r bldg_shr_static` percentage points and that contents payments decline by about `r net_cont_eff` per claim. At the same time, MH policies for post-1994 vintages have higher replacement costs and coverage amounts, and are more likely to be located in high-risk areas, all of which would tend to increase expected NFIP payments. These compositional shifts suggest that the estimated damage reductions comprise a lower bound on the true treatment effect of the HUD standard on flood damage.
 
-Combining costs and benefits at the unit level yields a back-of-envelope private cost-benefit calculation for the purchaser of a post-1994 manufactured home. Among insured MH in the NFIP data, the pre-1994 annual claim rate is roughly `r claim_rate_fmt`. Applied to per-claim reductions of `r delta_bldg` in building damages and `r delta_cont` in contents damages, this implies an expected annual damage reduction of `r ann_benefit`, or `r npv_baseline` discounting at 3% over a 20-year MH lifespan. Expected savings from reduced flood damage alone are roughly `r bcr_pct` of the `r cost_fmt` price increase. Among the households who purchase flood insurance, the flood channel therefore recovers about a fifth of the cost, before counting the wind channel that the regulation actually targets, reduced displacement, or uninsured losses.
+Combining costs and benefits at the unit level yields a back-of-envelope private cost-benefit calculation for the purchaser of a post-1994 manufactured home. Among insured MH in the NFIP data, the pre-1994 annual claim rate is roughly `r claim_rate_fmt`. Applied to per-claim reductions of `r delta_bldg` in building damages and `r delta_cont` in contents damages, this implies an expected annual damage reduction of `r ann_benefit`, or `r npv_baseline` discounting at 3% over a 20-year MH lifespan. Expected savings from reduced flood damage alone are roughly `r bcr_pct` of the `r cost_fmt` price increase. Among the households who purchase flood insurance, the flood channel alone therefore does not recover the full cost, before counting the wind channel that the regulation actually targets, reduced displacement, or uninsured losses.
 
 At the aggregate level, the reform generates meaningful fiscal spillovers. The point estimates imply reductions of roughly `r net_bldg_eff` in net building payments and `r net_cont_eff` in net contents payments per MH claim. Applied to the `r n_post_claims` claims on MH built between 1994 and 1999 observed in the NFIP sample, this yields roughly `r nfip_sav_m` in direct NFIP payment savings---a conservative figure that conditions on filing a claim and does not scale to the full stock of post-reform MH.[^fiscal-nfip] Spillovers to \emph{ex post} disaster relief---most notably FEMA Individual Assistance, SBA disaster loans, and state emergency grants---are likely substantially larger. <!--\textcolor{red}{[PLACEHOLDER: estimate of \emph{ex post} disaster relief spillover to be added.]}-->
 
@@ -154,7 +186,20 @@ The NFIP data used in this paper record claims and policy information at the ind
 
 ## Manufactured Housing Prices and Shipments
 
-I estimate the price and quantity effects using a state-by-year panel from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state. I focus on the period immediately around the HUD code change, 1988 - 1999. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states (see Figure \ref{map:treated-states}).
+I estimate the price and quantity effects using a state-by-year panel from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state. I focus on the period immediately around the HUD code change, 1988 - 2000. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states (see Figure \ref{map:treated-states}).
+
+Manufactured homes are placed in two sizes. A single-section home arrives as one transportable unit; a multi-section home arrives as two or more units that are joined on site. Multi-section homes are larger and more expensive: over the sample period the average real sales price is `r avg_p_single` for a single-section home and `r avg_p_double` for a multi-section home, a ratio of `r price_ratio` to one. The survey reports an average sales price for each size separately and an average across all homes placed. The all-homes average is the placement-weighted mixture of the two size-specific averages, so it rises both when prices rise and when placements shift toward multi-section homes. The multi-section share differs across states and changes over the sample period, so the all-homes average conflates price changes with changes in the size mix, and a shift in the mix would enter a difference-in-differences estimate as a price effect.
+
+I therefore construct a fixed-weight price index. Let $p^{S}_{st}$ and $p^{D}_{st}$ denote the average real sales price of single-section and multi-section homes in state $s$ and year $t$. The index is
+
+\begin{equation}
+P_{st} = \omega^{S} p^{S}_{st} + \omega^{D} p^{D}_{st},
+\label{eq:price-index}
+\end{equation}
+
+where $\omega^{S}$ and $\omega^{D}$ are the shares of single- and multi-section homes among all homes placed nationally between 1988 and 1993, the six years preceding the reform. These weights are `r wt_single` and `r wt_double`, and they are held fixed across all states and all years. The index is therefore the cost of a fixed basket of homes: it changes only when the price of a size changes, and by construction no variation in the size mix, either across states or over time, can enter it. I report the index normalized so that its national 1993 value equals 100. The normalization divides the index by the single constant `r idx_base`, so the normalized and dollar-denominated versions of the index give the same estimates in different units.
+
+Constructing the index requires both size-specific averages. The survey suppresses these for states with few placements, so the index is defined for `r n_index` of the `r n_raw` state-years in which the all-homes average is published. The excluded state-years are small states, predominantly in the control group. The quantity analysis uses these same state-years, even though placement counts are published more widely, so that the price and quantity effects are estimated on one sample and can be read together.
 
 ## Flood Damage and Insurance Coverage
 
@@ -175,11 +220,11 @@ All nominal values are deflated to constant (2000) dollars using the CPI-U. I re
 I estimate the effect of the 1994 HUD standard on manufactured home prices using a two-way fixed effects event study:
 
 \begin{equation}
-\log(P_{st}) = \alpha_s + \gamma_t + \sum_{k \neq 1993} \beta_k (\mathbf{1}[\text{year} = k] \times \text{Treated}_s) + \varepsilon_{st}
+P_{st} = \alpha_s + \gamma_t + \sum_{k \neq 1993} \beta_k (\mathbf{1}[\text{year} = k] \times \text{Treated}_s) + \varepsilon_{st}
 \label{eq:event-study-cost}
 \end{equation}
 
-where $P_{st}$ is the average real sales price of manufactured homes in state $s$ in year $t$, $\alpha_s$ and $\gamma_t$ are state and year fixed effects, and $\text{Treated}_s$ indicates states containing wind zones II or III. The 1993 interaction is omitted: with state fixed effects the full set of treated-by-year interactions is collinear with the time-invariant treated indicator. The coefficients $\beta_k$ therefore trace out the price difference between treated and control states relative to 1993. Standard errors are clustered by state.
+where $P_{st}$ is the fixed-weight price index of Equation \eqref{eq:price-index} for state $s$ in year $t$, $\alpha_s$ and $\gamma_t$ are state and year fixed effects, and $\text{Treated}_s$ indicates states containing wind zones II or III. The 1993 interaction is omitted: with state fixed effects the full set of treated-by-year interactions is collinear with the time-invariant treated indicator. The coefficients $\beta_k$ therefore trace out the price difference between treated and control states relative to 1993. All MHS specifications, including this one, are weighted by each state's mean placements over 1988--1993, the base period fixed before the reform, so that a state placing a few hundred homes a year does not count as much as one placing tens of thousands; a handful of states with no placements published in that window use the mean over the fuller 1985--1993 run instead, so that every state that reports a price receives a positive weight. Standard errors are clustered by state.
 
 ## Benefit Estimation: Event Study
 
@@ -202,11 +247,15 @@ The cell-level specifications replace the county $\times$ loss-year fixed effect
 
 ## Cost Side: Manufactured Home Prices
 
-Figure \ref{fig:es-price} presents the event study for manufactured home prices. Prior to 1994, treated and control states follow parallel trends: the pre-treatment coefficients are small, precisely estimated, and statistically indistinguishable from zero. Prices diverge sharply in 1994, with treated states experiencing a `r price_eff` increase that stabilizes by 1995 and persists through the end of the sample. The price effect is economically large, corresponding to an `r price_pct` increase in the price.
+Figure \ref{fig:es-price} presents the event study for the fixed-weight manufactured home price index. Prior to 1994, treated and control states follow parallel trends: the pre-treatment coefficients are small, precisely estimated, and statistically indistinguishable from zero. The index diverges after 1993 and separates fully from 1995 onward, with treated states experiencing an average post-1994 increase of `r price_eff`. The effect is economically large, corresponding to an `r price_pct` increase on a pre-reform index level of `r avg_price_tr` in treated states.
 
-The 1994 break is consistent with prices adjusting around the July 1994 effective date. With annual price data the estimate cannot by itself distinguish anticipatory pricing from pass-through after implementation, since the 1994 coefficient mixes both halves of the year. The persistence of the premium through 2000 shows that the price gap was not a one-year implementation spike; its source---higher marginal production costs, fixed redesign costs amortized over many units, quality upgrading, or demand-side valuation of the improved construction---is not pinned down by the price path alone.
+The 1994 coefficient is small relative to those that follow, and the separation appears from 1995. This is what the timing of the reform implies: the standard took effect in July 1994, so only part of that year's placements were subject to it, and lags between production and installation push further compliance into 1995. The persistence of the premium through 2000 shows that the price gap was not a one-year implementation spike; its source---higher marginal production costs, fixed redesign costs amortized over many units, quality upgrading, or demand-side valuation of the improved construction---is not pinned down by the price path alone.
 
-Figure \ref{fig:es-placements} shows the corresponding event study for log placements. The point estimates are small, centered around zero, and statistically insignificant throughout the post-period, so the data do not show a large decline in the quantity of manufactured homes shipped to treated states. The estimates are imprecise enough that a modest decline would be difficult to detect, and they are consistent with a small decline in placements, with relatively inelastic demand, or with an outward demand shift from the improved construction offsetting the higher price.
+Because the outcome holds the size mix fixed, this estimate cannot reflect a shift in the composition of placements toward more expensive multi-section homes. Two comparisons show how much that restriction matters. First, holding the sample fixed, the all-homes average sales price yields `r price_eff_raw_cmn` against the index's `r price_eff`; valuing each state-year's actual size mix at fixed national prices, so that the mix shift is the only source of variation, yields `r price_eff_comp`, and the treated-control difference in the multi-section share after 1994 is `r share_dbl_eff` percentage points. The size mix therefore accounts for almost none of the price effect. Second, estimated on every state-year for which it is published rather than only those where the index is defined, the all-homes average yields `r price_eff_raw`. The gap between that figure and the index estimate is driven by the small states that drop out when both size-specific prices are required, not by composition.
+
+I also find that price effects are larger for multi-section units (`r price_eff_double`) than for single-section units (`r price_eff_single`), suggesting that part of the compliance cost varies with the size of the unit rather than being a fixed charge per home (Table \ref{tab:mhs-section-type}).
+
+Figure \ref{fig:es-placements} shows the corresponding event study for log placements, estimated on the same state-years as the price index so that the price and quantity effects describe one panel rather than two. Collapsing the post-period to a single coefficient gives `r plc_eff` log points (SE `r plc_se`), a 95% interval of `r plc_ci_lo` to `r plc_ci_hi`. The point estimate is positive and statistically indistinguishable from zero, so the data do not show a decline in the quantity of manufactured homes shipped to treated states. The interval is wide enough to contain declines of roughly `r fmt_lp(abs(get_mhs("placements_effect_static") - 1.96 * get_mhs("placements_effect_static_se")))` log points as well as increases, so a modest decline cannot be ruled out. The estimates are consistent with relatively inelastic demand, or with an outward demand shift from the improved construction offsetting the higher price.
 
 ## Benefit Side: Flood Damage
 
@@ -283,10 +332,10 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Wind Standard on Manufactured Home Prices}\label{fig:es-price}
-  \includegraphics{output/event-study/es-mhs-avg_sales_price.pdf}
+  \includegraphics{output/event-study/es-mhs-avg_sales_price_fw_idx.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. Nominal values are deflated to 2000 dollars. Source: Census Bureau Manufactured Housing Survey.
+  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. The outcome is the fixed-weight price index of Equation \eqref{eq:price-index}, normalized so that its national 1993 value equals 100, so coefficients are index points. Nominal values are deflated to 2000 dollars before the index is formed. Observations are weighted by each state's mean 1988--1993 placements. Source: Census Bureau Manufactured Housing Survey.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -297,7 +346,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \includegraphics{output/event-study/es-mhs-placements_ln.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. Outcome is log manufactured home placements.
+  Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. Outcome is log manufactured home placements. Estimated on the `r n_plc` state-years for which the price index of Equation \eqref{eq:price-index} is also defined, so that the price and quantity effects are estimated on the same sample. Observations are weighted by each state's mean 1988--1993 placements. Source: Census Bureau Manufactured Housing Survey.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -308,7 +357,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \begin{threeparttable}
     \input{output/event-study/mhs-dose-response-static.tex}
     \begin{tablenotes}
-      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-cost}, replacing the year-by-year interactions with a single post-1994 $\times$ treatment indicator, estimated on the same state-year sample, state and year fixed effects, and clustering as Figure \ref{fig:es-price}. Column (1) uses the binary treatment indicator (any Zone II/III county in the state). Column (2) replaces it with the MH-stock-weighted share of the state's 1980--2000 MH stock sitting in a Zone II/III county (Appendix Table \ref{tab:windzone-intensity}). Source: Census Bureau Manufactured Housing Survey; eCFR wind zone classification; Census 2000 manufactured-housing counts.
+      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-cost}, replacing the year-by-year interactions with a single post-1994 $\times$ treatment indicator, estimated on the same state-year sample, outcome (the fixed-weight price index of Equation \eqref{eq:price-index}, in dollars), state and year fixed effects, weighting, and clustering as Figure \ref{fig:es-price}. Column (1) uses the binary treatment indicator (any Zone II/III county in the state). Column (2) replaces it with the MH-stock-weighted share of the state's 1980--2000 MH stock sitting in a Zone II/III county (Appendix Table \ref{tab:windzone-intensity}). Source: Census Bureau Manufactured Housing Survey; eCFR wind zone classification; Census 2000 manufactured-housing counts.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
@@ -402,6 +451,23 @@ Table \ref{tab:take-up} reports OLS estimates of `policies_per_1k_homes` and `cl
 \end{table}
 
 **Caveat: the stock denominator is a 2000 snapshot, the policy data are not.** `homes_n` is fixed as of the 2000 Census, while the policy periods run from 2009 to 2023 -- 9 to 23 years later. If pre- and post-1994 manufactured homes attrite (are demolished, relocated, or converted) at different rates over that gap, the true denominator drifts away from the Census-fixed one asymmetrically by vintage, and the bias grows with the gap. An earlier version of this table reported the 2009--2013 calendar period separately, as the closest snapshot to 2000 and so the least exposed to this drift; its point estimates were extremely similar to the pooled 2009--2023 column, so it was dropped from the table without evidence that attrition is materially distorting the pooled estimate. The ACS's continuously updated housing-vintage tables could in principle bound the drift directly, but cannot substitute for `homes_n`: ACS year-built categories are decade bins that cannot isolate 1994 even in principle, and tract-level manufactured-home counts carry very large margins of error. Bounding the 2014--2023 estimates against the ACS decade series is left for future work.
+
+# Price Effects by Home Size {#appendix-section-type}
+
+The fixed-weight index of Equation \eqref{eq:price-index} removes variation in the size mix by valuing a single national basket, but it does not report whether the reform raised the price of single-section and multi-section homes by the same amount. Table \ref{tab:mhs-section-type} answers that question directly. I stack the panel so that each observation is one state, year, and home size, and I estimate the single-coefficient version of Equation \eqref{eq:event-study-cost} with size-specific state and year fixed effects. Identification is therefore within home size, and the size mix cannot enter the estimate for the same reason it cannot enter the index. Observations are weighted by each state's mean 1988--1993 placements (the same base-period weight used throughout Section \ref{empirical-strategy}) times the national base-period share of their size, which reproduces the fixed-weight index where both size-specific prices are published and additionally retains the state-years where only one of the two is published.
+
+Column (1) pools the two sizes and recovers the index estimate. Column (2) interacts the post-1994 treatment indicator with home size. Estimating the same contrast on each size separately, on that size's observations alone and with its own state and year fixed effects, gives identical coefficients, so the interaction is not an artifact of the shared fixed effects. The effect for multi-section homes is roughly twice that for single-section homes. Two readings are consistent with this pattern and the data here do not separate them: compliance may require more material on a larger structure, so that part of the cost scales with size, or multi-section homes may be placed disproportionately in the higher wind zones within treated states, where the binding requirements are stricter.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Price Effects by Home Size}\label{tab:mhs-section-type}
+  \begin{threeparttable}
+    \input{output/event-study/mhs-section-type.tex}
+    \begin{tablenotes}
+      \item Notes: The panel is stacked so that each observation is a state $\times$ year $\times$ home size, with the average real sales price for that size as the outcome, in 2000 dollars. Both columns include state $\times$ size and year $\times$ size fixed effects and weight observations by each state's mean 1988--1993 placements times the national 1988--1993 placement share of the size. Coefficients, standard errors, and the dependent variable mean are rounded to the nearest dollar. Standard errors are clustered by state. Source: Census Bureau Manufactured Housing Survey; eCFR wind zone classification.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
 
 # Wind-Zone Treatment Intensity by State {#appendix-windzone-intensity}
 
