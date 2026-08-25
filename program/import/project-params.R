@@ -6,6 +6,11 @@ MAX_YEAR_LOSS <- 2023
 MIN_YEAR_CONSTR <- 1983L
 MAX_YEAR_CONSTR <- 1999L
 
+# estimate-mhs.R state-DiD sample window (state x year panel of MH prices
+# and placements around the 1994 HUD wind standard).
+MIN_YEAR_MHS <- 1988L
+MAX_YEAR_MHS <- 2000L
+
 # research-database curated snapshot of fema_nfip_claims / fema_nfip_policies.
 # Pinned rather than resolved via rd_latest_version() so a paper's headline
 # numbers don't silently move when a newer snapshot lands in the cache/S3;
