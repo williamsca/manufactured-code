@@ -29,6 +29,22 @@ geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
 BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
 agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
+# Winsorization cap for claim-level loss and payment outcomes, in $000 of
+# 2000 dollars. The OpenFEMA loss fields carry a handful of records far outside
+# any plausible single-family loss: building damage has a 99.99th percentile of
+# 590 and a maximum of 1,018,489, and contents damage a 99.99th percentile of
+# 2,618 against an NFIP contents limit of 100. One uniform cap is applied to
+# all four claim-level damage and payment outcomes rather than a separate rule
+# per outcome. It binds for a few dozen records, all of them site-built, and
+# is a no-op for the two net-payment outcomes, which the NFIP statutory limits
+# already bound (maximum net building payment 441). Capping rather than
+# dropping keeps the estimation sample identical to the untrimmed
+# specification. The headline building-damage estimate is insensitive to it
+# (-5.56 uncapped vs -5.75 capped); contents damage moves more (-3.75 to
+# -3.20) because its contaminated records are a larger share of a smaller
+# sample.
+MAX_CLAIM_LOSS <- 1000
+
 # Calendar years per period_loss bin. The cell panel's five-year bins are
 # 2009-2013, 2014-2018, 2019-2023 (policy records begin 2009; MAX_YEAR_LOSS is
 # 2023), so every retained bin holds exactly this many years. Asserted against
@@ -84,11 +100,15 @@ v_dict <- c(
     # policy-level composition (Chunk J: derived/nfip-policy-micro.parquet,
     # one row per policy term, replacing the cell-level averages above)
     "repl_cost" = "Repl. cost",
+    "log_repl_cost_pol" = "Log repl. cost",
     "building_policy_covg" = "Bldg covg.",
+    "contents_policy_covg" = "Contents covg.",
     "contents_covg_positive" = "Contents covg. $>0$",
     "contents_policy_covg_pos" = "Contents covg. (if $>0$)",
     "elevated_policy" = "Elevated",
     "sfha_policy" = "SFHA",
+    "elevated_policy_pct" = "Elevated (\\%)",
+    "sfha_policy_pct" = "SFHA (\\%)",
     "policies_per_1k_homes_yr" = "Policies per 1,000 homes per year",
     "claims_per_1k_homes_yr" = "Claims per 1,000 homes per year",
     "homes_n" = "Homes (stock)",
@@ -284,6 +304,29 @@ dt_claims[, period_constr := bin_constr(
 dt_claims[, post1994      := as.integer(year_constr >= 1994L)]
 dt_claims[, post_mh       := post1994 * mh]
 
+# Winsorize the claim-level loss and payment outcomes at MAX_CLAIM_LOSS before
+# anything downstream is built from them, so the damage shares, the cell-level
+# per-claim averages, the dependent-variable means reported in the tables, and
+# the welfare inputs all use the same capped values. Counts of records the cap
+# binds for are exported below for the table notes.
+v_loss <- c("building_damage", "net_building_pmt",
+            "contents_damage", "net_contents_pmt")
+dt_winsor_n <- dt_claims[, lapply(
+    .SD, function(x) sum(x > MAX_CLAIM_LOSS, na.rm = TRUE)), .SDcols = v_loss]
+dt_winsor_mh <- dt_claims[, lapply(
+    .SD, function(x) sum(x > MAX_CLAIM_LOSS, na.rm = TRUE)),
+    by = mh, .SDcols = v_loss]
+# Zero rates, for the paper's statement of why these outcomes cannot be logged.
+dt_zero_share <- dt_claims[, lapply(
+    .SD, function(x) mean(x == 0, na.rm = TRUE)), .SDcols = v_loss]
+# Keep uncapped copies of the two damage fields so the static specification can
+# be re-estimated on them below and the paper can quote how much the cap moves
+# each coefficient.
+dt_claims[, building_damage_unw := building_damage]
+dt_claims[, contents_damage_unw := contents_damage]
+dt_claims[, (v_loss) := lapply(
+    .SD, function(x) pmin(x, MAX_CLAIM_LOSS)), .SDcols = v_loss]
+
 v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
 dt_claims[, (v_shares_names) := lapply(
@@ -362,8 +405,23 @@ est_claim_es <- feols(fmla_claim_es, data = dt_claims_est, cluster = ~countyfp)
 etable(est_claim_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_claim_es[lhs = "building_pmt$"])
 
+# Paper table columns. `building_damage_share` is still estimated (its scalars
+# feed notes/apps/abstract-appam.Rmd) but is no longer a column of either paper
+# table. Two reasons, in order of importance. First, its denominator
+# `building_value` is the worst-behaved field in the claims data -- a 99.9th
+# percentile of $1.07bn for site-built against $3.75M for MH -- so ~0.3% of the
+# estimation sample carries a share above 100, which is impossible by
+# construction, and those records drive the R2 from 0.52 down to 0.002. Second,
+# and decisively: once the share is bounded at 100 the event study shows
+# pre-1994 coefficients of +3.8, +5.4, +4.2, +1.8 against post-1994
+# coefficients of +0.07, +0.18, -2.0. That is a trend across the whole vintage
+# window, not a break at 1994, so parallel vintage trends fails for this
+# outcome and the static -3.8 averages over a pre-trend. The share is also
+# near-redundant: it is damage divided by value, and both the numerator (column
+# 1) and the denominator (replacement cost, in the composition table) are
+# reported separately, so the column adds only their covariance.
 v_alt <- c(
-    "building_damage$", "net_building_pmt$", "building_damage_share",
+    "building_damage$", "net_building_pmt$",
     "contents_damage$", "net_contents_pmt$")
 
 etable(
@@ -419,20 +477,48 @@ dt_pol_micro <- as.data.table(arrow::read_parquet(
 dt_pol_micro <- dt_pol_micro[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 dt_pol_micro[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
-# contents-coverage choice margin (Chunk J): the extensive-margin indicator
-# (contents_covg_positive) is already on the file; the intensive margin is
-# defined only conditional on it, same convention as the claim-level
-# per-claim averages above (NA, not 0, when the margin doesn't apply)
-dt_pol_micro[, contents_policy_covg_pos := fifelse(
-    contents_covg_positive == 1L, contents_policy_covg, NA_real_)]
+# Replacement cost enters in logs, not levels. `repl_cost` is the worst-behaved
+# field on the policy file: mean 199.9 against a standard deviation of 2,269, a
+# 99th percentile of 997, and a maximum of 1,371,528 -- a single-family home
+# with a $1.37bn replacement cost. Building coverage on the same rows has a
+# standard deviation of 45.6 because the NFIP statutory limit top-codes it,
+# which is why that column fits with an R2 of 0.23 while replacement cost in
+# levels fits with 0.001: essentially all of the level variance sits in records
+# no fixed effect can explain, and the fitted vintage profile is correspondingly
+# unstable (+32, +30, +10, -8, +31, +18, +2 across the seven bins). In logs the
+# same specification has an R2 of 0.20, flat and insignificant pre-1994
+# coefficients, and a stable +6 to +8% for all three post-1994 bins, which is
+# the pattern the composition argument in the paper actually needs. The cost is
+# the 5.6% of policy terms recording an exact zero replacement cost, which are
+# dropped; a $0 replacement cost on an insured single-family home is a missing
+# code rather than a fact. Winsorizing the level instead was checked and
+# rejected: it fits better than the raw level (R2 0.12) but leaves a steep
+# declining pre-trend, because the tail is where that pre-trend lives.
+dt_pol_micro[, log_repl_cost_pol := fifelse(
+    !is.na(repl_cost) & repl_cost > 0, log(repl_cost), NA_real_)]
+n_repl_zero <- dt_pol_micro[, mean(!is.na(repl_cost) & repl_cost == 0)]
+
+# Contents coverage enters unconditionally, with the zeros included, as one
+# column rather than as separate extensive- and intensive-margin columns. Both
+# margins are individually null after 1994 (the extensive margin is +0.004,
+# -0.01, -0.02 and the conditional amount -0.30, +0.22, +0.16), so one column
+# carries the whole finding, and the unconditional amount does not condition on
+# a variable that itself moves across vintages -- the conditional-amount column
+# was estimated on a sample selected by the outcome of the column beside it.
+# The two binary outcomes enter as percentage points rather than as 0/1 shares,
+# so their coefficients print at the same number of significant digits as the
+# dollar columns beside them instead of as a row of leading zeros. Pure
+# rescaling by 100: coefficients, standard errors, and the dependent-variable
+# mean all scale, and the R2 and t-statistics are unchanged.
+dt_pol_micro[, elevated_policy_pct := 100 * elevated_policy]
+dt_pol_micro[, sfha_policy_pct := 100 * sfha_policy]
 
 v_comp_pol <- c(
-    "repl_cost",
+    "log_repl_cost_pol",
     "building_policy_covg",
-    "contents_covg_positive",
-    "contents_policy_covg_pos",
-    "elevated_policy",
-    "sfha_policy"
+    "contents_policy_covg",
+    "elevated_policy_pct",
+    "sfha_policy_pct"
 )
 s_comp_pol <- paste0("c(", paste(v_comp_pol, collapse = ", "), ")")
 
@@ -727,6 +813,22 @@ est_rob_list <- list(
 
 stopifnot(length(unique(vapply(est_rob_list, nobs, numeric(1)))) == 1L)
 
+# Does the depth control have anything to work with? Adding the depth bins moves
+# the R2 by about a point, which invites the reading that depth barely varies
+# within a county x loss year and that the robustness check therefore has no
+# power. It does not hold: the depth bins vary richly inside the fixed-effect
+# cells, so the stability of post_mh across columns is informative rather than
+# mechanical. The small R2 gain instead says that depth explains little of the
+# claim-to-claim variance in damage once the cell is absorbed, which is a
+# statement about what drives damage (home size and value), not about the
+# control's variation. Reported in the appendix so a reader does not have to
+# take the check on faith.
+dt_wd_var <- dt_claims_est[, .(nbin = uniqueN(water_depth_bin), n = .N),
+    by = .(geo, year_loss)]
+wd_bins_per_cell   <- dt_wd_var[, sum(nbin * n) / sum(n)]
+wd_single_bin_shr  <- dt_wd_var[nbin == 1L, sum(n)] / dt_wd_var[, sum(n)]
+wd_n_bins          <- dt_claims_est[, uniqueN(water_depth_bin)]
+
 etable(est_rob_list, tex = TRUE,
     file = here("output", "event-study", agg_geo, "robustness.tex"),
     keep_raw = "post_mh", fitstat = c("n", "r2", "my"),
@@ -774,6 +876,15 @@ etable(
     fitstat = c("n", "r2", "my"),
     digits = 2, digits.stats = 2, replace = TRUE
 )
+
+# Same static specification on the UNWINSORIZED damage fields, so the paper can
+# report how much the MAX_CLAIM_LOSS cap moves each coefficient and its fit
+# rather than asserting the cap is innocuous. Not a paper table.
+est_static_unw <- feols(
+    c(building_damage_unw, contents_damage_unw) ~ post_mh |
+        geo^year_loss + mh + post1994,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_static_unw, fitstat = c("n", "r2", "my"))
 
 # ---------------------------------------------------------------------------
 # mechanism decomposition (Chunk D) ----
@@ -1202,12 +1313,23 @@ fwrite(
             "policies_per_1k_homes_yr_pre_first_se",
             "water_depth_missing_mh_pre",  "water_depth_missing_mh_post",
             "water_depth_missing_sb_pre",  "water_depth_missing_sb_post",
+            "water_depth_bins_per_cell", "water_depth_single_bin_share",
+            "water_depth_n_bins",
             "building_damage_static_rob_base",
             "building_damage_static_rob_base_se",
             "building_damage_static_rob_depth",
             "building_damage_static_rob_depth_se",
             "building_damage_static_rob_depthx",
-            "building_damage_static_rob_depthx_se"
+            "building_damage_static_rob_depthx_se",
+            "winsor_cap",
+            "winsor_n_building_damage",  "winsor_n_contents_damage",
+            "winsor_n_net_building_pmt", "winsor_n_net_contents_pmt",
+            "winsor_n_mh_building_damage", "winsor_n_mh_contents_damage",
+            "repl_cost_zero_share",
+            "zero_share_net_building_pmt", "zero_share_net_contents_pmt",
+            "building_damage_static_unw",  "contents_damage_static_unw",
+            "building_damage_r2",          "building_damage_r2_unw",
+            "contents_damage_r2",          "contents_damage_r2_unw"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -1236,9 +1358,24 @@ fwrite(
             bin_ppl_first$est,   bin_ppl_first$se,
             wd_miss_mh_pre,  wd_miss_mh_post,
             wd_miss_sb_pre,  wd_miss_sb_post,
+            wd_bins_per_cell, wd_single_bin_shr,
+            wd_n_bins,
             stc_rob_base$est,   stc_rob_base$se,
             stc_rob_depth$est,  stc_rob_depth$se,
-            stc_rob_depthx$est, stc_rob_depthx$se
+            stc_rob_depthx$est, stc_rob_depthx$se,
+            MAX_CLAIM_LOSS,
+            dt_winsor_n$building_damage,  dt_winsor_n$contents_damage,
+            dt_winsor_n$net_building_pmt, dt_winsor_n$net_contents_pmt,
+            dt_winsor_mh[mh == 1L, building_damage],
+            dt_winsor_mh[mh == 1L, contents_damage],
+            n_repl_zero,
+            dt_zero_share$net_building_pmt, dt_zero_share$net_contents_pmt,
+            extract_static(est_static_unw, "building_damage_unw")$est,
+            extract_static(est_static_unw, "contents_damage_unw")$est,
+            r2(est_static[lhs = "building_damage$"][[1]], "r2"),
+            r2(est_static_unw[lhs = "building_damage_unw"][[1]], "r2"),
+            r2(est_static[lhs = "contents_damage$"][[1]], "r2"),
+            r2(est_static_unw[lhs = "contents_damage_unw"][[1]], "r2")
         )
     ),
     here("output", "results", "nfip-scalars.csv")
