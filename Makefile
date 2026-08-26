@@ -44,6 +44,7 @@ data:
 	Rscript program/import/databuild-mhs.R
 	Rscript program/import/impute-stock.R
 	Rscript program/import/databuild-nfip.R
+	Rscript program/import/databuild-nfip-policy.R
 	Rscript program/import/databuild-welfare.R
 
 estimates:

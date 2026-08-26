@@ -4,6 +4,141 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk J — Single-family occupancy restriction and policy-level composition table (2026-08-26)
+
+Branch `chunk-j-policy-composition`, off `chunk-i-window-claim-rate`. Colin's
+request: align the claims and policy samples on a shared single-family
+occupancy restriction (Chunk I-b had diagnosed but not fixed this — see its
+entry below and `notes/specs.md` §12.2's "for the record" note), then
+implement Chunk J's policy-level composition table.
+
+### Occupancy restriction, both samples
+
+`OCCUPANCY_TYPE_SF <- c(1L, 11L, 14L)` added to `project-params.R` (legacy
+single-family code 1, RR2.0 single-family code 11, RR2.0 residential-MH code
+14 — see the file for the full code-list rationale) and applied as
+`occupancy_type IN (...)` in both SQL queries in `databuild-nfip.R`, plus
+the new policy-micro query below. A `stopifnot` after the claims query
+checks the restriction actually landed, since the SQL `WHERE` clause is the
+only thing enforcing it.
+
+Rebuilt `derived/nfip-claims.Rds` and `derived/nfip-balanced.Rds` against
+research-database (`NFIP_VERSION` unchanged). Site-built claims fall
+1,816,724 → 1,492,255 (-17.9%); MH claims fall 25,798 → 25,294 (-2.0%) —
+the floors-only filter had let 2-4 unit, 5+ unit, condo-association, and
+non-residential rows into the site-built group, and non-residential MH rows
+into the MH group. Sanity checks: uniqueness of the balanced panel on
+`(tractfp, period_loss, mh, year_constr)`, zero missingness on the ID/date
+columns, `occupancy_type` restricted to `{1, 11, 14}` on both sides, no
+negative counts, existing `assert_geo_coverage`/`assert_geo_coverage_any`
+checks unchanged. `make test` passes (fake-data harness, independent of
+this restriction).
+
+**Effect on headline numbers.** `building_damage_static` (Table
+`tab:claims-outcomes-static`) moves from $4,110 to **-5,557 (SE 1,461)** —
+larger in magnitude, as expected from removing a noisier tail from the
+comparison group. The take-up artifact from Chunk I-b's fix
+(`policies_per_1k_homes_yr_static`, +8.12 (2.71)) moves to **+4.65 (2.24,
+t=2.08)** — still positive and significant at 5%, so the reversed-sign
+take-up finding survives, at roughly half the earlier magnitude. Full
+detail and the complete new scalar set: `notes/specs.md` §13.
+
+**Not rebuilt:** `estimate-mhs.R` (blocked by a pre-existing missing
+`derived/mhs-dropped-states.Rds`, needs `databuild-mhs.R`, unrelated to this
+change) and `program/descriptives/map.R` (blocked by a pre-existing missing
+`tigris` package). Neither depends on the NFIP occupancy restriction — both
+are environment gaps in this sandbox, not introduced here. Everything else
+in `make estimates` (`estimate-nfip.R`, `estimate-welfare.R`,
+`estimate-sumstats-nfip.R`, `plot-nfip.R`) was re-run and completed without
+error.
+
+### Chunk J: policy-level composition table
+
+New `program/import/databuild-nfip-policy.R` → `derived/nfip-policy-micro.parquet`,
+one row per policy term (12,787,544 terms, 266,312 MH), same filters as
+`databuild-nfip.R`'s policy query (now including the occupancy restriction
+above), same construction-year window, restricted to calendar years
+2009-2023 and deflated to 2000 dollars. Added to the `data` Makefile target.
+
+`estimate-nfip.R`'s cell-level composition fit (`est_comp_post`, weighted
+OLS on cell averages) is removed and replaced with a fit run directly on
+the policy microdata: `c(repl_cost, building_policy_covg,
+contents_covg_positive, contents_policy_covg_pos, elevated_policy,
+sfha_policy) ~ i(period_constr, mh, ref = 1992) | countyfp^period_loss + mh
++ period_constr`, clustered by county, unweighted (no cell aggregation to
+re-weight against). Added the contents-coverage choice margin the TODO
+asked for: an indicator for carrying any contents coverage, and the amount
+conditional on carrying it. 31.9% of MH policy terms carry no contents
+coverage vs. 13.5% of site-built, in the 30-35% range the TODO anticipated.
+Output file name and table label (`policy-composition.tex`, `tab:composition`)
+kept the same, so `paper.Rmd`'s `\input`/`\ref` needed no path changes.
+
+**Result.** Pre-1994: replacement cost and contents coverage (conditional
+amount) show a large MH-site-built gap in the earliest bin that shrinks to
+insignificant by 1990-1991, same shape as the old table's coverage columns.
+SFHA share is a new finding at this level of detail: significantly *lower*
+for MH in three of four pre-1994 bins, and it does not shrink toward the
+reference bin the way the other two do — a genuine pre-trend concern for
+that one outcome. Post-1994: building coverage, replacement cost (first two
+of three bins), and SFHA share are all significantly *higher* for MH, all
+three pointing toward higher, not lower, expected damage for the treated
+group. This is one more outcome pointing that direction than the old
+two-outcome table, so the paper's conservative-bias reading in "Selection
+and Composition" is if anything strengthened, not weakened, by the more
+careful design. Elevated share rises only in the last post-1994 bin,
+unchanged from before, so Chunk D's mechanism-split comment referencing that
+timing did not need to change. Rewrote the "Selection and Composition"
+section's four paragraphs to match the new table; renumbered nothing else.
+
+`paper.Rmd` also gets a sentence in "Final Sample" describing the
+single-family restriction and noting the composition table's separate
+policy-term-level extract, and updated table notes for the new six-column
+structure. Full `make estimates` + `rmarkdown::render('paper.Rmd')` run
+clean to a rebuilt `paper.pdf` with no errors or missing-scalar failures.
+
+### Verified
+
+- `make test` — all fake-data tests pass, unaffected by any of the above.
+- `databuild-nfip.R` and `databuild-nfip-policy.R` — both run clean against
+  research-database; sanity checks above.
+- `estimate-nfip.R`, `estimate-welfare.R`, `estimate-sumstats-nfip.R`,
+  `plot-nfip.R` — re-run clean against the new derived data.
+- `rmarkdown::render('paper.Rmd')` — clean, `paper.pdf` rebuilt, table
+  renders with the expected six columns.
+
+### Open questions for check-in
+
+1. The SFHA pre-trend noted above (significantly negative in 3 of 4
+   pre-1994 bins, not shrinking toward the reference bin) is a genuinely
+   new finding versus the pre-restriction table, which showed no comparable
+   pre-1994 SFHA pattern. Worth a sentence flagging it as a caveat on the
+   parallel-trends assumption specifically for that outcome (currently
+   included in "Selection and Composition"), or should it be investigated
+   further (e.g., whether it is itself a multi-family/occupancy artifact in
+   the *pre*-restriction years, given the restriction was diagnosed on
+   post-1994 vintages)?
+2. `estimate-mhs.R` and `program/descriptives/map.R` remain blocked by
+   pre-existing environment gaps (`derived/mhs-dropped-states.Rds`,
+   `tigris`) unrelated to this chunk. Flagging in case a machine with a
+   complete environment is wanted before the next merge, so the cost-side
+   (Chunk C) numbers and the map figure can be confirmed unaffected by the
+   NFIP occupancy restriction (they should be — neither reads NFIP data —
+   but this was not empirically checked this session).
+3. Every prior chunk's damage/take-up point estimates (Chunks A, C1, D, E,
+   I, I-b) now describe a sample that no longer exists at those exact
+   numbers, since the occupancy restriction changed the underlying claims
+   and policy data. This session updated `notes/specs.md` and the headline
+   claims/take-up numbers it feeds into `paper.Rmd`, but did not re-audit
+   every number in every other section of the paper (e.g., Chunk D's
+   mechanism-split table, Chunk E's summary statistics) against the new
+   sample — `make estimates` regenerated their `.tex`/`.csv` outputs, so
+   `paper.Rmd` is internally consistent, but the *prose* describing those
+   other tables was not re-read against the refreshed numbers the way
+   "Selection and Composition" was here. Worth a pass before APPAM if this
+   merges.
+
+---
+
 ## Chunk I-b — Two take-up denominator defects, and the mandatory-purchase question (2026-08-26)
 
 Branch `mhs-fixed-weight-index`. Two questions from Colin: (1) does the

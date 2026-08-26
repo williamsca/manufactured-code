@@ -11,6 +11,17 @@
 #
 # period_loss: 5-year bins (2009 = 2009-2013, 2014 = 2014-2018, ...)
 # year_constr: individual construction year (binning done at estimation)
+#
+# Both claims and policies are restricted to single-family residential via
+# occupancy_type (OCCUPANCY_TYPE_SF in project-params.R), on top of the
+# floor-count filter that has always defined mh: number_of_floors_in_the_
+# insured_building is a floor count, not a unit count, so on its own it does
+# not exclude multi-family or non-residential buildings with 1-3 floors. A
+# diagnostic on the pre-restriction sample found 17.9% of site-built (mh=0)
+# claims carried a multi-unit or non-residential occupancy code (TODO.md
+# Chunk J/K, 2026-08-26) -- this is what the occupancy_type filter removes,
+# from claims and policies alike, so the two samples share one definition of
+# the comparison group.
 
 rm(list = ls()); gc()
 library(here)
@@ -27,6 +38,11 @@ source(here("program", "import", "geo-coverage-checks.R"))
 # drift apart (they were separate literals until Chunk I)
 year_min <- MIN_YEAR_CONSTR
 year_max <- MAX_YEAR_CONSTR
+
+# single-family occupancy_type restriction (see project-params.R for the
+# code list and rationale); applied identically to claims and policies below
+# so the two samples cannot use different definitions of the comparison group
+occ_sf <- paste(OCCUPANCY_TYPE_SF, collapse = ", ")
 
 dt_cpi <- fread(here("derived", "cpi-bls.csv"))
 dt_cpi <- dt_cpi[, .(cpi = mean(cpi)), by = year]
@@ -69,6 +85,7 @@ SELECT
     occupancy_type
 FROM read_parquet('%s')
 WHERE number_of_floors_in_the_insured_building IN (1, 2, 3, 5)
+    AND occupancy_type              IN (%s)
     AND year_of_loss               IS NOT NULL
     AND year_of_loss               >= %d
     AND year_of_loss               <= %d
@@ -81,7 +98,7 @@ WHERE number_of_floors_in_the_insured_building IN (1, 2, 3, 5)
 "
 
 dt_claims <- as.data.table(dbGetQuery(
-    con, sprintf(sql_claims, glob_claims, MIN_YEAR_LOSS, MAX_YEAR_LOSS)))
+    con, sprintf(sql_claims, glob_claims, occ_sf, MIN_YEAR_LOSS, MAX_YEAR_LOSS)))
 
 dt_claims <- merge(
     dt_claims,
@@ -112,6 +129,10 @@ message(sprintf(
     dt_claims[mh == 1L, .N],
     dt_claims[mh == 0L, .N]
 ))
+
+# consistency check: the SQL WHERE clause is the only thing enforcing the
+# single-family restriction, so confirm it actually landed on every row
+stopifnot(all(dt_claims$occupancy_type %in% OCCUPANCY_TYPE_SF))
 
 # post-1994 shares by MH status
 dt_claims[, .(
@@ -157,6 +178,7 @@ WITH filtered AS (
         END                                                               AS sfha_policy
     FROM read_parquet('%s')
     WHERE number_of_floors_in_insured_building IN (1, 2, 3, 5)
+        AND occupancy_type              IN (%s)
         AND original_construction_date IS NOT NULL
         AND policy_effective_date      IS NOT NULL
         AND policy_termination_date    IS NOT NULL
@@ -185,7 +207,7 @@ SELECT
 FROM filtered
 WHERE year BETWEEN %d AND %d
 GROUP BY tractfp, year, mh, year_constr
-", glob_policies, year_min, year_max, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
+", glob_policies, occ_sf, year_min, year_max, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
 
 dt_pol <- as.data.table(dbGetQuery(con, sql_policies))
 
