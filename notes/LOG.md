@@ -4,6 +4,144 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk L — Levels vs. logs on the NFIP outcomes, and table presentation (2026-08-26)
+
+Branch `chunk-k-water-depth-robustness` (continued from Chunk K rather than
+re-branched, since the diff builds directly on it). Colin's request came in
+three parts across a working session, all prompted by reading the revised
+`tab:composition` and `tab:claims-outcomes`: replacement cost varies wildly
+across vintages with an R2 near zero — why, and should it stay; the building
+damage share is noisy and imprecise with a tiny R2 and may add nothing; and
+contents coverage does not warrant two columns for its two margins. He then
+raised the levels-vs-logs tension explicitly (logs need no deflation given
+year fixed effects, avoid the insane values, and give more natural parallel
+trends for prices — but break comparability with the cost side and discard
+zeros), and asked for a recommendation. A follow-up turn asked for
+percentage-point units on the two binary composition columns and proposed
+dropping the water-depth robustness table.
+
+### What was done
+
+One diagnosis explains both badly-fitting columns. The FEMA
+*value/appraisal* fields are contaminated in the tail; the *payment* fields
+cannot be, because the NFIP statutory coverage limits censor them
+(`net_building_pmt` max 441, `net_contents_pmt` max 113, against `repl_cost`
+max 1,371,528). The contamination is asymmetric — `building_value` has a
+99.9th percentile of 1,074,609 for site-built against 3,750 for MH — so it
+sits in the comparison group and destabilizes the MH × vintage interaction
+rather than merely adding noise.
+
+Resolution: the estimand differs by table, so the units should too.
+
+1. **Claim-level damage and payment outcomes stay in levels**, because the
+   cost-benefit analysis needs the change in the expected dollar loss, not
+   the change in a geometric mean, and the retransformation does its heaviest
+   work in exactly the fat right tail that dominates expected loss.
+   Independently, the two payment outcomes are 29.6% and 66.9% zeros, so they
+   admit no log at all. All four are winsorized at `MAX_CLAIM_LOSS = 1000`
+   ($000 of 2000 dollars), which binds for 8 building-damage and 29
+   contents-damage records, no payment records, and no manufactured homes.
+   Uncapped copies are retained and the static spec re-estimated on them, so
+   the paper quotes the movement instead of asserting the cap is harmless.
+2. **Replacement cost moves to logs** in `tab:composition`, where the column
+   signs a bias and never enters an arithmetic ratio, so the comparability
+   objection does not apply. Winsorizing the level was checked and rejected:
+   it fits better than the raw level but leaves a steep declining pre-trend,
+   because the tail is where that pre-trend lives.
+3. **Contents coverage collapses to one unconditional column.** Both margins
+   are individually null after 1994, and the conditional-amount column was
+   estimated on a sample selected by the outcome of the column beside it.
+4. **The building damage share is dropped from both claims tables.** Bounding
+   it at 100 does fix the fit, but the cleaned event study then shows a trend
+   across the whole vintage window rather than a break at 1994, so parallel
+   vintage trends fails for this outcome and the static estimate averages
+   over a pre-trend. That is the decisive reason, not the R2. It is still
+   estimated and its scalars still exported, since
+   `notes/apps/abstract-appam.Rmd` reads `building_damage_share_avg`.
+5. **The two binary composition outcomes are scaled to percentage points**
+   (`elevated_policy_pct`, `sfha_policy_pct`, labelled *Elevated (%)* and
+   *SFHA (%)*) so they stop printing as leading zeros beside the log and
+   dollar columns. Pure rescaling: R2, t-statistics, and stars unchanged.
+
+On deflation, since it came up: the claims data are deflated by loss-year CPI
+against a `geo^year_loss` fixed effect, so under a log outcome the deflator
+would be exactly absorbed and deflating would be a no-op — but it is not a
+no-op under a level outcome, since deflation is multiplicative and does not
+commute with additive fixed effects. The policy micro is deflated by policy
+year against a fixed effect spanning five calendar years, across which CPI
+moves about 10%, so deflation is only partly absorbed there and remains
+necessary even in logs. Deflation is therefore not a reason to prefer logs.
+
+### What changed in outputs
+
+- `output/event-study/countyfp/policy-composition.tex`: six columns to five.
+  Log repl. cost R2 0.001 → 0.20, with flat insignificant pre-1994
+  coefficients and a stable +0.07\*\*\*/+0.06\*\*/+0.08\*\*\* after.
+  Contents covg. now unconditional (R2 0.19). Elevated and SFHA now in
+  points: elevated +0.96, -1.6, -1.3, -1.7 pre and -0.02, +1.2, +5.3\*\*\*
+  post; SFHA -2.9, -4.8\*\*, -3.6\*, -3.9\*\* pre and +2.7\*\*,
+  +4.3\*\*\*, +8.0\*\*\* post.
+- `output/event-study/countyfp/claims-outcomes.tex` and
+  `claims-outcomes-static.tex`: five columns to four. `building_damage_static`
+  -5.557 → -5.754 (SE 1.451), R2 0.33 → 0.43; `contents_damage_static`
+  -3.752 → -3.198 (SE 0.672), R2 0.07 → 0.25.
+- `output/results/welfare-scalars.csv`: `delta_contents` moves with the
+  contents-damage coefficient, so `delta_total` is now $6,342,
+  `npv_3pct_20yr` $1,411, and `bcr_3pct_20yr` 44%. **This is the one headline
+  number the winsorization rule materially affects**, and it is documented as
+  such rather than buried.
+- Sixteen new scalars in `nfip-scalars.csv` (winsor counts and cap, zero
+  shares, uncapped static coefficients, R2 pairs) plus three water-depth
+  variation scalars, so no figure in the new paper text is hardcoded.
+
+### Verified
+
+- `Rscript program/estimate/estimate-nfip.R` and `estimate-welfare.R`: exit 0.
+- `Rscript -e 'rmarkdown::render("paper.Rmd")'`: exit 0, no undefined
+  references, and the new appendix figures confirmed present in `paper.pdf`.
+- `make test`: all fake-data tests pass (mhs-price-did, nfip-claims-es,
+  take-up-imputation, welfare-arithmetic).
+- `notes/specs.md` §15 and §16 added; §14's superseded outcome list marked as
+  such in four places so it cannot be read as current.
+
+### One correction worth recording
+
+Colin proposed dropping `tab:water-depth-robustness` because it "adds almost
+nothing to R2," inferring that water depth must be nearly constant within a
+county and loss year. **The premise is false**, and it was checked before
+acting rather than after. On the estimation sample, of the 7 depth bins the
+average claim sits in a cell containing 6.0 of them, and only 4.1% of claims
+are in a cell where every claim falls in one bin; a continuous version,
+`water_depth ~ 1 | countyfp^year_loss`, has an R2 of 0.11, so about 89% of
+the depth variance is within-cell. The control therefore has ample variation,
+which is what makes the table informative — `post_mh` moves only
+-5.75 → -5.15 → -5.26 across the three columns despite a control that
+genuinely varies. Incremental R2 is the wrong diagnostic: the relevant
+questions are whether the covariate varies within cell and whether the
+coefficient is stable, and both are satisfied. The small R2 gain says depth
+explains little of the *claim-to-claim* variance in damage once the cell is
+absorbed, because single-claim damage is governed mainly by home size and
+value; depth predicts the mean damage level, which is what
+`fig:damage-function` already shows. Table kept, per Colin's call after seeing
+the diagnostic, and the appendix now states the point explicitly so a reader
+does not repeat the inference.
+
+### Open questions for check-in
+
+1. `contents_damage_static` moving $554 per claim on the winsorization cap is
+   the largest single sensitivity introduced here, and it flows into the BCR.
+   `MAX_CLAIM_LOSS = 1000` is deliberately generous (the NFIP contents limit
+   is 100); a tighter cap would move it further. Confirm 1000 is the rule you
+   want, or name a different one.
+2. Replacement cost in logs drops the 5.6% of policy terms recording an exact
+   zero. I read a $0 replacement cost on an insured single-family home as a
+   recording convention rather than a fact, but that is a judgment call.
+3. `building_damage_share` is still estimated and exported purely for
+   `notes/apps/abstract-appam.Rmd`. If the APPAM abstract no longer needs it,
+   the whole outcome can come out of the script.
+
+---
+
 ## Chunk K — Water-depth robustness for building damage (2026-08-26)
 
 Branch `chunk-k-water-depth-robustness`, off `main` (post Chunk J). Colin's

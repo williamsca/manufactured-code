@@ -4,7 +4,7 @@ Source of truth for every table/figure in `paper.Rmd`/`slides.tex`. Paper text
 is checked against this file, not against memory. Update in the same commit
 as any spec change (see `TODO.md` PROCESS).
 
-Last verified: 2026-08-26, against commit at the top of `notes/LOG.md` (Chunk K).
+Last verified: 2026-08-26, against commit at the top of `notes/LOG.md` (Chunk L).
 
 ## 1. MHS price/quantity event study (Eq. 1)
 
@@ -859,6 +859,13 @@ Colin's decision 2026-08-26. `est_comp_post`, `v_comp`, `s_comp`, and
 `fmla_comp_post` are removed from `estimate-nfip.R`; nothing else in the
 script read them.
 
+**The outcome list below is superseded by §15**, which replaces `repl_cost`
+with `log_repl_cost_pol` and collapses `contents_covg_positive` and
+`contents_policy_covg_pos` into a single unconditional `contents_policy_covg`
+column, taking the table from six columns to five. Everything else in this
+section — the build, the FE structure, the reference bin, the absence of
+weights, the clustering, the output path — still holds.
+
 - **Script:** `program/import/databuild-nfip-policy.R` (new) builds
   `derived/nfip-policy-micro.parquet`, one row per policy term, from the
   same `fema_nfip_policies` source and version (`NFIP_VERSION`) as
@@ -876,10 +883,13 @@ script read them.
   same `bin_constr()` used everywhere else in the file. Always run at
   `countyfp x period_loss`, independent of the script's `agg_geo` argument,
   since the Chunk J spec fixes the geography.
-- **Spec:** `c(repl_cost, building_policy_covg, contents_covg_positive, contents_policy_covg_pos, elevated_policy, sfha_policy) ~ i(period_constr, mh, ref = ref_period) | countyfp^period_loss + mh + period_constr`,
+- **Spec** (outcome list superseded by §15): `c(repl_cost, building_policy_covg, contents_covg_positive, contents_policy_covg_pos, elevated_policy, sfha_policy) ~ i(period_constr, mh, ref = ref_period) | countyfp^period_loss + mh + period_constr`,
   `ref_period` = 1992 under the default `BIN_CONSTR_YEAR = 2`, matching the
   literal `ref = 1992` in the Chunk J plan.
-- **New outcome: contents-coverage choice margin.** `contents_covg_positive`
+- **New outcome: contents-coverage choice margin** (dropped in §15 — both
+  margins are individually null post-1994, and conditioning the amount on the
+  indicator selects the sample on the neighbouring column's outcome; the
+  descriptive 31.9%-vs-13.5% split below still stands). `contents_covg_positive`
   (`1[contents coverage > 0]`, built in `databuild-nfip-policy.R`) and
   `contents_policy_covg_pos` (the coverage amount, `NA` when the indicator
   is 0 — same "NA, not 0, when the margin doesn't apply" convention as the
@@ -898,8 +908,9 @@ script read them.
 - **Outputs:** `output/event-study/countyfp/policy-composition.tex` (Table
   `tab:composition`, same file name and table label as the design it
   replaces, so `paper.Rmd`'s `\input` and `\ref` did not need to change).
-- **Result, briefly** (full reading in `paper.Rmd` "Selection and
-  Composition"): pre-1994, replacement cost and contents coverage
+- **Result, briefly** (superseded by §15 for replacement cost and contents
+  coverage; see `paper.Rmd` "Selection and Composition" for the current
+  reading): pre-1994, replacement cost and contents coverage
   (conditional amount) show a large gap in the two earliest bins that
   shrinks to insignificant by 1990-1991; the contents-coverage indicator
   (any coverage vs. none) shows a smaller version of the same gap but stays
@@ -913,3 +924,188 @@ script read them.
   group — strengthening the conservative-bias reading relative to the
   cell-level table's two-outcome version. Elevated share rises only in the
   last post-1994 bin, unchanged from before.
+
+## 15. Levels vs. logs and outlier handling in the NFIP outcomes (2026-08-26)
+
+Triggered by Colin's read of the Chunk J policy-level composition table: the
+`repl_cost` column had an R2 of 0.001 and a vintage profile that changed sign
+across bins, and `building_damage_share` had an R2 of 0.002 and a 1998-bin
+coefficient of -15.9 (12.0). Both were suspected of "not adding much."
+
+### Root cause: value fields are contaminated, payment fields are not
+
+One diagnosis covers both columns. The FEMA *value/appraisal* fields carry a
+tail of records far outside any plausible single-family figure. The *payment*
+fields cannot, because the NFIP statutory coverage limits censor them.
+
+| field | p99.99 | max | verdict |
+|---|---|---|---|
+| `net_building_pmt` | 234 | 441 | clean (limit binds) |
+| `net_contents_pmt` | 100 | 113 | clean (limit binds) |
+| `building_damage` | 590 | 1,018,489 | 8 bad records |
+| `contents_damage` | 2,618 | 6,985 | 29 suspect |
+| `building_value` | 1,817,010 | 2,168,006 | 0.1% tail rotten |
+| `repl_cost` | 20,999 | 1,371,528 | 1% tail rotten |
+
+All in $000 of 2000 dollars. `repl_cost` has mean 199.9 against sd 2,269;
+`building_policy_covg` on the same rows has sd 45.6 because the limit
+top-codes it, which is the whole of the R2 = 0.001 vs. 0.23 contrast between
+adjacent columns of one regression. `building_value`'s p99.9 is 1,074,609 for
+site-built against 3,750 for MH, so **the contamination sits in the comparison
+group**, which is why it destabilizes the MH x vintage interaction rather than
+just adding noise. Its Pearson correlation with `building_covg` is 0.024 but
+its Spearman is 0.534 (0.537 trimmed) — the centre of the field is fine, only
+the tail is bad.
+
+### Decision 1: claim-level damage/payment outcomes stay in LEVELS
+
+Not a presentation choice. The CBA of paper section `cost-benefit` needs
+`Delta E[Y]` in dollars, which levels estimates directly; logs estimate the
+change in the geometric mean, and the retransformation to a mean requires a
+distributional assumption doing its heaviest work in the upper tail of large
+floods — exactly where the expected benefit lives. Independently, the two
+payment outcomes are 29.6% and 66.9% zeros, so they admit no log at all, and
+logging only the damage columns would split the table into non-comparable
+halves. Cost side stays in levels too, since `compliance_cost` is the BCR
+denominator.
+
+`MAX_CLAIM_LOSS <- 1000` winsorizes all four claim-level loss outcomes. One
+uniform, generous cap rather than a per-outcome rule; capping rather than
+dropping so N is identical to the untrimmed spec. Binds for 8 building-damage
+and 29 contents-damage records, **zero** payment records, and **zero**
+manufactured homes (all capped records are site-built — exported as
+`winsor_n_*` scalars). Applied in the data-construction block before the
+shares, per-claim cell averages, dependent-variable means, and welfare inputs
+are built, so everything downstream uses one set of values. Uncapped copies
+(`building_damage_unw`, `contents_damage_unw`) are retained and the static spec
+re-estimated on them (`est_static_unw`) so the paper quotes the movement
+rather than asserting the cap is innocuous.
+
+- `building_damage_static`: -5.557 → **-5.754** (SE 1.451), R2 0.335 → 0.425.
+  Insensitive; headline unaffected.
+- `contents_damage_static`: -3.752 → **-3.198** (SE 0.672), R2 0.074 → 0.254.
+  Moves ~$550/claim, so `delta_contents` and the BCR move with it. Its
+  contaminated records are a larger share of a smaller sample.
+
+### Decision 2: `repl_cost` → LOGS in `tab:composition`
+
+Different estimand: the column signs a bias and never enters an arithmetic
+ratio, so the comparability objection to logs does not apply.
+
+| spec | R2 | 1984 | 1986 | 1988 | 1990 | 1994 | 1996 | 1998 |
+|---|---|---|---|---|---|---|---|---|
+| level | 0.001 | 32.3\*\*\* | 30.1\*\*\* | 9.9 | -7.6 | 31.0\*\*\* | 17.6\* | 1.6 |
+| winsor $1M | 0.12 | 19.0\*\*\* | 14.1\*\*\* | 6.9\*\*\* | -1.5 | 3.6\*\* | 1.0 | -6.1\*\*\* |
+| **log** | **0.20** | 0.01 | 0.02 | 0.05 | 0.01 | **0.07\*\*\*** | **0.06\*\*** | **0.08\*\*\*** |
+
+Logs give flat, insignificant pre-1994 coefficients and a stable +6 to +8%
+post-1994 — a cleaner version of the conservative-bias argument, and it
+retires the old "mid-1980s gap fading by 1990-91" pre-trend caveat. Costs the
+5.6% of terms with an exact zero replacement cost (`repl_cost_zero_share`),
+read as a recording convention rather than a measurement. **Winsorizing the
+level was rejected**: it fits better than the raw level but leaves a steep
+declining pre-trend, because the tail is where that pre-trend lives.
+`log_repl_cost_pol`, dict label "Log repl. cost".
+
+### Decision 3: contents coverage, two columns → one unconditional column
+
+Both margins are individually null post-1994 (extensive +0.004, -0.01, -0.02;
+conditional amount -0.30, +0.22, +0.16), so one column carries the finding.
+The unconditional amount (zeros included, mean 47.2, R2 0.194) also avoids
+conditioning on a variable that itself moves across vintages — the old
+conditional-amount column was estimated on a sample selected by the outcome of
+the column beside it. Pre-1994 profile 3.49, 2.52, 1.89, 1.37 (all
+significant, declining monotonically); post-1994 -0.23, -0.14, -0.79 (none
+significant). `tab:composition` is now 5 columns:
+`c(log_repl_cost_pol, building_policy_covg, contents_policy_covg, elevated_policy, sfha_policy)`.
+
+### Decision 4: `building_damage_share` dropped from both paper tables
+
+Bounding the share at 100 (impossible above that by construction) fixes the
+fit — R2 0.002 → 0.52, static -5.78 (2.78) → -3.83 (1.24), stable across every
+rule tried (drop >100 -4.07, winsorize -3.83, drop >200 -3.77,
+`building_value` >= $10k -3.78), on ~550 of 197,600 rows. But the *cleaned*
+event study is +3.81\*\*, +5.38\*\*, +4.23\*, +1.76 pre-1994 against +0.07,
++0.18, -1.99 post-1994: a trend across the whole vintage window, not a break
+at 1994. Parallel vintage trends fails for this outcome and the static
+estimate averages over a pre-trend — the decisive reason, stronger than the
+R2. It is also near-redundant, being the ratio of column (1) to a quantity
+reported in `tab:composition`, so it adds only their covariance. Alternative
+denominators do not help (damage / building coverage: R2 0.012, own
+contaminated tail). Removed from `v_alt` so it leaves both
+`claims-outcomes.tex` and `claims-outcomes-static.tex`; **still estimated and
+its scalars still exported**, since `notes/apps/abstract-appam.Rmd` reads
+`building_damage_share_avg`.
+
+### Deflation
+
+Claims are deflated by *loss-year* CPI and the claim-level FE is
+`geo^year_loss`, so in logs `log(deflator)` is a loss-year constant and is
+exactly absorbed — deflating the claims data would be a no-op under a log
+outcome, but is not under a level outcome, since deflation is multiplicative
+and does not commute with additive FEs. The policy micro is deflated by policy
+year against a `countyfp^period_loss` FE spanning *five* years, across which
+CPI moves ~10%, so deflation is only partly absorbed there and is still
+required even for `log_repl_cost_pol`. Deflation is therefore not a reason to
+prefer logs anywhere it would otherwise be a close call.
+
+### Downstream
+
+New scalars: `winsor_cap`, `winsor_n_{building_damage,contents_damage,net_building_pmt,net_contents_pmt}`,
+`winsor_n_mh_{building_damage,contents_damage}`, `repl_cost_zero_share`,
+`zero_share_net_{building,contents}_pmt`,
+`{building,contents}_damage_static_unw`, `{building,contents}_damage_r2{,_unw}`.
+`paper.Rmd`'s `bldg_pct_avg` was also switched from the event-study average to
+the static estimate, since the sentence using it reports the static figure
+(19% of mean building damage, not 16%). Post-change welfare figures:
+`delta_building` $4,898, `delta_contents` $1,444, `delta_total` $6,342,
+`npv_3pct_20yr` $1,411, `bcr_3pct_20yr` 44%.
+
+## 16. Composition-table units and the water-depth R2 question (2026-08-26)
+
+Two follow-ups to §15, both from Colin's read of the revised tables.
+
+### Percentage-point scaling for the two binary composition outcomes
+
+`elevated_policy` and `sfha_policy` are 0/1, so in a table whose other columns
+are log points and thousands of dollars their coefficients printed as a row of
+leading zeros. New columns `elevated_policy_pct` and `sfha_policy_pct`
+(`100 *` the indicator) replace them in `v_comp_pol`; dict labels
+`"Elevated (\\%)"` and `"SFHA (\\%)"`. Pure rescaling — coefficients, standard
+errors, and the dependent-variable mean all scale by 100 while R2,
+t-statistics, and significance stars are identical. The unscaled columns are
+left in place and still dict-labelled, since the cell-level `elevated_share` /
+`sfha_share` and the claim-level `elevated` / `sfha` subsample splits are
+unaffected. No exported scalar reads either column, so nothing downstream
+moved. Post-scaling: elevated +0.96, -1.6, -1.3, -1.7 pre-1994 and -0.02,
++1.2, +5.3\*\*\* post; SFHA -2.9, -4.8\*\*, -3.6\*, -3.9\*\* pre and +2.7\*\*,
++4.3\*\*\*, +8.0\*\*\* post. `tab:composition` notes updated to state the units.
+
+### The water-depth table is KEPT; the flat R2 is not a power problem
+
+Colin proposed dropping `tab:water-depth-robustness` on the grounds that it
+"adds almost nothing to R2," inferring that water depth must be nearly constant
+within a county x loss year. **That inference is wrong and was checked before
+acting.** On the estimation sample, of the 7 depth bins the average claim sits
+in a cell containing 6.0 of them, and only 4.1% of claims are in a cell where
+every claim falls in one bin (6.56 and 1.1% on the full claims file; the
+estimation-sample figures are the ones the paper quotes, since they match the
+regression). A continuous check agrees: `water_depth ~ 1 | countyfp^year_loss`
+has an R2 of 0.11, so ~89% of the depth variance is within-cell.
+
+The depth control therefore has ample variation, which is what makes the table
+informative: `post_mh` moves only -5.75 → -5.15 → -5.26 across the three
+columns despite a control that genuinely varies. Incremental R2 is the wrong
+diagnostic here — the relevant questions are whether the covariate varies
+within cell (it does) and whether the coefficient is stable (it is). The ~1
+point R2 gain says depth explains little of the *claim-to-claim* variance in
+damage once the cell is absorbed, because single-claim damage is governed
+mainly by home size and value; depth predicts the *mean* damage level, which is
+what `fig:damage-function` shows. Table kept unchanged per Colin's call after
+seeing the diagnostic.
+
+Because a reader can easily reach the same wrong inference from the printed
+R2 column, the appendix now says this explicitly. New block after the
+`est_rob_list` N assertion computes `dt_wd_var` and exports
+`water_depth_bins_per_cell`, `water_depth_single_bin_share`, and
+`water_depth_n_bins`; the appendix paragraph reads them rather than hardcoding.
