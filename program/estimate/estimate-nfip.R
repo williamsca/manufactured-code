@@ -29,6 +29,12 @@ geo_arg <- args[args %in% c("countyfp", "tractfp")][1L]
 BIN_CONSTR_YEAR <- if (!is.na(bin_arg)) as.integer(bin_arg) else 2L
 agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 
+# Calendar years per period_loss bin. The cell panel's five-year bins are
+# 2009-2013, 2014-2018, 2019-2023 (policy records begin 2009; MAX_YEAR_LOSS is
+# 2023), so every retained bin holds exactly this many years. Asserted against
+# the data below, since the annualized take-up rates divide by it.
+N_YEARS_PERIOD <- 5L
+
 source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
 source(here("program", "import", "geo-coverage-checks.R"))
@@ -61,7 +67,7 @@ v_dict <- c(
     "net_building_pmt" = "Net building pmt.",
     "contents_damage" = "Contents damage",
     "net_contents_pmt" = "Net contents pmt.",
-    "claim_rate" = "Claims per policy",
+    "claim_rate" = "Claims per policy-year",
     "repl_cost_ppol" = "Repl. cost",
     "policy_cost_ppol" = "Policy cost per policy",
     "building_policy_covg_ppol" = "Bldg covg.",
@@ -73,8 +79,8 @@ v_dict <- c(
     "sfha" = "SFHA",
     "primary_res_share" = "Primary res.",
     "mandatory_purchase_share" = "Mandatory",
-    "policies_per_1k_homes" = "Policies per 1,000 homes",
-    "claims_per_1k_homes" = "Claims per 1,000 homes",
+    "policies_per_1k_homes_yr" = "Policies per 1,000 homes per year",
+    "claims_per_1k_homes_yr" = "Claims per 1,000 homes per year",
     "homes_n" = "Homes (stock)",
     "building_damage_share" = "Bldg. dmg. share (%)",
     "net_building_pmt_share" = "Bldg. pmt. share (%)",
@@ -110,6 +116,16 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 # --- balanced panel ---
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
 dt <- dt[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
+
+# period_loss bins must be N_YEARS_PERIOD years wide and the last one complete,
+# or the annualized take-up rates below divide by the wrong denominator.
+periods_obs <- sort(unique(dt$period_loss))
+stopifnot(
+    length(periods_obs) > 1L,
+    all(diff(periods_obs) == N_YEARS_PERIOD),
+    max(periods_obs) + N_YEARS_PERIOD - 1L == MAX_YEAR_LOSS
+)
+
 dt[, geo := get(agg_geo)]
 dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
@@ -209,10 +225,26 @@ if (agg_geo == "countyfp") {
 } else {
     dt_cell[, homes_n := NA_real_]
 }
-dt_cell[, policies_per_1k_homes := fifelse(
-    !is.na(homes_n) & homes_n > 0, 1000 * policies_n / homes_n, NA_real_)]
-dt_cell[, claims_per_1k_homes := fifelse(
-    !is.na(homes_n) & homes_n > 0, 1000 * claims_n / homes_n, NA_real_)]
+# Take-up and claim-frequency rates, ANNUALIZED (Chunk I). policies_n is a
+# count of policy TERMS summed over the N_YEARS_PERIOD calendar years in a
+# period_loss bin (databuild-nfip.R assigns each term to one year by its
+# midpoint), so it is policy-years, not a stock of distinct policies -- the
+# file carries no policy identifier. Dividing by N_YEARS_PERIOD puts these on
+# a per-year footing, which (a) makes them readable as take-up rates rather
+# than five-year cumulative counts and (b) makes the decomposition
+#
+#     claims per home = policies per home x claims per policy
+#
+# hold in consistent units, since claim_rate above is already annual
+# (claims over the period / policy-years over the period). The `_yr` suffix is
+# deliberate: these replace the unsuffixed pre-Chunk-I variables, whose name
+# did not disclose that they were five-year cumulative.
+dt_cell[, policies_per_1k_homes_yr := fifelse(
+    !is.na(homes_n) & homes_n > 0,
+    1000 * policies_n / (homes_n * N_YEARS_PERIOD), NA_real_)]
+dt_cell[, claims_per_1k_homes_yr := fifelse(
+    !is.na(homes_n) & homes_n > 0,
+    1000 * claims_n / (homes_n * N_YEARS_PERIOD), NA_real_)]
 
 # Poisson panel: aggregate all cells (including zero-policy) to period_constr
 dt_pois <- dt[, .(claims_n    = sum(claims_n,    na.rm = TRUE),
@@ -322,9 +354,14 @@ fmla_pclaim_es <- as.formula(paste0(
     " | geo^period_loss + mh + period_constr")
 )
 
+# Clustered by geo (county under the default agg_geo), added in Chunk I. All
+# four cell-level fits below (est_pclaim_es, est_comp_post, est_share_es,
+# est_pois_es) previously passed no `cluster` argument, so fixest reported IID
+# standard errors while notes/specs.md 3 recorded that and the paper's Table 4
+# note claimed clustering. Cluster level matches the claim-level specs.
 est_pclaim_es <- feols(
     fmla_pclaim_es, data = dt_cell,
-    weights = ~policies_n,
+    weights = ~policies_n, cluster = ~geo,
     lean = TRUE)
 etable(est_pclaim_es, fitstat = c("n", "r2", "wr2", "my"))
 
@@ -349,7 +386,7 @@ fmla_comp_post <- as.formula(paste0(
 
 est_comp_post <- feols(
     fmla_comp_post, data = dt_cell,
-    weights = ~policies_n,
+    weights = ~policies_n, cluster = ~geo,
     lean = TRUE
 )
 etable(est_comp_post, fitstat = c("n", "r2", "wr2", "my"))
@@ -376,7 +413,7 @@ fmla_share_es <- as.formula(paste0(
 
 est_share_es <- feols(
     fmla_share_es, data = dt_share_cell,
-    weights = ~policies_n, lean = TRUE
+    weights = ~policies_n, cluster = ~geo, lean = TRUE
 )
 
 etable(est_share_es, fitstat = c("n", "r2", "wr2", "my"))
@@ -392,29 +429,45 @@ fmla_out_es <- as.formula(paste0(
 ))
 
 est_pois_es <- fepois(
-    fmla_out_es, data = dt_pois
+    fmla_out_es, data = dt_pois, cluster = ~geo
 )
 etable(est_pois_es)
 
 iplot(est_pois_es)
 
 # Take-up per housing-unit stock (Chunk E): OLS on the ratio outcomes
-# themselves (policies_per_1k_homes, claims_per_1k_homes), clustered by
+# themselves (policies_per_1k_homes_yr, claims_per_1k_homes_yr), clustered by
 # county (geo == countyfp under the default agg_geo), replacing the
 # policies-per-SF-permit ratio (wrong housing type, badly non-random BPS
-# coverage -- see TODO.md Chunk E). Decomposes the take-up margin into claim
-# frequency (claims per home, extensive/insurability margin) versus payment
-# conditional on a claim (the damage-severity specs above, `est_claim_es`),
-# which the review notes have different welfare interpretations.
+# coverage -- see TODO.md Chunk E).
 #
-# Weighted by homes_n: a handful of cells have imputed stock well under 1
-# home (thin county x period x mh cells, mostly the already-flagged 1994
-# bin), producing policies_per_1k_homes ratios in the tens of thousands
-# that would otherwise dominate an unweighted fit. Same logic as the
-# policies_n weights already used for the composition/claim-rate cell
-# regressions above.
+# Chunk I adds the third margin, claims per policy-year (`claim_rate`), so the
+# table now reports a complete decomposition of the benefit side's extensive
+# margin:
 #
-# Pooled across all three policy periods (2009-2023) only -- an
+#     claims per home = policies per home x claims per policy
+#     (hazard realized      (take-up:        (claim frequency
+#      per home in the       who insures)     conditional on
+#      housing stock)                         holding a policy)
+#
+# with payment conditional on a claim -- the intensive margin -- reported
+# separately in the claim-level damage tables above (`est_claim_es`,
+# `est_static`), which need no stock denominator. p(claim | policy) is also the
+# object `estimate-welfare.R` uses as its hazard rate, so this column says
+# directly whether the reform moved the number the cost-benefit rests on.
+#
+# All three outcomes are annual (see the `_yr` construction above), so the
+# decomposition holds in consistent units. Weights differ by column and cannot
+# be pooled into one fit: the per-home columns weight by homes_n (a handful of
+# cells have imputed stock well under 1 home -- thin county x period x mh
+# cells, mostly the already-flagged 1994 bin -- producing rates in the
+# thousands that would otherwise dominate an unweighted fit), while the claim
+# rate weights by policies_n, its own denominator, as the other cell-level
+# specs above do. Hence two feols calls, combined in one etable.
+#
+# Samples also differ: the per-home columns require a defined homes_n, the
+# claim rate requires policies_n > 0 (already imposed on dt_cell). Both are
+# pooled across all three policy periods (2009-2023) -- an
 # earliest-period-only (2009-2013) restriction was checked and dropped:
 # point estimates were extremely similar to the pooled column, so it added
 # a column without adding information. See notes/specs.md for the caveat
@@ -423,7 +476,7 @@ iplot(est_pois_es)
 dt_home_cell <- dt_cell[!is.na(homes_n) & homes_n > 0]
 
 fmla_home_ols <- as.formula(paste0(
-    "c(policies_per_1k_homes, claims_per_1k_homes)",
+    "c(policies_per_1k_homes_yr, claims_per_1k_homes_yr)",
     " ~ i(period_constr, mh, ref = ref_period)",
     " | geo^period_loss + mh + period_constr"
 ))
@@ -433,16 +486,72 @@ est_home_ols <- feols(
     weights = ~homes_n, lean = TRUE
 )
 etable(est_home_ols, fitstat = c("n", "r2", "my"))
-iplot(est_home_ols[lhs = "policies_per_1k_homes"])
+iplot(est_home_ols[lhs = "policies_per_1k_homes_yr"])
+
+# p(claim | policy): same FE structure and clustering, policies_n weights.
+# Estimated on dt_home_cell, not dt_cell: the claim rate needs no stock
+# denominator, but running it on the wider sample would make the three columns
+# of the table three different samples and break the decomposition identity
+# above. It matters most at the 1994 vintage bin, which holds construction
+# years 1994 and 1995 -- homes_n is undefined for 1994 (see impute-stock.R),
+# so on dt_home_cell that bin is construction year 1995 alone in every column
+# rather than in only the first two.
+est_claimrate_ols <- feols(
+    claim_rate ~ i(period_constr, mh, ref = ref_period) |
+        geo^period_loss + mh + period_constr,
+    data = dt_home_cell, cluster = ~geo, weights = ~policies_n
+)
+etable(est_claimrate_ols, fitstat = c("n", "r2", "my"))
+
+takeup_headers <- c(
+    "Policies per 1,000 homes",
+    "Claims per 1,000 homes",
+    "Claims per policy"
+)
+est_takeup_list <- list(
+    est_home_ols[lhs = "policies_per_1k_homes_yr"][[1]],
+    est_home_ols[lhs = "claims_per_1k_homes_yr"][[1]],
+    est_claimrate_ols
+)
 
 etable(
-    list(
-        "Policies per 1,000 homes" = est_home_ols[lhs = "policies_per_1k_homes"][[1]],
-        "Claims per 1,000 homes"   = est_home_ols[lhs = "claims_per_1k_homes"][[1]]
-    ),
-    digits = 2, digits.stats = 2, fitstat = c("n", "r2", "my"),
-    tex = TRUE, replace = TRUE,
+    est_takeup_list,
+    digits = 3, digits.stats = 2, fitstat = c("n", "r2", "my"),
+    tex = TRUE, replace = TRUE, depvar = FALSE,
+    headers = list("Annual rate" = takeup_headers),
     file = file.path(out_dir, "take-up.tex"))
+
+# Static counterpart: one post-1994 x MH coefficient per margin, same
+# samples/weights/clustering, collapsing the vintage profile the way
+# `est_static` does for the claim-level damage outcomes.
+fmla_home_static <- as.formula(paste0(
+    "c(policies_per_1k_homes_yr, claims_per_1k_homes_yr)",
+    " ~ post_mh | geo^period_loss + mh + post1994"
+))
+
+est_home_static <- feols(
+    fmla_home_static, data = dt_home_cell, cluster = ~geo,
+    weights = ~homes_n, lean = TRUE
+)
+
+est_claimrate_static <- feols(
+    claim_rate ~ post_mh | geo^period_loss + mh + post1994,
+    data = dt_home_cell, cluster = ~geo, weights = ~policies_n
+)
+
+est_takeup_static_list <- list(
+    est_home_static[lhs = "policies_per_1k_homes_yr"][[1]],
+    est_home_static[lhs = "claims_per_1k_homes_yr"][[1]],
+    est_claimrate_static
+)
+etable(est_takeup_static_list, fitstat = c("n", "r2", "my"))
+
+etable(
+    est_takeup_static_list,
+    digits = 3, digits.stats = 2, fitstat = c("n", "r2", "my"),
+    tex = TRUE, replace = TRUE, depvar = FALSE, se.below = FALSE,
+    headers = list("Annual rate" = takeup_headers),
+    file = file.path(out_dir, "take-up-static.tex"))
 
 # ---------------------------------------------------------------------------
 # covariate-controlled robustness: building damage ----
@@ -769,10 +878,57 @@ stc_net_cont <- extract_static(est_static, "net_contents_pmt")
 stc_bldg_shr <- extract_static(est_static, "building_damage_share")
 
 # take-up per housing-unit stock (Chunk E): OLS coefficients on the ratio
-# outcomes themselves, so these are LEVEL differences in policies (or
-# claims) per 1,000 homes, not log rate ratios
-eff_ppl_home <- extract_post_stats(est_home_ols, "policies_per_1k_homes", 1)
-eff_clm_home <- extract_post_stats(est_home_ols, "claims_per_1k_homes",   1)
+# outcomes themselves, so these are LEVEL differences in annual policies (or
+# claims) per 1,000 homes, not log rate ratios. Chunk I adds the third margin,
+# claims per policy-year, and static counterparts for all three.
+eff_ppl_home <- extract_post_stats(est_home_ols, "policies_per_1k_homes_yr", 1)
+eff_clm_home <- extract_post_stats(est_home_ols, "claims_per_1k_homes_yr",   1)
+
+# single-LHS fits, so coeftable() applies directly rather than via [lhs = ]
+extract_post_stats_single <- function(est_obj) {
+    ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    post <- ct[period >= 1994L, Estimate]
+    list(avg = mean(post), min = min(post), max = max(post))
+}
+extract_static_single <- function(est_obj) {
+    ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    list(est = ct$Estimate, se = ct[["Std. Error"]], t = ct[["t value"]])
+}
+
+eff_claim_rate <- extract_post_stats_single(est_claimrate_ols)
+stc_claim_rate <- extract_static_single(est_claimrate_static)
+stc_ppl_home   <- extract_static(est_home_static, "policies_per_1k_homes_yr")
+stc_clm_home   <- extract_static(est_home_static, "claims_per_1k_homes_yr")
+
+# Pre-1994 MH baselines for the three take-up margins, so the coefficients can
+# be read against the level they move from (the paper quotes them this way).
+base_ppl_home  <- dt_home_cell[
+    mh == 1L & period_constr < 1994L,
+    sum(policies_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
+base_clm_home  <- dt_home_cell[
+    mh == 1L & period_constr < 1994L,
+    sum(claims_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
+
+# Both sides of the policies-per-home difference-in-differences, in levels.
+# Needed because the coefficient (-5 per 1,000 homes per year) is larger in
+# magnitude than the MH pre-1994 level itself, which invites the reading that
+# MH take-up fell by more than it ever was. It did not: the site-built rate
+# rises steeply across the 1994 vintage boundary and the MH rate rises much
+# less, and the coefficient is that difference. Weighting the cell ratios by
+# homes_n makes each of these equal to the pooled ratio of summed policies to
+# summed home-years, so they are exactly the levels the fit differences.
+ppl_home_level <- function(is_mh, is_post) dt_home_cell[
+    mh == is_mh & (period_constr >= 1994L) == is_post,
+    sum(policies_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
+lvl_ppl_mh_pre  <- ppl_home_level(1L, FALSE)
+lvl_ppl_mh_post <- ppl_home_level(1L, TRUE)
+lvl_ppl_sb_pre  <- ppl_home_level(0L, FALSE)
+lvl_ppl_sb_post <- ppl_home_level(0L, TRUE)
+base_claim_rate <- dt_home_cell[
+    mh == 1L & period_constr < 1994L, sum(claims_n) / sum(policies_n)]
 
 fwrite(
     data.table(
@@ -798,10 +954,27 @@ fwrite(
             "net_contents_pmt_static_t",
             "building_damage_share_static", "building_damage_share_static_se",
             "building_damage_share_static_t",
-            "policies_per_1k_homes_avg", "policies_per_1k_homes_min",
-            "policies_per_1k_homes_max",
-            "claims_per_1k_homes_avg",   "claims_per_1k_homes_min",
-            "claims_per_1k_homes_max"
+            "policies_per_1k_homes_yr_avg", "policies_per_1k_homes_yr_min",
+            "policies_per_1k_homes_yr_max",
+            "claims_per_1k_homes_yr_avg",   "claims_per_1k_homes_yr_min",
+            "claims_per_1k_homes_yr_max",
+            "claim_rate_avg",             "claim_rate_min",
+            "claim_rate_max",
+            "policies_per_1k_homes_yr_static",
+            "policies_per_1k_homes_yr_static_se",
+            "policies_per_1k_homes_yr_static_t",
+            "claims_per_1k_homes_yr_static",
+            "claims_per_1k_homes_yr_static_se",
+            "claims_per_1k_homes_yr_static_t",
+            "claim_rate_static",          "claim_rate_static_se",
+            "claim_rate_static_t",
+            "policies_per_1k_homes_yr_base_mh",
+            "claims_per_1k_homes_yr_base_mh",
+            "claim_rate_base_mh",
+            "policies_per_1k_homes_yr_mh_pre",
+            "policies_per_1k_homes_yr_mh_post",
+            "policies_per_1k_homes_yr_sb_pre",
+            "policies_per_1k_homes_yr_sb_post"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -816,7 +989,14 @@ fwrite(
             stc_net_cont$est, stc_net_cont$se, stc_net_cont$t,
             stc_bldg_shr$est, stc_bldg_shr$se, stc_bldg_shr$t,
             eff_ppl_home$avg, eff_ppl_home$min, eff_ppl_home$max,
-            eff_clm_home$avg, eff_clm_home$min, eff_clm_home$max
+            eff_clm_home$avg, eff_clm_home$min, eff_clm_home$max,
+            eff_claim_rate$avg, eff_claim_rate$min, eff_claim_rate$max,
+            stc_ppl_home$est,   stc_ppl_home$se,   stc_ppl_home$t,
+            stc_clm_home$est,   stc_clm_home$se,   stc_clm_home$t,
+            stc_claim_rate$est, stc_claim_rate$se, stc_claim_rate$t,
+            base_ppl_home, base_clm_home, base_claim_rate,
+            lvl_ppl_mh_pre, lvl_ppl_mh_post,
+            lvl_ppl_sb_pre, lvl_ppl_sb_post
         )
     ),
     here("output", "results", "nfip-scalars.csv")

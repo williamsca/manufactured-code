@@ -4,6 +4,181 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk I — Vintage window 1984–1999, annualized take-up, and p(claim | policy) (2026-08-26)
+
+Branch `chunk-i-window-claim-rate`. Four requests: move the effect window to
+1984–1999, add p(claim | policy) to the take-up table, revisit the policy
+composition results, and begin on how much of the damage decline is
+composition versus technology. The last of these is Chunks J and K; this memo
+covers the first three plus several defects found on the way.
+
+### What changed
+
+**1. Window is 1984–1999.** `MIN_YEAR_CONSTR` moved 1983 → 1984 in
+`project-params.R`. Two reasons, both in the file's comment: with two-year bins
+anchored so 1992–1993 is the last pre-treatment bin, a 1983 start left one bin
+holding a single construction year, and 1984–1999 coincides exactly with the
+range over which the take-up denominator `homes_n` is defined (no source
+separates 1980–1983 inside the Census `1980_1989` bin; 1999 is the last vintage
+with a value). Colin's instruction was to stop at 1999, which removes the
+2000-bin question entirely and means no new stock imputation was needed.
+
+`databuild-nfip.R` had its own `year_min`/`year_max` literals; it now reads the
+parameters, so the panel grid and the estimation-time restriction cannot drift
+apart. Both `derived/nfip-claims.Rds` and `derived/nfip-balanced.Rds` were
+rebuilt against research-database (`NFIP_VERSION` v2026-08-15, unchanged):
+1,842,522 claims (25,798 MH), balanced panel 5,591,840 rows over 67,357 tracts
+and 16 construction years. Event-study coefficients per outcome are now 7, not
+8. `paper.Rmd` claimed "eleven" in two places; corrected to seven.
+
+**2. The per-home take-up outcomes were not rates.** `policies_n` counts policy
+*years* summed over the five calendar years of a `period_loss` bin, so
+`policies_per_1k_homes` and `claims_per_1k_homes` were five-year cumulative
+counts carrying a per-period label, and the appendix read them as rates. Both
+are now divided by `homes_n * N_YEARS_PERIOD` and renamed with a `_yr` suffix.
+Point estimates are the old ones ÷ 5. `N_YEARS_PERIOD = 5L` is asserted against
+the data rather than assumed: every retained `period_loss` bin must be exactly
+five years wide and the last must end at `MAX_YEAR_LOSS`.
+
+Relatedly, `paper.Rmd`'s panel description said each cell "reports the number of
+unique policies active at any time during the period." There is no policy
+identifier in the file and nothing counts distinct policies; the cell counts
+policy terms assigned to a calendar year by their coverage midpoint. Corrected,
+with the midpoint rule stated.
+
+**3. p(claim | policy) is now column (3).** `claim_rate` was already estimated
+and plotted (`est_pclaim_es`, `es-claim-rate.pdf`) but never tabled. Colin chose
+Table 6 column 3 with all columns annualized, which makes the three columns an
+exact decomposition:
+
+    claims/home = policies/home × claims/policy
+
+To keep that identity from being broken by a sample difference, the claim-rate
+fits run on `dt_home_cell` (the `homes_n > 0` subsample) rather than the wider
+`dt_cell`, so all three columns use the same 73,487 cells. This matters at the
+1994 bin, which spans construction years 1994–1995: `homes_n` is undefined for
+1994, so on the common sample that bin is construction year 1995 alone in every
+column. Weights still differ by column (`homes_n` for (1)–(2), `policies_n` for
+(3)) and cannot be pooled into one fit, so the table is two `feols` calls
+combined in one `etable`; `depvar = FALSE` suppresses the list names, so column
+headers come from `headers`.
+
+A static counterpart, `tab:take-up-static`, was added, matching §2's convention
+of quoting the single `post_mh` coefficient as the headline.
+
+**Result on the margin that matters: claim frequency is flat.** Static +0.64
+claims per 1,000 policy-years (SE 0.65) against a pre-1994 MH rate of 14.7, and
+no vintage bin is individually significant. Claims per 1,000 homes per year is
+also indistinguishable from zero (+0.018, SE 0.040, baseline 0.095). Since
+`estimate-welfare.R` uses exactly this hazard rate, the cost-benefit's
+assumption of a constant claim rate now has direct support, and the whole of the
+estimated benefit comes from severity rather than frequency. This is stated in
+§6.1 as well as the appendix.
+
+**4. Four cell-level fits reported IID standard errors.** `est_pclaim_es`,
+`est_comp_post`, `est_share_es` and `est_pois_es` passed no `cluster` argument,
+so `fixest` defaulted to IID — while both `paper.Rmd`'s notes for Tables 3 and 4
+and `notes/specs.md` §3 stated the SEs were clustered. This is the same defect
+Chunk C1 fixed on the claim-level side; the cell side was missed then. Now
+`cluster = ~geo`. SEs widen materially and several previously-significant
+post-1994 composition coefficients no longer clear conventional levels, which
+forced the next item.
+
+**5. "Selection and Composition" was rewritten.** The old text asserted that
+post-1994 MH policies have higher replacement cost ($20–30k), higher building
+coverage ($8–15k) *and* higher contents coverage ($1–2k), and read the damage
+estimates as a lower bound on that basis. The table does not show that. What it
+shows, and what the section now says:
+
+- The large coefficients are *pre-1994*: MH building coverage is much lower and
+  contents coverage modestly higher for mid-1980s vintages relative to the
+  1992–1993 reference, shrinking to roughly a quarter of that size by 1990–1991.
+  These movements are complete before treatment, so they cannot be an effect of
+  the reform, but they do mean the coverage columns have non-flat pre-trends,
+  and the section says so rather than claiming flatness the table contradicts.
+- The *post-1994* coverage shifts are small and mostly insignificant, and
+  opposite in sign to the mid-1980s gaps.
+- The one clean post-1994 shift is location: SFHA share rises monotonically and
+  significantly across all three post bins.
+
+The direction-of-bias argument survives but now rests on SFHA concentration and
+the modest coverage increases rather than on the coverage claims that did not
+hold. The intro's "comprise a lower bound on the true treatment effect"
+sentence is replaced with the weaker and accurate "run against the estimated
+damage reductions rather than producing them," and the section says explicitly
+that it is not offering a quantitative bound. The table notes also described
+`Primary res.` and `Mandatory` columns that are commented out of the outcome
+list and have not appeared in the table for some time.
+
+**6. Take-up column (1) is an artifact and is now labelled as one.** Its static
+coefficient is −4.9 annual policies per 1,000 homes against a pre-1994 MH level
+of 6.4, and the 1994–1995 bin is −35.5 — a decline larger than the level, which
+is impossible as stated. It is not a decline. MH take-up *rises* across the
+vintage boundary, 6.4 → 10.2 annual policies per 1,000 homes; site-built rises
+28.3 → 47.0; the coefficient is the difference net of the county × period fixed
+effects. Four new level scalars
+(`policies_per_1k_homes_yr_{mh,sb}_{pre,post}`) let the appendix quote all four
+levels so the coefficient cannot be misread.
+
+The site-built jump lands exactly at the 1994/1995 vintage boundary and is
+common to both housing types, which does not look like construction quality.
+The candidate explanation offered in the paper is the National Flood Insurance
+Reform Act of 1994: homes built from 1995 on were first financed under
+strengthened mandatory-purchase enforcement, and chattel-financed MH are
+largely outside federally related lending — which the paper already argues in
+§3.2 as the reason MH take-up is low overall. Under that reading column (1)
+measures differential exposure to a contemporaneous mandate, not a demand
+response to the HUD standard, and it is not evidence on self-protection
+crowding out insurance. **This is asserted as a candidate explanation, not
+tested** — see open questions.
+
+### Verified
+
+- `make test` passes (`mhs-price-did`, `nfip-claims-es`, `take-up-imputation`,
+  `welfare-arithmetic`).
+- Full chain rerun in dependency order against the rebuilt panel:
+  `databuild-nfip.R` → `databuild-welfare.R` → `estimate-nfip.R` →
+  `estimate-welfare.R` → `estimate-sumstats-nfip.R` → `plot-nfip.R`, then
+  `paper.Rmd`. No errors; `paper.pdf` renders with no unresolved references.
+- The import layer ran for real this time. Earlier chunks could not run
+  `databuild-nfip.R` (no `$DATA_PATH`); the research-database parquet cache is
+  available in this sandbox, so §12's standing "not covered by this chunk" note
+  about the real `databuild-nfip.R` run is now closed for the NFIP path.
+- Decomposition identity checked in units: with all three outcomes annual and
+  estimated on the same 73,487 cells, columns (1)–(3) are consistent.
+- Take-up levels cross-checked outside the regression: the `homes_n`-weighted
+  mean of cell ratios equals the pooled ratio of summed policies to summed
+  home-years, so the four quoted levels are exactly the quantities the fit
+  differences.
+
+### Open questions for Colin
+
+1. **NFIRA 1994 is asserted, not tested.** Separating it from other differences
+   specific to 1995+ vintages needs mortgage-origination timing or variation in
+   the mandatory-purchase flag — which is in the policy file but commented out
+   of the composition spec. If column (1) stays in the paper it deserves a
+   paragraph of evidence rather than a plausible story. Alternatively, drop
+   column (1) and present only the two margins that are interpretable.
+2. **`estimate-welfare.R` takes its deltas from the event-study average while
+   the paper's headline is the static estimate.** Pre-existing and unchanged
+   here, but now conspicuous: the abstract quotes $4.11k for building damage
+   (static) while the cost-benefit applies $4.88k (event-study average).
+   Contents runs the other way ($2.77k event-study, $4.07k static), so
+   switching to static deltas throughout would raise the BCR from ~0.52 to
+   ~0.56, not lower it. Same class of decision as Chunk C's open
+   compliance-cost question; they should be settled together.
+3. **The pre-1994 coverage trends are a real weakness, not just a text fix.**
+   The rewritten section is honest about them, but "the pre-trends are not flat
+   for coverage" invites the question of whether they are flat for damage
+   because of power rather than because of parallel vintages. Chunk J's
+   single-family restriction is the first thing to try, since the diagnostic
+   behind the rewrite traced most of the 1980s coverage gap to a tail of
+   multi-family and commercial policies in the site-built comparison group.
+4. **`databuild-welfare.R`'s `1980_1989` Census bin now pairs with 1984–1989
+   policies** rather than 1983–1989. Pre-existing mismatch between the Census
+   vintage bin and the policy window, slightly changed by the new start year;
+   not addressed here.
+
 ## Geographic coverage safeguards, and closing a second silent leak (2026-08-24)
 
 Follow-up to the CT incident below, per Colin's request: turn the specific

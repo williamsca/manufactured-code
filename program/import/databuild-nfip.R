@@ -22,9 +22,11 @@ source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
 source(here("program", "import", "geo-coverage-checks.R"))
 
-# vintage filtering
-year_min <- 1983L
-year_max <- 1999L
+# vintage filtering: read from project-params.R rather than restated here, so
+# the panel grid and the estimation-time restriction in estimate-nfip.R cannot
+# drift apart (they were separate literals until Chunk I)
+year_min <- MIN_YEAR_CONSTR
+year_max <- MAX_YEAR_CONSTR
 
 dt_cpi <- fread(here("derived", "cpi-bls.csv"))
 dt_cpi <- dt_cpi[, .(cpi = mean(cpi)), by = year]

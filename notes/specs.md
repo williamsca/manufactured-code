@@ -25,13 +25,26 @@ Last verified: 2026-08-13, against commit at the top of `notes/LOG.md` (Chunk E)
   Chunk C1 — was `1L`, i.e. annual bins, contradicting `paper.Rmd`'s
   claim of two-year binning)
 - **Data:** `derived/nfip-claims.Rds`, restricted to
-  `year_constr` in [1983, 1999] and `year_loss` in [1994, 2023]
+  `year_constr` in [1984, 1999] and `year_loss` in [1994, 2023]
   (`MIN_YEAR_CONSTR`/`MAX_YEAR_CONSTR`/`MIN_YEAR_LOSS`/`MAX_YEAR_LOSS` in
   `program/import/project-params.R`; `MIN_YEAR_CONSTR` extended from 1988
   to 1983 in Chunk C1 to buy a longer pre-period for the parallel-trends
-  check — `MAX_YEAR_CONSTR` extension is an open question, not decided);
-  rows with negative net payments after recoveries are dropped so the OLS
+  check, then moved 1983 → 1984 in Chunk I, which closes the
+  `MAX_YEAR_CONSTR` open question at 1999). Two reasons for 1984–1999:
+  with two-year bins anchored so 1992–1993 is the last pre-treatment bin,
+  1984 makes every bin hold two full construction years (the 1983 start
+  left a bin holding one year), and the window then coincides exactly
+  with the range over which the take-up denominator `homes_n` is defined
+  (§12) — no vintage in the panel lacks a stock denominator for a reason
+  other than the deliberately dropped 1994. Vintage filtering now lives
+  only in `project-params.R`: `databuild-nfip.R` reads
+  `MIN_YEAR_CONSTR`/`MAX_YEAR_CONSTR` rather than restating literals, so
+  the panel grid and the estimation-time restriction cannot drift apart.
+  Rows with negative net payments after recoveries are dropped so the OLS
   and Poisson estimators share a sample (`dt_claims_est`).
+- **Event-study coefficients:** 7 per outcome (bins 1984, 1986, 1988,
+  1990, 1994, 1996, 1998; 1992 is the reference). Was 8 under the 1983
+  start. `paper.Rmd` states this count in two places.
 - **Spec:** `c(building_damage, net_building_pmt, ...) ~ i(period_constr, mh, ref = 1992) | geo^year_loss + mh + period_constr`,
   where `geo = countyfp`, `period_constr` is the construction-vintage bin
   (two-year, `BIN_CONSTR_YEAR = 2`, ref bin 1992-1993 — see script header
@@ -93,11 +106,27 @@ Last verified: 2026-08-13, against commit at the top of `notes/LOG.md` (Chunk E)
     since the take-up PPML models the policy count itself.
 - **Spec (take-up, PPML):** `c(policies_n, claims_n) ~ i(period_constr, mh, ref = 1993) | geo^period_loss + mh + period_constr`
 - **Spec (policy composition, OLS):** `c(repl_cost_ppol, ...) ~ i(period_constr, mh, ref = 1993) | geo^period_loss + mh + period_constr`
+  Five outcomes are reported (replacement cost, building coverage, contents
+  coverage, elevated share, SFHA share); `primary_res_share` and
+  `mandatory_purchase_share` are commented out of the outcome list, and
+  Chunk I removed them from the Table 3 notes, which still described them.
 - **Weights:** cell-level OLS specs (composition, MH-share, claim-rate) are
   weighted by `policies_n`; the take-up PPML is unweighted (counts model)
-- **Clustering:** none (IID)
+- **Clustering: by county (`geo`)**, fixed in Chunk I (2026-08-26).
+  Previously no `cluster` argument was passed to the four cell-level fits
+  (`est_pclaim_es`, `est_comp_post`, `est_share_es`, `est_pois_es`), so
+  `fixest` reported IID SEs — while `paper.Rmd`'s notes for Tables 3 and 4
+  and this spec sheet's own §3 both claimed clustering. The claim-level
+  specs in §2 had already been fixed in Chunk C1; this closes the same bug
+  on the cell side. SEs widen materially: the pre-1994 building-coverage
+  coefficients keep their signs and significance, but several
+  previously-significant post-1994 composition coefficients are no longer
+  distinguishable from zero, which is what forced the rewrite of the
+  paper's Selection and Composition section in Chunk I.
 - **Outputs:** `output/event-study/countyfp/take-up.tex` (Table
-  `tab:take-up`, appendix), `output/event-study/countyfp/policy-composition.tex`
+  `tab:take-up`, appendix), `output/event-study/countyfp/take-up-static.tex`
+  (Table `tab:take-up-static`, appendix, new in Chunk I),
+  `output/event-study/countyfp/policy-composition.tex`
   (Table `tab:composition`)
 - **Fixed (Chunk E, 2026-08-13):** `policies_ppermit` (policies ÷
   single-family building permits) was the wrong take-up denominator —
@@ -489,24 +518,82 @@ Replaces `policies_ppermit` (§3's old "known issue") throughout.
   insurability margin, this section) vs. payment conditional on a claim
   (the existing damage-outcome tables/`est_claim_es`, intensive margin, no
   stock denominator needed) — different welfare interpretations per the
-  review notes.
-- **Result:** pooled post-1994 average coefficient (across the 1994, 1996,
-  1998 `period_constr` bins) is -126.6 policies and -0.11 claims per 1,000
-  homes, relative to site-built homes of the same vintage — small, and
-  largely driven by the volatile 1994 bin (built from the single,
-  ambiguous 1994 construction year rather than a full two-year bin; see
-  the stock-imputation note above); the 1996/1998 coefficients are small
-  and closer to zero. Read as no clear extensive-margin take-up/
-  claim-frequency shift, in contrast to the earlier PPML-offset version of
-  this table (log rate ratios ≈ +7%/+22%) — the sign/magnitude are NOT
-  robust to the OLS-vs-PPML choice, and this OLS version is what is
-  currently in the paper.
+  review notes. Chunk I splits the first of these in two; see §12.1.
+- **Result (as of Chunk E; superseded by §12.1):** pooled post-1994 average
+  coefficient (across the 1994, 1996, 1998 `period_constr` bins) is -126.6
+  policies and -0.11 claims per 1,000 homes over a five-year period,
+  relative to site-built homes of the same vintage — largely driven by the
+  volatile 1994 bin; the 1996/1998 coefficients are small and closer to
+  zero. Read as no clear extensive-margin take-up/claim-frequency shift, in
+  contrast to the earlier PPML-offset version of this table (log rate
+  ratios ≈ +7%/+22%) — the sign/magnitude are NOT robust to the
+  OLS-vs-PPML choice, and this OLS version is what is currently in the
+  paper.
 - **Outputs:** `derived/stock-county-vintage.Rds`,
   `output/event-study/countyfp/take-up.tex` (Table `tab:take-up`, retitled
-  "NFIP Take-Up per Housing-Unit Stock," 2 columns: policies and claims per
-  1,000 homes, pooled sample only), `policies_per_1k_homes_{avg,min,max}`
-  / `claims_per_1k_homes_{avg,min,max}` rows (level differences, not log
-  rate ratios) in `output/results/nfip-scalars.csv`.
+  "NFIP Take-Up per Housing-Unit Stock"), and take-up rows in
+  `output/results/nfip-scalars.csv` (renamed in Chunk I, see §12.1).
+
+### 12.1 Annualization, third margin, and static column (Chunk I, 2026-08-26)
+
+- **Annualized outcomes.** `policies_per_1k_homes` and
+  `claims_per_1k_homes` divided `policies_n`/`claims_n` by `homes_n` only.
+  Because `policies_n` counts policy-**years** summed over the five
+  calendar years of a `period_loss` bin, those outcomes were five-year
+  cumulative counts carrying a per-period label — the paper called them
+  rates. Both are now divided by `homes_n * N_YEARS_PERIOD` and renamed
+  with a `_yr` suffix: `policies_per_1k_homes_yr`,
+  `claims_per_1k_homes_yr`. Point estimates are the old ones ÷ 5.
+  `N_YEARS_PERIOD = 5L` is asserted against the data (every retained
+  `period_loss` bin is exactly five years wide and the last one ends at
+  `MAX_YEAR_LOSS`), since the annualization divides by it.
+- **Third margin: `claim_rate`** (claims per policy-year) added as column
+  (3) of Tables `tab:take-up`/`tab:take-up-static` (`est_claimrate_ols`,
+  `est_claimrate_static`). It was already estimated and plotted
+  (`est_pclaim_es`, `es-claim-rate.pdf`) but never tabled. With all three
+  outcomes annual, the columns satisfy
+  `claims/home = policies/home × claims/policy` in consistent units.
+  Weights differ by column (`homes_n` for (1)-(2), `policies_n` for (3)),
+  so the table is two `feols` calls combined in one `etable`; column
+  headers are set via `headers`, not the list names, since `depvar = FALSE`
+  suppresses those.
+- **Common sample.** `est_claimrate_*` is estimated on `dt_home_cell`
+  (`!is.na(homes_n) & homes_n > 0`), not the wider `dt_cell`, so all three
+  columns use the same 73,487 cells and the identity above is not broken by
+  a sample difference. This matters at the 1994 vintage bin, which spans
+  construction years 1994-1995: `homes_n` is undefined for 1994, so on
+  `dt_home_cell` that bin is construction year 1995 alone in every column.
+  The paper says so; earlier text called 1995 "a single, ambiguous
+  construction year," conflating it with the 1994 year that was dropped
+  *because* it is ambiguous.
+- **Static column.** `est_home_static` / `est_claimrate_static`:
+  `~ post_mh | geo^period_loss + mh + post1994`, same samples, weights and
+  clustering, written to
+  `output/event-study/countyfp/take-up-static.tex` (Table
+  `tab:take-up-static`). The paper now quotes the static estimate as the
+  headline for each margin, matching §2's choice for the damage outcomes.
+- **Scalars.** Renamed `policies_per_1k_homes_*` →
+  `policies_per_1k_homes_yr_*`, `claims_per_1k_homes_*` →
+  `claims_per_1k_homes_yr_*`. Added `claim_rate_{avg,min,max}`,
+  `*_static`/`*_static_se`/`*_static_t` for all three margins, pre-1994 MH
+  baselines `*_base_mh` for all three, and the four levels
+  `policies_per_1k_homes_yr_{mh,sb}_{pre,post}`.
+- **Why those four levels.** Column (1)'s static coefficient (-4.9 annual
+  policies per 1,000 homes) is larger in magnitude than the pre-1994 MH
+  level itself (6.4), which invites the reading that MH take-up fell by
+  more than it ever was. It did not: MH take-up rises 6.4 → 10.2 across the
+  1994 boundary while site-built rises 28.3 → 47.0, and the coefficient is
+  the difference net of the county × period FE. The site-built jump lands
+  exactly at the 1994/1995 vintage boundary for both housing types, which
+  points at the National Flood Insurance Reform Act of 1994 (stronger
+  mandatory-purchase enforcement on federally related mortgages, which
+  chattel-financed MH are largely outside of) rather than at the HUD wind
+  standard. The paper states this as a candidate explanation and declines
+  to read column (1) as a treatment effect; column (3), which is flat, is
+  the one the cost-benefit calculation depends on. **Not tested directly**
+  — separating NFIRA from other 1995+ vintage differences would need
+  mortgage-origination or mandatory-purchase-flag variation and is an open
+  item.
 - **Caveat, in the paper (`paper.Rmd` appendix), not just here:** `homes_n`
   is fixed as of the 2000 Census; the policy periods run 2009-2023, 9-23
   years later, so differential attrition of the pre-/post-1994 MH stock
