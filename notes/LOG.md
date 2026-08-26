@@ -4,6 +4,154 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk K — Water-depth robustness for building damage (2026-08-26)
+
+Branch `chunk-k-water-depth-robustness`, off `main` (post Chunk J). Colin's
+request: pick up the first bullet of `TODO.md`'s Chunk K — "non-parametric
+water-depth controls and depth-bin × MH interactions, plus a damage-function
+figure. Handle the post-1994 rise in MH water-depth missingness" — as a new
+appendix table, columns (1) baseline, (2) + water depth, (3) another spec.
+The single-family-restriction bullet under the same TODO heading was already
+done in the Chunk J session; the trim/winsorize bullet is untouched.
+
+### What changed
+
+`estimate-nfip.R` (`program/estimate/estimate-nfip.R`):
+
+1. **`water_depth_bin`:** six non-parametric bins on `water_depth` — below
+   the lowest floor; 0-1, 1-2, 2-4, 4-8 ft above it; 8+ ft — plus an
+   explicit `"Missing"` bin, built on `dt_claims` so it is available
+   everywhere `dt_claims_est` is used. The top bin also catches a data
+   quality issue found while designing the bins: a sharp spike of 1,576
+   claims at exactly `water_depth == 99`, ~50x the count at neighboring
+   values and physically implausible as a real flood depth — almost
+   certainly a top-coded sentinel in the source field. Binning rather than
+   using water depth linearly means this doesn't need a separate decision;
+   it just lands in the top bin with the other severe/extreme readings.
+2. **Missingness diagnostic (`dt_wd_miss`):** the rate is highest, and
+   rises the most across the reform, for MH: 12.9% (pre-1994 MH) → 14.0%
+   (post-1994 MH) vs. 9.8% → 10.0% for site-built. This is the cell the
+   composition concern in "Selection and Composition" is about, which is
+   why a linear control (which would listwise-delete these rows) was
+   rejected in favor of the bin approach.
+3. **Rewrote `fmla_rob_a`-`d` as `fmla_rob_a`-`c`, and switched from event
+   study to static.** The old three-column-plus-baseline event-study table
+   (`i(period_constr, mh, ref = ...) | geo^period_loss + mh`, optionally `+
+   water_depth + elevated + sfha`, optionally tract FE) had three
+   independent problems, none caught before because the table was never
+   wired into `paper.Rmd`: it used `period_loss` where the main spec uses
+   `year_loss`, it was missing the `period_constr`/`post1994` FE entirely
+   (the bug Chunk B flagged and assigned to whoever next touched this
+   table), and `fmla_rob_b`'s formula had a literal duplicated
+   `water_depth` term (`water_depth + elevated + sfha + water_depth`).
+   Replaced with a static `post_mh` spec matching `fmla_static` exactly —
+   `building_damage ~ post_mh | geo^year_loss + mh + post1994` — so column
+   (1) is not just similar to but bit-identical to the headline
+   `building_damage_static` (both estimate to -5.5567272527661, SE
+   1.46084170890248; verified by comparing the two scalars after a run,
+   not just eyeballing rounded table output). Column (2) adds
+   `water_depth_bin` as a fixed effect (non-parametric, absorbs the
+   average damage level in each bin). Column (3) additionally adds
+   `i(water_depth_bin, mh, ref = "[0,1) ft")`, letting the damage-depth
+   relationship itself differ by housing type, identifying `post_mh` off
+   within-depth-bin, within-housing-type variation alone. A `stopifnot` on
+   `nobs()` asserts N is identical across all three columns — true by
+   construction once "Missing" is its own bin rather than a dropped value,
+   and a cheap check that the bin approach is doing what it claims.
+   Retired the tract-FE columns (already covered by `fmla_geo_rob`/
+   `tab:geo-robustness`, separately still commented out pending Colin's
+   review — untouched here). `est_geo_rob` still has the
+   `period_constr`/`year_loss` issue Chunk B flagged; out of scope since
+   this chunk only touched `fmla_rob_a`-`c`.
+4. **Table output.** `etable(..., keep_raw = "post_mh", headers =
+   names(est_rob_list))` — `keep_raw` (not `keep`) because `post_mh` has a
+   dictionary entry, and fixest's `keep` matches pre-dictionary names by
+   default; `headers = names(est_rob_list)` because a named list's names
+   are NOT used as column headers in `etable`'s `tex = TRUE` mode by
+   default (they are in the console-print default), which needed a quick
+   throwaway check against a toy `fixest` example to confirm before relying
+   on it. Output path unchanged (`output/event-study/countyfp/robustness.tex`)
+   since nothing else referenced it.
+5. **Damage-function figure.** Replaced the old `plot_es_multi(est_rob_list,
+   ...)` call (which required the event-study coefficient shape the
+   rewritten `est_rob_list` no longer has) with a new plot: raw mean
+   `building_damage` by `water_depth_bin` × `mh` (excluding `"Missing"`,
+   which has no position on a depth axis), with 95% CIs from the
+   within-cell standard deviation. Depth-ordered on the x-axis (`<0 ft` →
+   `>=8 ft`) — note this is a *different* factor level order than the
+   regression's reference-level ordering (`"[0,1) ft"` first, for the
+   `i()` reference), so the plotting code re-levels a copy rather than
+   reusing the regression's factor. Output:
+   `output/event-study/countyfp/damage-function.pdf`.
+6. **New scalars in `nfip-scalars.csv`:** the four missingness rates and
+   the three columns' `post_mh` estimate/SE
+   (`building_damage_static_rob_{base,depth,depthx}[_se]`).
+7. **Dictionary additions:** `post1994` → "Post-1994", `water_depth_bin` →
+   "Water depth bin". These are used by every table with a `post1994` FE,
+   not just this one, so `claims-outcomes-static.tex` and
+   `take-up-static.tex`'s FE-row label changed from the raw `post1994` to
+   "Post-1994" as a side effect — cosmetic only, no point estimates
+   touched (diffed both files to confirm).
+
+`paper.Rmd`: new appendix section `# Water Depth and the Damage Function
+{#appendix-water-depth}`, placed after the take-up appendix's caveat
+subsection and before "Price Effects by Home Size" (benefit-side material
+grouped with benefit-side material, ahead of the cost-side appendices). New
+Table `tab:water-depth-robustness` and Figure `fig:damage-function`. A new
+paragraph in "Selection and Composition" (main text) flags the depth-based
+version of the composition concern and points to the appendix rather than
+arguing it in place, matching how the take-up appendix is referenced
+elsewhere in that section.
+
+### Result
+
+The static building-damage effect is stable across all three columns:
+**baseline -$5,557 (SE $1,461) → +water-depth-bins -$4,951 (SE $1,321) →
++depth-bins×MH -$5,071 (SE $1,314)**. All three significant at 1%. The
+damage-function figure shows why the interaction column barely moves the
+estimate: damage rises with water depth for both housing types (as
+expected), but visibly more steeply for site-built than for manufactured
+homes — a level and slope difference the depth-bin×MH interaction absorbs,
+without disturbing the treatment estimate. Read together with "Selection
+and Composition"'s existing findings (composition, where it moves at all,
+moves in a direction that works against the result), this closes the most
+obvious remaining channel by which the building-damage estimate could be a
+composition artifact rather than a construction-quality effect: it is not
+explained by manufactured and site-built homes being flooded to
+systematically different depths.
+
+### Verified
+
+`make estimates` (just `estimate-nfip.R`, standalone) runs clean, no
+errors, no new `fixest` warnings beyond the pre-existing ones (singleton FE
+removal, LHS-NA removal on `building_damage_share`, both present before
+this chunk). `make test` passes (fake-data harness is independent of this
+change — it does not touch `impute-stock.R`, take-up, or the claims
+event-study spec this chunk didn't modify). `make paper.pdf` builds clean
+from a fresh render; spot-checked the rendered PDF text for the new
+section, table, and figure and confirmed the two prose numbers that quote
+the baseline column ($5,557/$1,461) match the existing headline exactly.
+
+### Open questions
+
+- The TODO bullet's stated missingness figure was "rises to 16%"; the
+  actual computed rate on the current (post-Chunk-J single-family-restricted)
+  sample is 14.0% for post-1994 MH. Reported the measured number in the
+  paper rather than chasing the discrepancy — plausibly the TODO figure
+  predates Chunk J's occupancy restriction, which changed the claims sample
+  composition, but this isn't confirmed.
+- Whether the ≥99 ft spike is truly a sentinel (vs. a small number of real
+  extreme floods) is not confirmed against FEMA's data dictionary; the bin
+  design sidesteps needing to decide, but a reviewer asking directly "what
+  is water_depth == 99?" would not be answered by anything in this chunk.
+- `est_geo_rob`/`tab:geo-robustness` still carries the FE bug Chunk B
+  flagged in 2026-08-12 and assigned to "whichever chunk writes up that
+  section." This chunk fixed the water-depth table's copy of the same bug
+  but left the geography table's copy alone, since it's a separate,
+  still-commented-out table outside this chunk's scope.
+- The remaining Chunk K/F bullet (winsorize/trim `building_value` for the
+  `building_damage_share` outcome) is untouched.
+
 ## Chunk J — Single-family occupancy restriction and policy-level composition table (2026-08-26)
 
 Branch `chunk-j-policy-composition`, off `chunk-i-window-claim-rate`. Colin's

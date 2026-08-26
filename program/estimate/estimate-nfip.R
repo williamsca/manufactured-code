@@ -75,6 +75,8 @@ v_dict <- c(
     "elevated_share" = "Elevated",
     "sfha_share" = "SFHA",
     "water_depth" = "Water depth (ft)",
+    "water_depth_bin" = "Water depth bin",
+    "post1994" = "Post-1994",
     "elevated" = "Elevated",
     "sfha" = "SFHA",
     "primary_res_share" = "Primary res.",
@@ -292,6 +294,31 @@ dt_claims[, log_repl_cost := fifelse(
     !is.na(building_repl_cost) & building_repl_cost > 0,
     log(building_repl_cost), NA_real_)]
 dt_claims[, occupancy_type := factor(occupancy_type)]
+
+# Water-depth bins (Chunk K): a non-parametric control for flood severity,
+# used in place of the linear `water_depth` control so the ~10-14% of claims
+# with no recorded depth (higher, and rising, for post-1994 MH -- see the
+# missingness rates exported below) enter their own bin instead of being
+# dropped by listwise deletion on a continuous covariate. The top bin also
+# absorbs a small number of physically implausible depths (a spike exactly at
+# 99 ft, well above any plausible flood, consistent with a top-coded sentinel
+# in the source field) without requiring a judgment call about which values
+# are real.
+wd_breaks <- c(-Inf, 0, 1, 2, 4, 8, Inf)
+wd_labels <- c("<0 ft", "[0,1) ft", "[1,2) ft", "[2,4) ft", "[4,8) ft", ">=8 ft")
+dt_claims[, water_depth_bin := as.character(
+    cut(water_depth, breaks = wd_breaks, labels = wd_labels, right = FALSE))]
+dt_claims[is.na(water_depth_bin), water_depth_bin := "Missing"]
+dt_claims[, water_depth_bin := factor(
+    water_depth_bin, levels = c("[0,1) ft", wd_labels[wd_labels != "[0,1) ft"], "Missing"))]
+
+# Missingness diagnostic (text/notes, not part of any regression): the rate
+# is highest, and rises most, for post-1994 MH -- the cell the composition
+# concern is about -- which is why the bin approach above retains these rows
+# rather than dropping them.
+dt_wd_miss <- dt_claims[, .(
+    water_depth_missing_rate = mean(is.na(water_depth))
+), by = .(mh, post1994)]
 
 v_shares_contents <- c("contents_damage", "net_contents_pmt")
 v_shares_contents_names <- paste0(v_shares_contents, "_share")
@@ -664,42 +691,47 @@ etable(
     file = file.path(out_dir, "take-up-static.tex"))
 
 # ---------------------------------------------------------------------------
-# covariate-controlled robustness: building damage ----
+# water-depth robustness: building damage (Chunk K) ----
 # ---------------------------------------------------------------------------
-# Progressively add covariates to assess whether composition changes in the
-# insured pool drive the main result. Using building_damage (not net payment)
-# to avoid any confounding from deductible changes across vintages.
-# FEs vary with agg_geo so the full script runs at a consistent geography.
+# Does the post_mh building-damage effect survive controlling for water
+# depth -- the flood-severity dimension underlying the composition concern
+# of "Selection and Composition" -- and does the damage-depth relationship
+# itself differ by housing type? Static post_mh spec (matching fmla_static's
+# sample and FE structure below, not yet defined at this point in the script
+# but built the same way) rather than the event study, so the covariate
+# comparison is one coefficient per column rather than a curve per column.
+# Depth enters as the non-parametric `water_depth_bin` fixed effect
+# constructed above (not a linear control), with an explicit "Missing" bin,
+# so N is identical across all three columns -- asserted below -- unlike a
+# linear control, which would listwise-delete the ~10-14% of claims with no
+# recorded depth.
+fmla_rob_a <- building_damage ~ post_mh |
+    geo^year_loss + mh + post1994
 
-fmla_rob_a <- building_damage ~
-    i(period_constr, mh, ref = ref_period) |
-    geo^period_loss + mh
+fmla_rob_b <- building_damage ~ post_mh |
+    geo^year_loss + mh + post1994 + water_depth_bin
 
-fmla_rob_b <- building_damage ~
-    i(period_constr, mh, ref = ref_period) +
-    water_depth + elevated + sfha + water_depth |
-    geo^period_loss + mh
-
-fmla_rob_c <- building_damage ~
-    i(period_constr, mh, ref = ref_period) |
-    tractfp^period_loss + mh
-
-fmla_rob_d <- building_damage ~
-    i(period_constr, mh, ref = ref_period) +
-    water_depth + elevated + sfha  |
-    tractfp^period_loss + mh
+# Depth-bin x MH: lets the damage-depth relationship itself differ by
+# housing type (on top of the common depth-bin effect already absorbed by
+# the FE in fmla_rob_b), so post_mh in this column is identified off
+# within-depth-bin, within-housing-type variation alone.
+fmla_rob_c <- building_damage ~ post_mh +
+    i(water_depth_bin, mh, ref = "[0,1) ft") |
+    geo^year_loss + mh + post1994 + water_depth_bin
 
 est_rob_list <- list(
-    "Baseline"          = feols(fmla_rob_a, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
-    "+ Controls"     = feols(fmla_rob_b, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
-    "+ Tract FE"  = feols(fmla_rob_c, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
-    "+ Controls + Tract FE"    = feols(fmla_rob_d, data = dt_claims_est, lean = TRUE, cluster = ~countyfp)
+    "Baseline"                   = feols(fmla_rob_a, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
+    "+ Water depth"              = feols(fmla_rob_b, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
+    "+ Water depth $\\times$ MH" = feols(fmla_rob_c, data = dt_claims_est, lean = TRUE, cluster = ~countyfp)
 )
+
+stopifnot(length(unique(vapply(est_rob_list, nobs, numeric(1)))) == 1L)
 
 etable(est_rob_list, tex = TRUE,
     file = here("output", "event-study", agg_geo, "robustness.tex"),
-    fitstat = c("n", "r2"), digits = 2, digits.stats = 2, replace = TRUE,
-    depvar = FALSE)
+    keep_raw = "post_mh", fitstat = c("n", "r2", "my"),
+    digits = 2, digits.stats = 2, replace = TRUE,
+    depvar = FALSE, headers = names(est_rob_list))
 
 # geographic robustness: state vs. county vs. tract FEs ----
 # County is the baseline geography for the main results (see fmla_claim_es
@@ -924,9 +956,42 @@ plot_es_multi <- function(est_list, vline_x = 1992.5, path = NULL,
     p
 }
 
-plot_es_multi(
-    est_rob_list,
-    path = file.path(out_dir, "es-building-damage-robust.pdf"))
+# Damage function (Chunk K): raw mean building damage by water-depth bin,
+# by housing type, on the same estimation sample as the water-depth
+# robustness table above. "Missing" is excluded here since it has no
+# position on a depth axis; its rate is reported in the table notes/text
+# instead. A housing-type gap that widens or narrows across depth bins is
+# exactly what fmla_rob_c's depth-bin x MH interaction tests for.
+dt_dmgfn <- dt_claims_est[
+    water_depth_bin != "Missing",
+    .(mean_damage = mean(building_damage, na.rm = TRUE),
+      se_damage   = sd(building_damage, na.rm = TRUE) / sqrt(.N)),
+    by = .(water_depth_bin, mh)]
+
+# Reorder to increasing depth for the figure only -- the regressions above
+# use "[0,1) ft" as the reference level, which is not depth-ordered.
+dt_dmgfn[, water_depth_bin := factor(
+    as.character(water_depth_bin), levels = wd_labels)]
+dt_dmgfn[, housing_type := factor(
+    fifelse(mh == 1L, "Manufactured", "Site-built"),
+    levels = c("Site-built", "Manufactured"))]
+
+p_dmgfn <- ggplot(
+    dt_dmgfn,
+    aes(x = water_depth_bin, y = mean_damage, color = housing_type,
+        group = housing_type)
+) +
+    geom_line() +
+    geom_pointrange(aes(
+        ymin = mean_damage - 1.96 * se_damage,
+        ymax = mean_damage + 1.96 * se_damage)) +
+    scale_color_manual(values = v_palette[1:2]) +
+    labs(x = "Water depth at loss", y = "Mean building damage (000s)",
+         color = NULL) +
+    theme_paper() +
+    theme(legend.position = "bottom")
+
+ggsave(file.path(out_dir, "damage-function.pdf"), p_dmgfn, width = 9, height = 5)
 
 plot_es(est_claim_es, "net_building_pmt",
         path = file.path(out_dir, "es-net-building-pmt.pdf"))
@@ -986,6 +1051,27 @@ stc_net_bldg <- extract_static(est_static, "net_building_pmt")
 stc_cont_dmg <- extract_static(est_static, "contents_damage")
 stc_net_cont <- extract_static(est_static, "net_contents_pmt")
 stc_bldg_shr <- extract_static(est_static, "building_damage_share")
+
+# water-depth robustness (Chunk K): post_mh across the three single-LHS
+# columns of est_rob_list, so the text can report how the headline
+# coefficient moves as the non-parametric depth control is added.
+extract_postmh_single <- function(est_obj) {
+    ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    list(est = ct$Estimate, se = ct[["Std. Error"]])
+}
+stc_rob_base   <- extract_postmh_single(est_rob_list[["Baseline"]])
+stc_rob_depth  <- extract_postmh_single(est_rob_list[["+ Water depth"]])
+stc_rob_depthx <- extract_postmh_single(est_rob_list[["+ Water depth $\\times$ MH"]])
+
+# water-depth missingness by mh x post1994 (dt_wd_miss built during data
+# construction), for the same discussion.
+get_wd_miss <- function(is_mh, is_post) dt_wd_miss[
+    mh == is_mh & post1994 == is_post, water_depth_missing_rate]
+wd_miss_mh_pre  <- get_wd_miss(1L, 0L)
+wd_miss_mh_post <- get_wd_miss(1L, 1L)
+wd_miss_sb_pre  <- get_wd_miss(0L, 0L)
+wd_miss_sb_post <- get_wd_miss(0L, 1L)
 
 # take-up per housing-unit stock (Chunk E): OLS coefficients on the ratio
 # outcomes themselves, so these are LEVEL differences in annual policies (or
@@ -1113,7 +1199,15 @@ fwrite(
             "policies_per_1k_homes_yr_static_nogeo",
             "policies_per_1k_homes_yr_static_nogeo_se",
             "policies_per_1k_homes_yr_pre_first",
-            "policies_per_1k_homes_yr_pre_first_se"
+            "policies_per_1k_homes_yr_pre_first_se",
+            "water_depth_missing_mh_pre",  "water_depth_missing_mh_post",
+            "water_depth_missing_sb_pre",  "water_depth_missing_sb_post",
+            "building_damage_static_rob_base",
+            "building_damage_static_rob_base_se",
+            "building_damage_static_rob_depth",
+            "building_damage_static_rob_depth_se",
+            "building_damage_static_rob_depthx",
+            "building_damage_static_rob_depthx_se"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -1139,7 +1233,12 @@ fwrite(
             stc_ppl_mand$est,    stc_ppl_mand$se,
             stc_ppl_nonmand$est, stc_ppl_nonmand$se,
             stc_ppl_nogeo$est,   stc_ppl_nogeo$se,
-            bin_ppl_first$est,   bin_ppl_first$se
+            bin_ppl_first$est,   bin_ppl_first$se,
+            wd_miss_mh_pre,  wd_miss_mh_post,
+            wd_miss_sb_pre,  wd_miss_sb_post,
+            stc_rob_base$est,   stc_rob_base$se,
+            stc_rob_depth$est,  stc_rob_depth$se,
+            stc_rob_depthx$est, stc_rob_depthx$se
         )
     ),
     here("output", "results", "nfip-scalars.csv")
