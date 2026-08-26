@@ -4,6 +4,175 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk I-b — Two take-up denominator defects, and the mandatory-purchase question (2026-08-26)
+
+Branch `mhs-fixed-weight-index`. Two questions from Colin: (1) does the
+site-built take-up jump at the 1994/1995 vintage boundary come from
+mandatory-purchase policies, and if so should there be a non-mandatory-only
+version; (2) does the multi-family contamination noted for the policy sample
+also affect the claims data, and what exactly are the current filters. The
+first question turned out to have a different answer than expected, because
+checking it surfaced two defects in the take-up denominator that between them
+were producing the jump.
+
+### Answer to (1): no, and the specification is not needed
+
+Split column (1)'s numerator into `mandatory_purchase_policy_n` and its
+complement, same denominator, weights, fixed effects and clustering, so the two
+coefficients sum to the total. Mandated **+0.79 (0.20)**, non-mandated **+7.33
+(2.56)**: about nine-tenths of the movement is in policies the homeowner was not
+required to buy. A non-mandatory-only version would therefore give essentially
+the same answer, so it is not worth a separate column. One caveat: the flag
+marks only 4–9% of policy-years, well below the SFHA share in the same cells, so
+it under-records mandate exposure and the split is a lower bound on the mandated
+part. This closes the open NFIRA item under Chunk I — the National Flood
+Insurance Reform Act of 1994 explanation is now tested directly and rejected,
+and the text asserting it is out of the paper.
+
+### Answer to (2): yes, and on both sides, because the filter is on floors
+
+The structure restriction is a *floors* filter, not an occupancy filter:
+`number_of_floors_in_the_insured_building IN (1, 2, 3, 5)` on claims and
+`number_of_floors_in_insured_building IN (1, 2, 3, 5)` on policies. Code 5 is the
+manufactured-home category and is what defines `mh`; code 4 (split-level) is
+excluded. Nothing in either query filters occupancy — `occupancy_type` is
+selected but unused on the claims side and is not selected at all on the policies
+side, which has to change before Chunk J's single-family restriction can be
+applied there. So small multi-family and low-rise non-residential structures
+enter the site-built comparison group in the claims data too. Tabulating the
+1984–1999 claim sample: site-built claim rows are 83.6% single-family (codes 1
+and 11), with the remaining 16.4% split across 2–4 unit, other residential and
+non-residential categories; MH rows are 98.1% single-family or
+residential-manufactured (codes 1 and 14), 1.3% non-residential (4) and 0.3%
+non-residential manufactured (17). The full filter list, both sides, is written
+into `notes/specs.md` §12.2 so it does not have to be re-derived.
+
+### Defect A — within-bin shares normalized over retained years only
+
+`impute-stock.R` allocates each Census 2000 county × vintage-bin total across
+construction years using MHS placements (MH) and BPS single-family permits
+(site-built). The Census bins are wider than the retained 1984–1999 window: the
+`1980_1989` bin keeps only 1984–1989, `1990_1994` keeps 1990–1993, `1999_2000`
+keeps 1999. The shares were computed *after* subsetting the annual sources to
+the retained years, so they summed to one over the retained years and the full
+bin total was spread across them. The dropped years' stock was silently
+redistributed onto the years that remained, inflating 1984–1989 denominators by
+about 1.5×, 1990–1993 by about 1.3× and 1999 by about 1.2×, while the fully
+retained 1995–1998 bin was correct.
+
+That is bias along the treatment split, not noise. It depressed measured
+pre-reform take-up on both sides, and since the site-built rate is roughly four
+times the MH rate it moved the comparison group's pre-reform level by about four
+times as much in levels — which is exactly the "site-built jump at 1994/1995"
+that prompted Colin's question.
+
+The old adding-up test enshrined the defect: it asserted that the retained years
+sum to the full Census bin total, which is precisely what should not hold.
+
+Fixed with a new `bin_span` table listing every construction year each bin
+spans, with a partial-year weight (the last Census bin is "1999 to March 2000",
+so 2000 enters at 3/12). Shares normalize over the span and are then subset, so
+a partly retained bin contributes only its retained fraction. Validation was
+restructured rather than relaxed: the exact invariant (shares sum to one over
+the full span, per state × bin for MH and per county × bin for site-built) now
+lives in the share-construction blocks where it belongs, and the allocation-step
+test became a bound — retained years never exceed the bin total, fully retained
+bins match exactly — plus a printed realized-versus-year-count retained
+fraction. My first attempt asserted the *mechanical* year-count fraction as an
+exact target and failed: the shares are source-proportional, so the realized
+retained fraction is placements- and permits-weighted (0.61–0.67 for
+`1980_1989`, 0.74–0.77 for `1990_1994`, 0.81–0.83 for `1999_2000`), not the
+0.6/0.8/0.8 the year counts imply. The report now shows both side by side. The
+national benchmark moves from ratio 0.95 to 0.75 against cumulative MHS
+shipments, which is the expected direction: the imputed stock is now a
+Census-2000 surviving stock net of the dropped 1994 year rather than an inflated
+one.
+
+### Defect B — the 1994 bin mixed a two-year numerator with a one-year denominator
+
+`dt_home_cell` was `dt_cell[!is.na(homes_n) & homes_n > 0]`. `dt_cell` sums
+`policies_n` and `claims_n` over every construction year in a `period_constr`
+bin, while `homes_n` is undefined for construction year 1994. The 1994 bin
+therefore had a numerator covering 1994 and 1995 over a denominator covering
+1995 alone. Construction year 1994 supplies 48.5% of that bin's site-built
+policy-years and 45.3% of its MH policy-years, so the bin's measured rate was
+inflated about 1.9× — again mostly on the comparison group in levels, and again
+at exactly the treatment boundary. Chunk I's own specs note asserted this was
+already handled; it was true of the denominator only.
+
+`dt_home_cell` is now rebuilt from the row level: the set of `(county,
+construction year, type)` cells with a positive `homes_n` is computed first, the
+numerator is the row-level panel inner-joined to it, and the denominator comes
+from the same rows, deduped on the county key before summing since `homes_n` is
+tract-duplicated by the section-5.5 merge. `stopifnot` asserts that no
+construction year 1994 survives on either side. The per-home rate columns were
+deleted from `dt_cell`, where they were unsafe by construction.
+
+### What this does to the results
+
+The static take-up estimate moves −4.88 (3.06) → +3.62 (2.93) after fix A →
+**+8.12 (2.71)** after fix B. Claims per 1,000 homes per year: 0.018 (0.040) →
+**+0.110 (0.055)**. Claims per policy is essentially unmoved — 0.00064 → 0.00055,
+SE 0.00065, still insignificant — because it never used `homes_n`. The 1994-bin
+event-study coefficient in column (1) moves −35.5 → −28.0 → −4.34. N falls
+73,487 → 71,492. The claim-level damage results and the whole of
+`estimate-welfare.R` are untouched: neither uses the housing-stock denominator,
+so the cost-benefit numbers in the abstract are unaffected.
+
+The sign is now reversed. Post-1994 MH take-up is *higher*, not lower, and since
+claims per policy is flat the decomposition identity assigns nearly all of the
+claims-per-home rise to the take-up margin — the opposite of the crowding-out
+story the earlier text told.
+
+### How the paper reports it
+
+Descriptively, not causally, with three limitations stated in the text rather
+than in a footnote:
+
+1. The vintage profile trends rather than steps. The earliest pre-reform bin is
+   −14.2 (3.05) and significant, so a level shift at 1994 is not what column (1)
+   shows.
+2. The sign depends on the geographic fixed effects. The same contrast without
+   them is −2.05 (1.49), because MH stock concentrates in counties whose overall
+   take-up rose least. This also means the four pooled levels (MH 10.2 → 9.6,
+   site-built 40.3 → 41.8) do **not** decompose the fitted coefficient the way
+   Chunk I's text claimed; that claim is gone.
+3. The denominator is imputed from a single 2000 Census cross-section while the
+   numerator is administrative.
+
+Also added a paragraph to Selection and Composition on the insured-pool-size
+channel, whose sign is not determined: more MH policies could mean either
+better-informed owners of better-built homes or a wider pool including
+marginal risks.
+
+### Open item this leaves
+
+The trending pre-period in column (1) is unexplained. A monotone pre-1994
+profile in a take-up *rate* is what differential survivorship in a
+Census-2000-anchored denominator would produce — older vintages have lost more
+stock, and differentially by housing type — rather than anything about the 1994
+standard. Bounding it needs a vintage-specific attrition estimate, which is the
+same ACS continuous-vintage series already open under Chunk E's caveat. Until
+that exists, column (1) stays descriptive. Filed under Chunk I-b in `TODO.md`.
+
+### Verification
+
+`estimate-nfip.R` runs clean end-to-end against the patched panel (the standing
+`$DATA_PATH` limitation means `databuild-nfip.R` itself is not re-run here, same
+as every prior chunk); `impute-stock.R` runs clean with the new invariants;
+`make test` passes; `paper.pdf` re-renders with no unresolved references. Six
+throwaway diagnostics under `/tmp` (mandatory-purchase split, denominator
+levels, occupancy tabulation, the 1994-bin decomposition) are not committed.
+
+One process note worth recording: my first pass at the hand-computed take-up
+levels disagreed with the script's scalars by a factor of two, because the
+diagnostic summed `homes_n` across tract rows. The estimation code dedupes to
+county level first and was right; the diagnostic was wrong. The section-5.5
+comment in `databuild-nfip.R` says this explicitly, and it is worth reading
+before writing any new diagnostic that touches `homes_n`.
+
+---
+
 ## Chunk I — Vintage window 1984–1999, annualized take-up, and p(claim | policy) (2026-08-26)
 
 Branch `chunk-i-window-claim-rate`. Four requests: move the effect window to

@@ -239,12 +239,11 @@ if (agg_geo == "countyfp") {
 # (claims over the period / policy-years over the period). The `_yr` suffix is
 # deliberate: these replace the unsuffixed pre-Chunk-I variables, whose name
 # did not disclose that they were five-year cumulative.
-dt_cell[, policies_per_1k_homes_yr := fifelse(
-    !is.na(homes_n) & homes_n > 0,
-    1000 * policies_n / (homes_n * N_YEARS_PERIOD), NA_real_)]
-dt_cell[, claims_per_1k_homes_yr := fifelse(
-    !is.na(homes_n) & homes_n > 0,
-    1000 * claims_n / (homes_n * N_YEARS_PERIOD), NA_real_)]
+# These are NOT built on dt_cell: dt_cell's numerator spans every construction
+# year in a period_constr bin, including years with no stock denominator, so the
+# ratio would be inconsistent for any partially covered bin. They are built on
+# dt_home_cell instead, where both sides are restricted to the same construction
+# years -- see the take-up block below.
 
 # Poisson panel: aggregate all cells (including zero-policy) to period_constr
 dt_pois <- dt[, .(claims_n    = sum(claims_n,    na.rm = TRUE),
@@ -459,21 +458,86 @@ iplot(est_pois_es)
 # All three outcomes are annual (see the `_yr` construction above), so the
 # decomposition holds in consistent units. Weights differ by column and cannot
 # be pooled into one fit: the per-home columns weight by homes_n (a handful of
-# cells have imputed stock well under 1 home -- thin county x period x mh
-# cells, mostly the already-flagged 1994 bin -- producing rates in the
-# thousands that would otherwise dominate an unweighted fit), while the claim
+# thin county x period x mh cells have imputed stock well under 1 home,
+# producing rates in the thousands that would otherwise dominate an unweighted
+# fit), while the claim
 # rate weights by policies_n, its own denominator, as the other cell-level
 # specs above do. Hence two feols calls, combined in one etable.
 #
 # Samples also differ: the per-home columns require a defined homes_n, the
-# claim rate requires policies_n > 0 (already imposed on dt_cell). Both are
-# pooled across all three policy periods (2009-2023) -- an
-# earliest-period-only (2009-2013) restriction was checked and dropped:
-# point estimates were extremely similar to the pooled column, so it added
-# a column without adding information. See notes/specs.md for the caveat
-# on the Census-2000-vs-policy-data time gap this restriction was meant to
-# address.
-dt_home_cell <- dt_cell[!is.na(homes_n) & homes_n > 0]
+# claim rate requires policies_n > 0. Both are pooled across all three policy
+# periods (2009-2023) -- an earliest-period-only (2009-2013) restriction was
+# checked and dropped: point estimates were extremely similar to the pooled
+# column, so it added a column without adding information. See notes/specs.md
+# for the caveat on the Census-2000-vs-policy-data time gap this restriction
+# was meant to address.
+#
+# The per-home cells are rebuilt from the row level rather than filtered out of
+# dt_cell, because numerator and denominator must span the SAME construction
+# years. dt_cell sums policies_n and claims_n over every year_constr in a
+# period_constr bin, while homes_n is undefined for construction year 1994
+# (impute-stock.R drops it as ambiguously pre/post). Filtering dt_cell would
+# therefore leave the 1994 bin with a two-year numerator (1994 and 1995) over a
+# one-year denominator (1995 alone), which nearly doubles that bin's measured
+# take-up rate -- construction year 1994 supplies about 49% of the bin's
+# site-built policy-years and 45% of its MH policy-years. Since the site-built
+# take-up rate is roughly four times the MH rate, that inflation lands almost
+# entirely on the comparison group, and appears as a large negative coefficient
+# at exactly the treatment boundary. Restricting both sides to construction
+# years with a stock denominator removes it.
+home_key <- c("countyfp", "year_constr", "mh")
+dt_home_ok <- unique(dt[!is.na(homes_n) & homes_n > 0, ..home_key])
+
+dt_home_num <- merge(
+    dt[!is.na(policies_n) & policies_n > 0L], dt_home_ok, by = home_key)
+dt_home_cell <- dt_home_num[
+    , .(claims_n   = sum(claims_n,   na.rm = TRUE),
+        policies_n = sum(policies_n, na.rm = TRUE),
+        mand_n     = sum(mandatory_purchase_policy_n, na.rm = TRUE)),
+    by = .(geo, period_loss, mh, period_constr)]
+
+# denominator over the same construction years; homes_n is a county-level value
+# duplicated across tract rows, so dedupe on the county key before summing
+dt_home_den <- unique(dt[!is.na(homes_n) & homes_n > 0,
+                         .(countyfp, year_constr, mh, homes_n)])
+dt_home_den[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
+dt_home_den <- dt_home_den[
+    , .(homes_n = sum(homes_n)), by = .(countyfp, period_constr, mh)]
+
+dt_home_cell <- merge(
+    dt_home_cell, dt_home_den,
+    by.x = c("geo", "period_constr", "mh"),
+    by.y = c("countyfp", "period_constr", "mh"))
+
+dt_home_cell[, post1994 := as.integer(period_constr >= 1994L)]
+dt_home_cell[, post_mh  := post1994 * mh]
+dt_home_cell[, claim_rate := claims_n / policies_n]
+dt_home_cell[, policies_per_1k_homes_yr :=
+    1000 * policies_n / (homes_n * N_YEARS_PERIOD)]
+dt_home_cell[, claims_per_1k_homes_yr :=
+    1000 * claims_n / (homes_n * N_YEARS_PERIOD)]
+
+# Take-up split by mandatory-purchase status, same denominator. The two split
+# outcomes sum to policies_per_1k_homes_yr by construction, so their post_mh
+# coefficients sum to the total one and say how much of the take-up response
+# occurs where the homeowner was choosing rather than complying. The flag is
+# reported by the insurer and is almost certainly under-recorded (it marks only
+# 4-9% of policy-years, well below the SFHA share), so read the split as a lower
+# bound on the mandated part, not a clean partition.
+dt_home_cell[, nonmand_n := policies_n - mand_n]
+stopifnot(all(dt_home_cell$nonmand_n >= 0))
+dt_home_cell[, policies_mand_per_1k_homes_yr :=
+    1000 * mand_n / (homes_n * N_YEARS_PERIOD)]
+dt_home_cell[, policies_nonmand_per_1k_homes_yr :=
+    1000 * nonmand_n / (homes_n * N_YEARS_PERIOD)]
+
+# the 1994 bin must now be construction year 1995 alone on BOTH sides
+stopifnot(
+    nrow(dt_home_cell) > 0L,
+    !anyNA(dt_home_cell$homes_n), all(dt_home_cell$homes_n > 0),
+    dt_home_ok[, !any(year_constr == 1994L)],
+    dt_home_num[, !any(year_constr == 1994L)]
+)
 
 fmla_home_ols <- as.formula(paste0(
     "c(policies_per_1k_homes_yr, claims_per_1k_homes_yr)",
@@ -492,10 +556,7 @@ iplot(est_home_ols[lhs = "policies_per_1k_homes_yr"])
 # Estimated on dt_home_cell, not dt_cell: the claim rate needs no stock
 # denominator, but running it on the wider sample would make the three columns
 # of the table three different samples and break the decomposition identity
-# above. It matters most at the 1994 vintage bin, which holds construction
-# years 1994 and 1995 -- homes_n is undefined for 1994 (see impute-stock.R),
-# so on dt_home_cell that bin is construction year 1995 alone in every column
-# rather than in only the first two.
+# above.
 est_claimrate_ols <- feols(
     claim_rate ~ i(period_constr, mh, ref = ref_period) |
         geo^period_loss + mh + period_constr,
@@ -538,6 +599,27 @@ est_claimrate_static <- feols(
     claim_rate ~ post_mh | geo^period_loss + mh + post1994,
     data = dt_home_cell, cluster = ~geo, weights = ~policies_n
 )
+
+# Two diagnostics on the take-up column, reported in the text rather than the
+# table. (a) The mandatory/non-mandatory split described above. (b) The same
+# static contrast with the geographic fixed effects removed, which is the raw
+# pre/post difference-in-differences across all counties. The two differ in
+# sign: the sign of the take-up estimate rests entirely on comparing MH to
+# site-built WITHIN a county and period, since MH stock is concentrated in
+# counties whose overall post-1994 take-up rose least. Reporting both keeps that
+# dependence visible instead of resting on the fixed effects silently.
+est_home_mand_static <- feols(
+    c(policies_mand_per_1k_homes_yr, policies_nonmand_per_1k_homes_yr) ~
+        post_mh | geo^period_loss + mh + post1994,
+    data = dt_home_cell, cluster = ~geo, weights = ~homes_n, lean = TRUE
+)
+etable(est_home_mand_static, fitstat = c("n", "my"))
+
+est_home_static_nogeo <- feols(
+    policies_per_1k_homes_yr ~ post_mh | mh + post1994,
+    data = dt_home_cell, cluster = ~geo, weights = ~homes_n
+)
+etable(est_home_static_nogeo, fitstat = c("n", "my"))
 
 est_takeup_static_list <- list(
     est_home_static[lhs = "policies_per_1k_homes_yr"][[1]],
@@ -884,6 +966,21 @@ stc_bldg_shr <- extract_static(est_static, "building_damage_share")
 eff_ppl_home <- extract_post_stats(est_home_ols, "policies_per_1k_homes_yr", 1)
 eff_clm_home <- extract_post_stats(est_home_ols, "claims_per_1k_homes_yr",   1)
 
+# earliest PRE-reform vintage bin of the take-up column. The paper cites it
+# because it is large and significant, which is what disqualifies the take-up
+# event study as a level-break design -- the profile trends rather than steps.
+extract_bin <- function(est_obj, outcome, bin) {
+    ct <- as.data.table(coeftable(est_obj[lhs = outcome][[1]]),
+                        keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    stopifnot(ct[period == bin, .N] == 1L)
+    list(est = ct[period == bin, Estimate],
+         se  = ct[period == bin][["Std. Error"]])
+}
+bin_ppl_first <- extract_bin(
+    est_home_ols, "policies_per_1k_homes_yr", MIN_YEAR_CONSTR)
+
 # single-LHS fits, so coeftable() applies directly rather than via [lhs = ]
 extract_post_stats_single <- function(est_obj) {
     ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
@@ -902,6 +999,11 @@ eff_claim_rate <- extract_post_stats_single(est_claimrate_ols)
 stc_claim_rate <- extract_static_single(est_claimrate_static)
 stc_ppl_home   <- extract_static(est_home_static, "policies_per_1k_homes_yr")
 stc_clm_home   <- extract_static(est_home_static, "claims_per_1k_homes_yr")
+stc_ppl_mand    <- extract_static(
+    est_home_mand_static, "policies_mand_per_1k_homes_yr")
+stc_ppl_nonmand <- extract_static(
+    est_home_mand_static, "policies_nonmand_per_1k_homes_yr")
+stc_ppl_nogeo   <- extract_static_single(est_home_static_nogeo)
 
 # Pre-1994 MH baselines for the three take-up margins, so the coefficients can
 # be read against the level they move from (the paper quotes them this way).
@@ -912,14 +1014,15 @@ base_clm_home  <- dt_home_cell[
     mh == 1L & period_constr < 1994L,
     sum(claims_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
 
-# Both sides of the policies-per-home difference-in-differences, in levels.
-# Needed because the coefficient (-5 per 1,000 homes per year) is larger in
-# magnitude than the MH pre-1994 level itself, which invites the reading that
-# MH take-up fell by more than it ever was. It did not: the site-built rate
-# rises steeply across the 1994 vintage boundary and the MH rate rises much
-# less, and the coefficient is that difference. Weighting the cell ratios by
-# homes_n makes each of these equal to the pooled ratio of summed policies to
-# summed home-years, so they are exactly the levels the fit differences.
+# Both sides of the policies-per-home comparison, in pooled levels. Weighting
+# the cell ratios by homes_n makes each of these equal to the pooled ratio of
+# summed policies to summed home-years. These are NOT what the fitted
+# coefficient differences: the raw pre/post contrast they imply is negative
+# while the fitted post_mh is positive, because the fit is within county x
+# calendar period and MH stock sits disproportionately in counties whose overall
+# take-up rose least across the vintage boundary. They are reported as context
+# for the magnitudes, with est_home_static_nogeo above supplying the raw
+# contrast the paper cites alongside the fitted one.
 ppl_home_level <- function(is_mh, is_post) dt_home_cell[
     mh == is_mh & (period_constr >= 1994L) == is_post,
     sum(policies_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
@@ -974,7 +1077,15 @@ fwrite(
             "policies_per_1k_homes_yr_mh_pre",
             "policies_per_1k_homes_yr_mh_post",
             "policies_per_1k_homes_yr_sb_pre",
-            "policies_per_1k_homes_yr_sb_post"
+            "policies_per_1k_homes_yr_sb_post",
+            "policies_mand_per_1k_homes_yr_static",
+            "policies_mand_per_1k_homes_yr_static_se",
+            "policies_nonmand_per_1k_homes_yr_static",
+            "policies_nonmand_per_1k_homes_yr_static_se",
+            "policies_per_1k_homes_yr_static_nogeo",
+            "policies_per_1k_homes_yr_static_nogeo_se",
+            "policies_per_1k_homes_yr_pre_first",
+            "policies_per_1k_homes_yr_pre_first_se"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -996,7 +1107,11 @@ fwrite(
             stc_claim_rate$est, stc_claim_rate$se, stc_claim_rate$t,
             base_ppl_home, base_clm_home, base_claim_rate,
             lvl_ppl_mh_pre, lvl_ppl_mh_post,
-            lvl_ppl_sb_pre, lvl_ppl_sb_post
+            lvl_ppl_sb_pre, lvl_ppl_sb_post,
+            stc_ppl_mand$est,    stc_ppl_mand$se,
+            stc_ppl_nonmand$est, stc_ppl_nonmand$se,
+            stc_ppl_nogeo$est,   stc_ppl_nogeo$se,
+            bin_ppl_first$est,   bin_ppl_first$se
         )
     ),
     here("output", "results", "nfip-scalars.csv")

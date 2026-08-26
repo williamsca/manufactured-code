@@ -6,7 +6,11 @@
 # vintage bin). Census counts a mobile home as a housing unit regardless of
 # titling, so there is no chattel-titling gap in the levels.
 #
-# Within-bin YEAR allocation only is driven by lower-quality annual sources:
+# Within-bin YEAR allocation only is driven by lower-quality annual sources.
+# Shares are normalized over every year the Census bin spans, not over the
+# subset retained below, so a bin whose span is only partly retained contributes
+# only that fraction of its total (see bin_span).
+#
 # MHS state-year placements for MH (broadcast to every county in the state,
 # since MHS has no county detail); BPS county-year single-family permits for
 # site-built, falling back to the state's permit shares when a county has
@@ -40,6 +44,35 @@ n_years_bin <- lengths(bin_years)
 year_to_bin <- setNames(rep(names(bin_years), n_years_bin), unlist(bin_years))
 kept_years  <- unlist(bin_years, use.names = FALSE)
 
+# Every construction year each Census bin ACTUALLY spans, with the fraction of
+# that year the bin covers. This is distinct from bin_years above: the within-bin
+# shares must be normalized over the full span, so that dropping a year from
+# bin_years drops its stock too instead of redistributing it onto the years that
+# remain. Normalizing over kept years only would assign the whole 1980-1989
+# Census total to 1984-1989 (a ~1.6x overstatement of those denominators) and
+# the whole 1990-1994 total to 1990-1993 (~1.3x), which biases take-up rates
+# downward before 1994 relative to after -- i.e. exactly along the treatment
+# split. The last Census bin is "1999 to March 2000", so 2000 enters at 3/12.
+bin_span <- rbindlist(list(
+    data.table(vintage_census = "1980_1989", year = 1980:1989, yr_wt = 1),
+    data.table(vintage_census = "1990_1994", year = 1990:1994, yr_wt = 1),
+    data.table(vintage_census = "1995_1998", year = 1995:1998, yr_wt = 1),
+    data.table(vintage_census = "1999_2000", year = 1999:2000, yr_wt = c(1, 3 / 12))
+))
+span_years <- unique(bin_span$year)
+bin_span[, kept := year %in% kept_years]
+# effective number of source years per bin, used for equal-weight fallbacks, and
+# the fraction of each bin's span that is retained -- i.e. the fraction of the
+# Census bin total the kept years are collectively entitled to
+span_tot <- bin_span[, .(n_span = sum(yr_wt), n_kept = sum(yr_wt * kept)),
+                     by = vintage_census]
+n_span_bin <- span_tot[, setNames(n_span, vintage_census)]
+kept_frac  <- span_tot[, setNames(n_kept / n_span, vintage_census)]
+stopifnot(
+    identical(sort(span_tot$vintage_census), sort(names(bin_years))),
+    all(kept_frac > 0), all(kept_frac <= 1 + 1e-12)
+)
+
 # ---------------------------------------------------------------------------
 # 1. Census 2000 levels, by county x vintage bin ----
 # ---------------------------------------------------------------------------
@@ -65,24 +98,34 @@ grid[, statefp := substr(countyfp, 1, 2)]
 # ---------------------------------------------------------------------------
 
 dt_mhs <- rd_read("census_mhs_state_year")
-dt_mhs <- dt_mhs[year %in% kept_years, .(statefp, year, placements)]
+dt_mhs <- dt_mhs[year %in% span_years, .(statefp, year, placements)]
 dt_mhs[, placements := fifelse(is.na(placements), 0, placements)]
-dt_mhs[, vintage_census := year_to_bin[as.character(year)]]
+# bin tag and partial-year weight come from the full span, so the denominator
+# below covers every year the Census bin includes
+dt_mhs <- merge(dt_mhs, bin_span, by = "year")
+dt_mhs[, placements := placements * yr_wt]
 
 state_bin_tot <- dt_mhs[, .(tot = sum(placements)), by = .(statefp, vintage_census)]
 dt_mhs <- merge(dt_mhs, state_bin_tot, by = c("statefp", "vintage_census"))
 dt_mhs[, share_mh := fifelse(
-    tot > 0, placements / tot, 1 / n_years_bin[vintage_census])]
+    tot > 0, placements / tot, yr_wt / n_span_bin[vintage_census])]
+# adding-up invariant, checked on the full span before the kept-year subset:
+# each state x bin's shares must exhaust the bin exactly. The retained years then
+# claim only their own shares, so the dropped years' stock is dropped, not
+# redistributed. How much a bin retains is source-implied (placements-weighted),
+# not the mechanical year-count fraction, which is why this is the exact test and
+# the one in section 5 is a bound.
+stopifnot(dt_mhs[, abs(sum(share_mh) - 1) < 1e-9, by = .(statefp, vintage_census)][, all(V1)])
 
 grid <- merge(
     grid,
-    dt_mhs[, .(statefp, vintage_census, year_constr = year, share_mh)],
+    dt_mhs[kept == TRUE, .(statefp, vintage_census, year_constr = year, share_mh)],
     by = c("statefp", "vintage_census", "year_constr"),
     all.x = TRUE
 )
 # states with no MHS row at all in a bin (shouldn't happen, but fail loudly
 # rather than silently drop stock) get an equal-weight fallback
-grid[is.na(share_mh), share_mh := 1 / n_years_bin[vintage_census]]
+grid[is.na(share_mh), share_mh := 1 / n_span_bin[vintage_census]]
 
 # ---------------------------------------------------------------------------
 # 3. Site-built within-bin shares: county-year BPS SF permits, with state
@@ -92,16 +135,17 @@ grid[is.na(share_mh), share_mh := 1 / n_years_bin[vintage_census]]
 dt_bps <- rd_read("census_bps")
 dt_bps[, statefp := substr(countyfp, 1, 2)]
 
-# full county x kept-year grid so counties absent from BPS enter as explicit
+# full county x span-year grid so counties absent from BPS enter as explicit
 # zeros (and so trigger the state fallback below) rather than as NA rows
-full_bps <- CJ(countyfp = counties, year = kept_years)
+full_bps <- CJ(countyfp = counties, year = span_years)
 full_bps[, statefp := substr(countyfp, 1, 2)]
 full_bps <- merge(
-    full_bps, dt_bps[year %in% kept_years, .(countyfp, year, permits_sf)],
+    full_bps, dt_bps[year %in% span_years, .(countyfp, year, permits_sf)],
     by = c("countyfp", "year"), all.x = TRUE
 )
 full_bps[is.na(permits_sf), permits_sf := 0]
-full_bps[, vintage_census := year_to_bin[as.character(year)]]
+full_bps <- merge(full_bps, bin_span, by = "year")
+full_bps[, permits_sf := permits_sf * yr_wt]
 
 county_bin_tot <- full_bps[, .(tot_co = sum(permits_sf)), by = .(countyfp, vintage_census)]
 state_year_tot <- full_bps[, .(permits_st = sum(permits_sf)), by = .(statefp, year, vintage_census)]
@@ -113,12 +157,14 @@ full_bps <- merge(full_bps, state_bin_tot,  by = c("statefp", "vintage_census"))
 
 full_bps[, share_sb := fifelse(
     tot_co > 0, permits_sf / tot_co,
-    fifelse(tot_st > 0, permits_st / tot_st, 1 / n_years_bin[vintage_census])
+    fifelse(tot_st > 0, permits_st / tot_st, yr_wt / n_span_bin[vintage_census])
 )]
+# same full-span adding-up invariant as for MH above
+stopifnot(full_bps[, abs(sum(share_sb) - 1) < 1e-9, by = .(countyfp, vintage_census)][, all(V1)])
 
 grid <- merge(
     grid,
-    full_bps[, .(countyfp, vintage_census, year_constr = year, share_sb)],
+    full_bps[kept == TRUE, .(countyfp, vintage_census, year_constr = year, share_sb)],
     by = c("countyfp", "vintage_census", "year_constr"),
     all.x = TRUE
 )
@@ -152,16 +198,33 @@ stopifnot(uniqueN(dt_stock[, .(countyfp, year_constr, mh)]) == nrow(dt_stock))
 stopifnot(!anyNA(dt_stock$homes_n))
 stopifnot(all(dt_stock$homes_n >= 0))
 
-# adding-up: allocated years sum exactly (within floating-point tolerance)
-# to the Census bin total they were split from
+# adding-up: the retained years of a bin must never sum to MORE than the Census
+# bin total (they sum to exactly the total only where the whole span is retained).
+# The exact invariant -- shares exhausting each bin over its full span -- is
+# asserted in sections 2 and 3 above; here the concern is that the kept-year
+# subset did not inherit stock from the dropped years.
 chk <- dt_stock[, .(alloc_tot = sum(homes_n)), by = .(countyfp, vintage_census, mh)]
 chk_mh <- merge(chk[mh == 1L], dt_vtg[, .(countyfp, vintage_census, mh_units)],
                 by = c("countyfp", "vintage_census"))
 chk_sb <- merge(chk[mh == 0L], dt_vtg[, .(countyfp, vintage_census, sb_units)],
                 by = c("countyfp", "vintage_census"))
-stopifnot(all(abs(chk_mh$alloc_tot - chk_mh$mh_units) < 1e-6))
-stopifnot(all(abs(chk_sb$alloc_tot - chk_sb$sb_units) < 1e-6))
-message("Adding-up test passed: allocated years sum to Census bin totals.")
+stopifnot(all(chk_mh$alloc_tot <= chk_mh$mh_units * (1 + 1e-9) + 1e-6))
+stopifnot(all(chk_sb$alloc_tot <= chk_sb$sb_units * (1 + 1e-9) + 1e-6))
+# a fully retained bin must still add up exactly
+full_bins <- names(kept_frac)[kept_frac > 1 - 1e-12]
+stopifnot(all(abs(
+    chk_mh[vintage_census %in% full_bins, alloc_tot - mh_units]) < 1e-6))
+stopifnot(all(abs(
+    chk_sb[vintage_census %in% full_bins, alloc_tot - sb_units]) < 1e-6))
+message("Adding-up test passed: retained years never exceed their Census bin total; fully retained bins match exactly.")
+# report the realized retained fraction against the year-count benchmark, so a
+# future change to bin_years or bin_span shows up here rather than silently
+realized <- rbind(
+    chk_mh[, .(mh = 1L, frac = sum(alloc_tot) / sum(mh_units)), by = vintage_census],
+    chk_sb[, .(mh = 0L, frac = sum(alloc_tot) / sum(sb_units)), by = vintage_census])
+realized[, year_count_frac := kept_frac[vintage_census]]
+message("Realized retained fraction of each Census bin total:")
+print(realized[order(mh, vintage_census)])
 
 # stability: correlate each county's share of state MH stock across bins
 dt_stock[, statefp := substr(countyfp, 1, 2)]
