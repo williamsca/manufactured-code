@@ -93,6 +93,7 @@ v_dict <- c(
     "year_loss" = "Loss year",
     "mh" = "MH",
     "period_constr" = "$\\nu_i$",
+    "post_mh" = "$1\\{\\nu_i \\geq 1994\\} \\times$ MH",
     "capped_pmt" = "Capped payment (=1)",
     "pmt_covg_ratio" = "Payment / coverage",
     "damage_repl_ratio" = "Damage / repl. cost",

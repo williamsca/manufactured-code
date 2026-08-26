@@ -394,7 +394,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \begin{threeparttable}
     \input{output/event-study/countyfp/claims-outcomes-static.tex}
     \begin{tablenotes}
-      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-benefit}, replacing the vintage-bin interactions $\sum_k \beta_k (\mathbf{1}[\nu_i = k] \times \text{MH}_i)$ with a single post-1994 $\times$ MH indicator (\emph{post\_mh}), estimated on the same claim-level sample and county $\times$ loss-year fixed effects as Table \ref{tab:claims-outcomes}, with a separate post-1994 main effect. Standard errors clustered by county. All damage and payment values are reported in thousands of 2000 dollars. Source: OpenFEMA claims data.
+      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-benefit}, replacing the vintage-bin interactions $\sum_k \beta_k (\mathbf{1}[\nu_i = k] \times \text{MH}_i)$ with a single $1\{\nu_i \geq 1994\} \times$ MH indicator, estimated on the same claim-level sample and county $\times$ loss-year fixed effects as Table \ref{tab:claims-outcomes}, with a separate post-1994 main effect. Standard errors clustered by county. All damage and payment values are reported in thousands of 2000 dollars. Source: OpenFEMA claims data.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}

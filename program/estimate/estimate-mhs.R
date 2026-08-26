@@ -302,8 +302,8 @@ est_type_double <- feols(price ~ post_treated | statefp + year,
                          weights = ~placements_base, cluster = ~statefp)
 
 dict_type <- c(dict_static,
-    "post_treated:section_typesingle" = "Post 1994 x Treated x Single-section",
-    "post_treated:section_typedouble" = "Post 1994 x Treated x Multi-section",
+    "post_treated:section_typesingle" = "Post 1994 x Treated x Single",
+    "post_treated:section_typedouble" = "Post 1994 x Treated x Double",
     "statefp^section_type"            = "State x Section type",
     "year^section_type"               = "Year x Section type")
 
