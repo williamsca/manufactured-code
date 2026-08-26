@@ -748,9 +748,8 @@ and the split is a lower bound on the mandated part.
 `policies_per_1k_homes_yr_pre_first{,_se}` (the earliest pre-reform bin),
 and `policies_per_1k_homes_yr_max`.
 
-**Sample filters, for the record** (asked alongside the above; unchanged by
-this fix, and the same on both sides). The structure restriction is a
-*floors* filter, not an occupancy filter:
+**Sample filters, for the record** (diagnostic only — see §13 for the fix).
+The structure restriction is a *floors* filter, not an occupancy filter:
 `number_of_floors_in_the_insured_building IN (1, 2, 3, 5)` on claims and
 `number_of_floors_in_insured_building IN (1, 2, 3, 5)` on policies (code 5 is
 the manufactured-home category and defines `mh`; code 4, split-level, is
@@ -765,3 +764,122 @@ non-residential manufactured (17). `occupancy_type` is selected but never
 filtered in the claims query and is **not selected at all** in the policies
 query — it must be added there before Chunk J's single-family restriction
 can be applied on the policy side.
+
+## 13. Single-family occupancy_type restriction, claims and policies (Chunk J/K, 2026-08-26)
+
+Implements the §12.2-adjacent diagnostic above. Colin's decision 2026-08-26:
+apply one `occupancy_type` restriction to both the claims and policies
+queries in `databuild-nfip.R`, ahead of and shared with Chunk J's
+policy-micro build (§14), rather than leaving it as an estimation-time
+robustness spec (the original Chunk K plan).
+
+- **Restriction.** `OCCUPANCY_TYPE_SF <- c(1L, 11L, 14L)` in
+  `project-params.R`, applied as `occupancy_type IN (...)` in both SQL
+  queries in `databuild-nfip.R` (`occ_sf`, built once and shared). Kept
+  codes are detached single-family residential under both FEMA coding eras:
+  legacy code 1 (also covers pre-RR2.0 MH, since the legacy scheme has no
+  separate MH occupancy code), RR2.0 code 11 (single-family, excepting MH or
+  a unit within a multi-unit building), and RR2.0 code 14 (residential MH).
+  Dropped: 2/3/12/13/15/16 (multi-unit) and 4/6/17/18/19 (non-residential).
+  A `stopifnot` after the claims query asserts every retained row's
+  `occupancy_type` is in the kept set, since the SQL `WHERE` clause is the
+  only thing enforcing this.
+- **Effect on sample size.** Claims: 1,816,724 → 1,492,255 site-built
+  (mh=0, -17.9%), 25,798 → 25,294 MH (mh=1, -2.0%). The floors-only filter
+  had let occupancy 2/3/4/6/12/13/15/16/18/19 rows into the site-built
+  group and occupancy 4/6/17 (non-residential) rows into the MH group.
+- **Effect on the headline claim-level result.** `building_damage_static`
+  (Table `tab:claims-outcomes-static`, §2) moves from the pre-restriction
+  $4,110 to **-5,557 (SE 1,461, t=-3.80)** — larger in magnitude, as
+  expected from removing a noisier, non-single-family tail from the
+  comparison group rather than from the MH group (MH loses only 2% of
+  rows). Event-study coefficients keep the same flat-pre/growing-post
+  shape (Table `tab:claims-outcomes`, `est_claim_es`).
+- **Effect on the take-up artifact (§12.2).** Column (1) of
+  `tab:take-up-static` (`policies_per_1k_homes_yr_static`) moves from
+  §12.2's post-fix +8.12 (2.71) to **+4.65 (2.24, t=2.08)** — still
+  positive and still significant at 5%, so §12.2's reversed-sign finding
+  (post-1994 MH take-up higher, not lower) survives the restriction, at
+  roughly half the earlier magnitude. `claims_per_1k_homes_yr_static` and
+  `claim_rate_static` move similarly modestly; see current
+  `output/results/nfip-scalars.csv` for the full set.
+- **Consistency checks run:** uniqueness of `nfip-balanced.Rds` on
+  `(tractfp, period_loss, mh, year_constr)`; zero missingness on
+  `countyfp`/`tractfp`/`year_loss`/`year_constr`/`mh`; `occupancy_type`
+  values confirmed restricted to `{1, 11, 14}` on both sides; no negative
+  `policies_n`/`claims_n`; `assert_geo_coverage`/`assert_geo_coverage_any`
+  (wind-zone, `homes_n`) both pass unchanged. `make test` (fake-data
+  harness) passes unchanged, since it runs on simulated data independent
+  of this restriction.
+- **Not rebuilt this pass:** `estimate-mhs.R` and its downstream MHS
+  tables/scalars (cost side, Chunk C) — blocked in this environment by a
+  pre-existing missing `derived/mhs-dropped-states.Rds` (needs
+  `databuild-mhs.R`, unrelated to this restriction and out of scope here)
+  — and `program/descriptives/map.R`, blocked by a pre-existing missing
+  `tigris` package in this environment. Neither depends on the NFIP
+  occupancy restriction; both are pre-existing environment gaps, not
+  introduced by this change.
+
+## 14. Policy-level composition table (Chunk J, 2026-08-26)
+
+Replaces the cell-level policy-composition table of the old §3
+(`est_comp_post`, weighted OLS on `geo x period_loss x mh x period_constr`
+cell averages) with a design run directly on policy-term microdata, per
+Colin's decision 2026-08-26. `est_comp_post`, `v_comp`, `s_comp`, and
+`fmla_comp_post` are removed from `estimate-nfip.R`; nothing else in the
+script read them.
+
+- **Script:** `program/import/databuild-nfip-policy.R` (new) builds
+  `derived/nfip-policy-micro.parquet`, one row per policy term, from the
+  same `fema_nfip_policies` source and version (`NFIP_VERSION`) as
+  `databuild-nfip.R`'s policy query, with the same floors/occupancy_type/
+  state/county/tract filters and construction-year window
+  (`MIN_YEAR_CONSTR`-`MAX_YEAR_CONSTR`), restricted to calendar years
+  2009-`MAX_YEAR_LOSS` (policy records begin in 2009, matching the balanced
+  panel) and deflated to `DISCOUNT_YEAR` dollars via the same CPI series.
+  `id` (the dataset's key field) is asserted unique. Added to the `data`
+  Makefile target, after `databuild-nfip.R`.
+- **Estimation:** `program/estimate/estimate-nfip.R` reads the parquet,
+  restricts to `MIN_YEAR_CONSTR`-`MAX_YEAR_CONSTR` (redundant with the
+  build-time restriction, kept for consistency with every other data block
+  in the script), and computes `period_constr` from `year_constr` with the
+  same `bin_constr()` used everywhere else in the file. Always run at
+  `countyfp x period_loss`, independent of the script's `agg_geo` argument,
+  since the Chunk J spec fixes the geography.
+- **Spec:** `c(repl_cost, building_policy_covg, contents_covg_positive, contents_policy_covg_pos, elevated_policy, sfha_policy) ~ i(period_constr, mh, ref = ref_period) | countyfp^period_loss + mh + period_constr`,
+  `ref_period` = 1992 under the default `BIN_CONSTR_YEAR = 2`, matching the
+  literal `ref = 1992` in the Chunk J plan.
+- **New outcome: contents-coverage choice margin.** `contents_covg_positive`
+  (`1[contents coverage > 0]`, built in `databuild-nfip-policy.R`) and
+  `contents_policy_covg_pos` (the coverage amount, `NA` when the indicator
+  is 0 — same "NA, not 0, when the margin doesn't apply" convention as the
+  claim-level per-claim averages elsewhere in the script). 31.9% of MH
+  policy terms carry no contents coverage vs. 13.5% of site-built, matching
+  the 30-35% range in the TODO.md plan.
+- **Weights:** none — unlike the cell-level version (`weights = ~policies_n`),
+  this is a direct regression on policy-level rows, so no re-weighting is
+  needed to recover a policy-weighted average.
+- **Clustering: by county (`countyfp`)**, matching every other spec in the
+  file.
+- **Sample:** 12,787,544 policy terms (266,312 MH, 12,521,232 site-built)
+  before per-outcome missingness; `repl_cost` N = 12,645,529 (1.1% missing);
+  `contents_policy_covg_pos` N = 11,010,714 (the ~14-32% with no contents
+  coverage, by construction).
+- **Outputs:** `output/event-study/countyfp/policy-composition.tex` (Table
+  `tab:composition`, same file name and table label as the design it
+  replaces, so `paper.Rmd`'s `\input` and `\ref` did not need to change).
+- **Result, briefly** (full reading in `paper.Rmd` "Selection and
+  Composition"): pre-1994, replacement cost and contents coverage
+  (conditional amount) show a large gap in the two earliest bins that
+  shrinks to insignificant by 1990-1991; the contents-coverage indicator
+  (any coverage vs. none) shows a smaller version of the same gap but stays
+  significant in three of four pre-1994 bins rather than fading; SFHA share
+  is significantly *lower* for MH in three of four pre-1994 bins and, like
+  the contents-coverage indicator, does not shrink toward the reference bin
+  the way replacement cost and conditional contents coverage do. Post-1994,
+  building coverage, replacement cost (first two
+  of three bins), and SFHA share are all significantly *higher* for MH,
+  each pointing toward higher, not lower, expected damage for the treated
+  group — strengthening the conservative-bias reading relative to the
+  cell-level table's two-outcome version. Elevated share rises only in the
+  last post-1994 bin, unchanged from before.

@@ -79,6 +79,14 @@ v_dict <- c(
     "sfha" = "SFHA",
     "primary_res_share" = "Primary res.",
     "mandatory_purchase_share" = "Mandatory",
+    # policy-level composition (Chunk J: derived/nfip-policy-micro.parquet,
+    # one row per policy term, replacing the cell-level averages above)
+    "repl_cost" = "Repl. cost",
+    "building_policy_covg" = "Bldg covg.",
+    "contents_covg_positive" = "Contents covg. $>0$",
+    "contents_policy_covg_pos" = "Contents covg. (if $>0$)",
+    "elevated_policy" = "Elevated",
+    "sfha_policy" = "SFHA",
     "policies_per_1k_homes_yr" = "Policies per 1,000 homes per year",
     "claims_per_1k_homes_yr" = "Claims per 1,000 homes per year",
     "homes_n" = "Homes (stock)",
@@ -366,38 +374,58 @@ etable(est_pclaim_es, fitstat = c("n", "r2", "wr2", "my"))
 
 iplot(est_pclaim_es[lhs = "claim_rate"])
 
-# policy composition summary table
-v_comp <- c(
-    "repl_cost_ppol",
-    "building_policy_covg_ppol",
-    "contents_policy_covg_ppol",
-    "elevated_share",
-    "sfha_share"
-    # "primary_res_share",
-    #"mandatory_purchase_share"
-)
-s_comp <- paste0("c(", paste(v_comp, collapse = ", "), ")")
+# ---------------------------------------------------------------------------
+# policy-level composition table (Chunk J) ----
+#
+#   Replaces the cell-level policy-composition table (which averaged policy
+#   characteristics within geo x period x mh x vintage cells before
+#   regressing). This regresses policy characteristics directly on the
+#   policy-term microdata (derived/nfip-policy-micro.parquet, built by
+#   program/import/databuild-nfip-policy.R: one row per policy term, already
+#   restricted to single-family residential occupancy_type -- see
+#   project-params.R). Always at countyfp x period_loss, per the Chunk J
+#   spec, independent of the agg_geo command-line argument.
+# ---------------------------------------------------------------------------
 
-fmla_comp_post <- as.formula(paste0(
-    s_comp, " ~ i(period_constr, mh, ref = ref_period)",
-    " | geo^period_loss + mh + period_constr"
+dt_pol_micro <- as.data.table(arrow::read_parquet(
+    here("derived", "nfip-policy-micro.parquet")))
+dt_pol_micro <- dt_pol_micro[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
+dt_pol_micro[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
+
+# contents-coverage choice margin (Chunk J): the extensive-margin indicator
+# (contents_covg_positive) is already on the file; the intensive margin is
+# defined only conditional on it, same convention as the claim-level
+# per-claim averages above (NA, not 0, when the margin doesn't apply)
+dt_pol_micro[, contents_policy_covg_pos := fifelse(
+    contents_covg_positive == 1L, contents_policy_covg, NA_real_)]
+
+v_comp_pol <- c(
+    "repl_cost",
+    "building_policy_covg",
+    "contents_covg_positive",
+    "contents_policy_covg_pos",
+    "elevated_policy",
+    "sfha_policy"
+)
+s_comp_pol <- paste0("c(", paste(v_comp_pol, collapse = ", "), ")")
+
+fmla_comp_pol <- as.formula(paste0(
+    s_comp_pol, " ~ i(period_constr, mh, ref = ref_period)",
+    " | countyfp^period_loss + mh + period_constr"
 ))
 
-est_comp_post <- feols(
-    fmla_comp_post, data = dt_cell,
-    weights = ~policies_n, cluster = ~geo,
-    lean = TRUE
+est_comp_pol <- feols(
+    fmla_comp_pol, data = dt_pol_micro,
+    cluster = ~countyfp, lean = TRUE
 )
-etable(est_comp_post, fitstat = c("n", "r2", "wr2", "my"))
-
+etable(est_comp_pol, fitstat = c("n", "r2", "wr2", "my"))
 
 etable(
-    est_comp_post,
+    est_comp_pol,
     tex = TRUE, se.below = FALSE,
     file = file.path(out_dir, "policy-composition.tex"),
     fitstat = c("n", "r2", "my"),
-    # keep = "post_mh",
-    digits = 1, digits.stats = 2, replace = TRUE
+    digits = 2, digits.stats = 2, replace = TRUE
 )
 
 # MH share event study
