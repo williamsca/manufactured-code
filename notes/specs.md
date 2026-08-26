@@ -4,7 +4,7 @@ Source of truth for every table/figure in `paper.Rmd`/`slides.tex`. Paper text
 is checked against this file, not against memory. Update in the same commit
 as any spec change (see `TODO.md` PROCESS).
 
-Last verified: 2026-08-13, against commit at the top of `notes/LOG.md` (Chunk E).
+Last verified: 2026-08-26, against commit at the top of `notes/LOG.md` (Chunk K).
 
 ## 1. MHS price/quantity event study (Eq. 1)
 
@@ -60,7 +60,7 @@ Last verified: 2026-08-13, against commit at the top of `notes/LOG.md` (Chunk E)
   which is not defensible given repeat flooding and persistent local
   siting practices). SEs move only modestly (see Chunk C1 diagnostics in
   `TODO.md` DONE). Applies to all claim-level specs: `est_claim_es`,
-  `est_claim_pois`, `est_static`, `est_rob_list` (a-d), `est_geo_rob`.
+  `est_claim_pois`, `est_static`, `est_rob_list` (a-c, §4), `est_geo_rob`.
   State clustering (49 clusters) considered and rejected as the default —
   visibly noisier variance estimate; pair with a wild cluster bootstrap if
   a referee asks for it. Two-way county + loss-year rejected: returned a
@@ -149,17 +149,47 @@ Last verified: 2026-08-13, against commit at the top of `notes/LOG.md` (Chunk E)
   monotonically increasing 0.03 → 0.47 post-1994 profile) — check this in
   the diff along with the §5 change.
 
-## 4. Covariate-controlled and geographic robustness
+## 4. Water-depth and geographic robustness
 
 - **Script:** same as §2, same run
-- **Covariate robustness (`fmla_rob_a`-`d`):** baseline vs. `+ water_depth +
-  elevated + sfha` controls, vs. tract × loss-period FE, vs. both. Outcome:
-  `building_damage`. Output: `output/event-study/countyfp/robustness.tex`.
+- **Water-depth robustness (`fmla_rob_a`-`c`, Chunk K, rewritten
+  2026-08-26):** static `post_mh` spec, matching §2's static ATT exactly
+  (`building_damage ~ post_mh | geo^year_loss + mh + post1994`) rather than
+  the event study the old `fmla_rob_a`-`d` used — column (1) is byte-identical
+  to `building_damage_static` (asserted by the shared coefficient, not just
+  visually close). Column (2) adds `water_depth_bin` (six non-parametric
+  bins — below the lowest floor; 0-1, 1-2, 2-4, 4-8 ft above it; 8+ ft,
+  which also absorbs a small number of physically implausible depths
+  including a spike exactly at 99 ft, likely a top-coded sentinel — plus an
+  explicit "Missing" bin) as a fixed effect. Column (3) additionally adds
+  `i(water_depth_bin, mh, ref = "[0,1) ft")` so the damage-depth
+  relationship can differ by housing type. The old linear `water_depth +
+  elevated + sfha` control (which had a duplicated `water_depth` term in
+  `fmla_rob_b`, likely a typo, never caught because the table was never
+  wired into `paper.Rmd`) and the tract-FE columns (`fmla_rob_c`/`d`) are
+  retired — tract-FE robustness is already covered by `fmla_geo_rob` below.
+  Because "Missing" is its own bin rather than a dropped value, N is
+  identical across all three columns (`stopifnot` at estimation time),
+  unlike a linear control, which would listwise-delete claims with no
+  recorded depth (12.9%/14.0% of pre/post-1994 MH claims, 9.8%/10.0% of
+  site-built — computed in `dt_wd_miss`). Outcome: `building_damage`.
+  Table only shows the `post_mh` coefficient (`keep_raw`); depth-bin
+  coefficients are estimated but not reported. Output:
+  `output/event-study/countyfp/robustness.tex` (Table
+  `tab:water-depth-robustness`, wired into `paper.Rmd`'s appendix,
+  §appendix-water-depth). A companion figure, `damage-function.pdf`, plots
+  raw mean `building_damage` by `water_depth_bin` × `mh` (excluding
+  "Missing") — the relationship the column (3) interaction tests.
+  Also gave `post1994` and `water_depth_bin` proper dictionary labels
+  (`v_dict`), which cosmetically changes the FE-row label from `post1994`
+  to "Post-1994" in every table using that FE (`claims-outcomes-static.tex`,
+  `take-up-static.tex`), not just this one — no point estimates affected.
 - **Geographic robustness (`fmla_geo_rob`):** `building_damage ~ i(period_constr, mh, ref = 1993) | sw(statefp^period_loss, countyfp^period_loss, tractfp^period_loss) + mh`.
   Three columns: state (coarsest), county (baseline), tract (finest).
   Output: `output/event-study/geo-robustness.tex` (Table `tab:geo-robustness`,
   currently commented out in `paper.Rmd` pending Colin's review — see
-  `notes/LOG.md`).
+  `notes/LOG.md`). Still lacks the `period_constr`/`year_loss` fix noted in
+  Chunk B (out of scope for Chunk K, which only touched `fmla_rob_a`-`c`).
 
 ## 5. Geography discrepancy — resolved 2026-08-11
 

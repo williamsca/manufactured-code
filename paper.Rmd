@@ -162,6 +162,19 @@ ppl_nonmand_stc_se <- formatC(get_nfip("policies_nonmand_per_1k_homes_yr_static_
 ppl_nogeo_stc     <- signed_fmt(get_nfip("policies_per_1k_homes_yr_static_nogeo"), 2)
 ppl_nogeo_stc_se  <- formatC(get_nfip("policies_per_1k_homes_yr_static_nogeo_se"),
                              format = "f", digits = 2)
+
+# Water-depth robustness (Chunk K): the three columns of Table
+# \ref{tab:water-depth-robustness} share the building-damage headline's
+# sample and FE, so column (1) reproduces `bldg_dmg_eff`/`bldg_dmg_se`
+# exactly (asserted at estimation time) -- only columns (2)-(3) are new.
+wd_dmg_depth    <- fmt_d(abs(get_nfip("building_damage_static_rob_depth")))
+wd_dmg_depth_se <- fmt_d(abs(get_nfip("building_damage_static_rob_depth_se")))
+wd_dmg_depthx    <- fmt_d(abs(get_nfip("building_damage_static_rob_depthx")))
+wd_dmg_depthx_se <- fmt_d(abs(get_nfip("building_damage_static_rob_depthx_se")))
+wd_miss_mh_pre   <- fmt_pct(get_nfip("water_depth_missing_mh_pre") * 100, 1)
+wd_miss_mh_post  <- fmt_pct(get_nfip("water_depth_missing_mh_post") * 100, 1)
+wd_miss_sb_pre   <- fmt_pct(get_nfip("water_depth_missing_sb_pre") * 100, 1)
+wd_miss_sb_post  <- fmt_pct(get_nfip("water_depth_missing_sb_post") * 100, 1)
 ```
 
 \begin{abstract}
@@ -320,6 +333,8 @@ These post-1994 shifts work against the main result. Higher building coverage an
 I therefore read the post-1994 composition of insured manufactured homes as shifting toward higher, not lower, expected flood damage, and read the damage estimates as understating the effect of construction quality by whatever amount that shift contributes. This reading now rests on three outcomes moving together in the same direction rather than one, and I still do not treat it as a quantitative bound.
 
 A further channel is the size of the insured pool rather than its observed characteristics. Section \ref{appendix-take-up} reports that the fraction of manufactured homes holding an NFIP policy is higher for post-1994 vintages, so the post-1994 insured pool is a larger and therefore less selected share of the underlying stock. Whether a less selected pool has higher or lower average flood damage depends on how the homes drawn into coverage compare with those already insured, which these data do not identify. Unlike the coverage and location shifts above, this channel is unsigned, and I note it as a limitation rather than as a bound.
+
+A separate concern operates through flood severity itself rather than through policy characteristics: if post-1994 manufactured homes are flooded to different depths than pre-1994 manufactured homes or than site-built homes of the same vintage, the damage reduction could reflect differential exposure rather than construction quality. Section \ref{appendix-water-depth} adds water depth at the time of loss as a control, and reports both the resulting estimate and how it varies with housing type. The result is close to the baseline and does not depend on flood severity in a way that would account for the main finding.
 
 <!--
 ## Robustness
@@ -536,6 +551,38 @@ One mechanical explanation can be ruled out. If the pattern in column (1) reflec
 ## Caveat: the stock denominator is a 2000 snapshot, the policy data are not
 
 The imputed home stock is fixed as of the 2000 Census, while the policy periods run from 2009 to 2023 -- 9 to 23 years later. If pre- and post-1994 manufactured homes attrite (are demolished, relocated, or converted) at different rates over that gap, the true denominator drifts away from the Census-fixed one asymmetrically by vintage, and the bias grows with the gap. An earlier version of this table reported the 2009--2013 calendar period separately, as the closest snapshot to 2000 and so the least exposed to this drift; its point estimates were extremely similar to the pooled 2009--2023 estimates, so it was dropped from the table without evidence that attrition is materially distorting them. The American Community Survey's continuously updated housing-vintage tables could in principle bound the drift directly, but cannot substitute for the imputed stock: its year-built categories are decade bins that cannot isolate 1994 even in principle, and its tract-level manufactured-home counts carry very large margins of error. Bounding the 2014--2023 estimates against the decade series is left for future work.
+
+# Water Depth and the Damage Function {#appendix-water-depth}
+
+The building damage estimates condition on filing a claim but not on the severity of the flood that produced it. If post-1994 manufactured homes are flooded to different depths than pre-1994 manufactured homes, or than site-built homes of the same vintage, the estimated damage reduction could reflect that difference in exposure rather than construction quality. This appendix controls for water depth at the time of loss and reports the damage-depth relationship directly.
+
+A claim's recorded water depth is missing more often for manufactured homes than for site-built homes, and the gap widens after 1994: `r wd_miss_mh_pre` of pre-1994 manufactured-home claims and `r wd_miss_mh_post` of post-1994 manufactured-home claims lack a recorded depth, against `r wd_miss_sb_pre` and `r wd_miss_sb_post` for site-built claims of the same vintages. A linear control on water depth would drop every one of these claims, and would drop a growing and unequal share of the two housing types across the reform. Table \ref{tab:water-depth-robustness} instead groups water depth into six bins together with an explicit bin for claims with no recorded depth, so every claim enters every column and the count of observations is identical across columns (1)-(3).
+
+Column (1) reproduces the baseline building-damage estimate of Table \ref{tab:claims-outcomes-static}. Column (2) adds the water-depth bins as controls: the estimate is `r wd_dmg_depth` (SE `r wd_dmg_depth_se`), close to the `r bldg_dmg_eff` (SE `r bldg_dmg_se`) baseline. Column (3) additionally lets the relationship between damage and water depth differ by housing type, so that the treatment estimate is identified only from variation within a depth bin and housing type; it changes little, at `r wd_dmg_depthx` (SE `r wd_dmg_depthx_se`). The building-damage effect is not an artifact of manufactured and site-built homes being flooded to different depths.
+
+Figure \ref{fig:damage-function} plots the relationship the interaction in column (3) tests for: mean building damage by water-depth bin, separately by housing type, on the same claims as the table (excluding the no-depth bin, which has no position on a depth axis). Damage rises with water depth for both housing types, consistent with deeper flooding causing more damage, but rises more steeply for site-built homes. Manufactured homes experience less additional damage from a given increase in flood depth than site-built homes do, at every depth bin with an appreciable number of claims.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Building Damage: Water-Depth Robustness}\label{tab:water-depth-robustness}
+  \begin{threeparttable}
+    \input{output/event-study/countyfp/robustness.tex}
+    \begin{tablenotes}
+      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-benefit}, on the same claim-level sample, outcome (building damage, in thousands of 2000 dollars), county $\times$ loss-year fixed effects, and clustering as Table \ref{tab:claims-outcomes-static}, with a post-1994 main effect in place of the full vintage-bin fixed effect. Column (2) adds water depth at the time of loss, grouped into six bins---below the lowest floor; 0--1, 1--2, 2--4, and 4--8 feet above it; and 8 feet or more above it---plus a seventh bin for claims with no recorded depth, entered as fixed effects; column (3) additionally interacts these bins with the manufactured-home indicator. Water-depth-bin coefficients are omitted from the table. Observations are identical across all three columns by construction. Source: OpenFEMA claims data.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \caption{Building Damage by Water Depth and Housing Type}\label{fig:damage-function}
+  \includegraphics{output/event-study/countyfp/damage-function.pdf}
+  \begin{flushleft}
+  \begin{footnotesize}
+  Notes: Mean building damage by water-depth bin and housing type, on the same claim-level sample as Table \ref{tab:water-depth-robustness}, excluding the bin for claims with no recorded water depth. Error bars are 95\% confidence intervals for the mean within each bin and housing type, based on the within-cell standard deviation. Source: OpenFEMA claims data.
+  \end{footnotesize}
+  \end{flushleft}
+\end{figure}
 
 # Price Effects by Home Size {#appendix-section-type}
 
