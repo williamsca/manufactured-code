@@ -57,6 +57,7 @@ price_ratio    <- formatC(get_mhs("price_ratio_double_single"),
                           format = "f", digits = 1)
 n_index        <- format(as.integer(get_mhs("n_index")), big.mark = ",")
 n_raw          <- format(as.integer(get_mhs("n_raw")), big.mark = ",")
+n_dropped_mhs  <- as.integer(get_mhs("n_dropped_states"))
 price_eff_raw     <- fmt_d(get_mhs("price_effect_raw_level"))
 price_eff_raw_cmn <- fmt_d(get_mhs("price_effect_raw_cmn_level"))
 price_eff_comp    <- fmt_d(get_mhs("price_effect_comp_level"))
@@ -199,7 +200,7 @@ P_{st} = \omega^{S} p^{S}_{st} + \omega^{D} p^{D}_{st},
 
 where $\omega^{S}$ and $\omega^{D}$ are the shares of single- and multi-section homes among all homes placed nationally between 1988 and 1993, the six years preceding the reform. These weights are `r wt_single` and `r wt_double`, and they are held fixed across all states and all years. The index is therefore the cost of a fixed basket of homes: it changes only when the price of a size changes, and by construction no variation in the size mix, either across states or over time, can enter it. I report the index normalized so that its national 1993 value equals 100. The normalization divides the index by the single constant `r idx_base`, so the normalized and dollar-denominated versions of the index give the same estimates in different units.
 
-Constructing the index requires both size-specific averages. The survey suppresses these for states with few placements, so the index is defined for `r n_index` of the `r n_raw` state-years in which the all-homes average is published. The excluded state-years are small states, predominantly in the control group. The quantity analysis uses these same state-years, even though placement counts are published more widely, so that the price and quantity effects are estimated on one sample and can be read together.
+Constructing the index requires both size-specific averages. The survey suppresses these for states with few placements, so the index is defined for `r n_index` of the `r n_raw` state-years in which the all-homes average is published. The excluded state-years are small states, predominantly in the control group. The quantity analysis uses these same state-years, even though placement counts are published more widely, so that the price and quantity effects are estimated on one sample and can be read together. All specifications are weighted by the state's average number of shipments between 1988 and 1993; `r n_dropped_mhs` states with no recorded shipments over that period are dropped from the sample.
 
 ## Flood Damage and Insurance Coverage
 
@@ -224,7 +225,7 @@ P_{st} = \alpha_s + \gamma_t + \sum_{k \neq 1993} \beta_k (\mathbf{1}[\text{year
 \label{eq:event-study-cost}
 \end{equation}
 
-where $P_{st}$ is the fixed-weight price index of Equation \eqref{eq:price-index} for state $s$ in year $t$, $\alpha_s$ and $\gamma_t$ are state and year fixed effects, and $\text{Treated}_s$ indicates states containing wind zones II or III. The 1993 interaction is omitted: with state fixed effects the full set of treated-by-year interactions is collinear with the time-invariant treated indicator. The coefficients $\beta_k$ therefore trace out the price difference between treated and control states relative to 1993. All MHS specifications, including this one, are weighted by each state's mean placements over 1988--1993, the base period fixed before the reform, so that a state placing a few hundred homes a year does not count as much as one placing tens of thousands; a handful of states with no placements published in that window use the mean over the fuller 1985--1993 run instead, so that every state that reports a price receives a positive weight. Standard errors are clustered by state.
+where $P_{st}$ is the fixed-weight price index of Equation \eqref{eq:price-index} for state $s$ in year $t$, $\alpha_s$ and $\gamma_t$ are state and year fixed effects, and $\text{Treated}_s$ indicates states containing wind zones II or III. The 1993 interaction is omitted: with state fixed effects the full set of treated-by-year interactions is collinear with the time-invariant treated indicator. The coefficients $\beta_k$ therefore trace out the price difference between treated and control states relative to 1993. All MHS specifications, including this one, are weighted by the state's average number of shipments between 1988 and 1993. Standard errors are clustered by state.
 
 ## Benefit Estimation: Event Study
 

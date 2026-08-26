@@ -80,6 +80,14 @@ dt[is.na(treated_intensity), treated_intensity := 0]
 # Chunk C for the state table with all intensities)
 dt[, high_intensity := statefp %in% c("12", "22", "25")]
 
+# Full state x treatment-status table, saved before the base-period-weight
+# drop below removes a few small states from `dt`. Wind-zone treatment
+# status is defined for every state regardless of whether it has 1988-1993
+# shipment data, so map.R (which just draws treatment status, not the
+# price sample) reads this instead of sample-mhs.Rds.
+saveRDS(unique(dt[, .(statefp, state_name, treated)]),
+        here("derived", "mhs-state-treatment.Rds"))
+
 # CPI
 dt <- merge(dt, dt_cpi[, .(year, cpi)], by = "year", all.x = TRUE)
 
@@ -166,43 +174,35 @@ dt[, avg_sales_price_comp :=
 # size in the base period, not the reform-era outcome itself).
 # Contemporaneous placements are themselves an outcome of the reform, so
 # weighting on them would condition on treatment; using a fixed pre-period
-# mean instead avoids that.
-#
-# Primary definition is the mean over v_base_years (1988-1993). A few
-# small states (e.g. Connecticut, Rhode Island) have Census small-cell
-# suppression across the *entire* 1988-1993 window despite reporting
-# placements in nearby years, which would otherwise leave their weight
-# undefined even though they contribute real price observations inside
-# the 1988-2000 estimation window. For exactly those states, fall back to
-# the mean over the full pre-reform run of years the survey covers
-# (1985-1993) instead of dropping them from every weighted regression.
+# mean instead avoids that. Every state is weighted the same way, off the
+# mean over v_base_years (1988-1993) alone: states with no recorded
+# shipments anywhere in that window (small-cell suppression, e.g.
+# Connecticut, Rhode Island) get an undefined weight and are dropped
+# below rather than given a different base period.
 dt_wt <- dt[year %in% v_base_years, .(
     placements_base = mean(placements, na.rm = TRUE)), by = statefp]
 dt_wt[is.nan(placements_base) | placements_base <= 0,
       placements_base := NA_real_]
 
-v_prereform_years <- min(dt$year):1993L
-dt_wt_fb <- dt[year %in% v_prereform_years, .(
-    placements_base_fb = mean(placements, na.rm = TRUE)), by = statefp]
-dt_wt_fb[is.nan(placements_base_fb) | placements_base_fb <= 0,
-         placements_base_fb := NA_real_]
-
-dt_wt <- merge(dt_wt, dt_wt_fb, by = "statefp", all.x = TRUE)
-dt_wt[is.na(placements_base), placements_base := placements_base_fb]
-dt_wt[, placements_base_fb := NULL]
-
 dt <- merge(dt, dt_wt, by = "statefp", all.x = TRUE)
 
-# Every state that reports an average sales price anywhere in the panel
-# (i.e. could enter a price regression in some year range) must have a
-# defined, positive base-period weight. DC is the one state with no price
-# data at all, in any year - it drops out of every price regression via
-# the outcome, not the weight, so it is exempt from this check.
+# States that report an average sales price somewhere in the panel but
+# have no defined base-period weight are dropped entirely, so no state
+# enters a price regression under a different weighting rule. DC has no
+# price data at all, in any year, so it never enters v_price_states or
+# v_drop_states; it stays in `dt` and drops out of every price regression
+# via the outcome, not the weight.
 v_price_states <- dt[!is.na(avg_sales_price), unique(statefp)]
-bad_wt <- dt[statefp %in% v_price_states,
-             .(placements_base = placements_base[1]), by = statefp][
-    is.na(placements_base)]
-stopifnot(nrow(bad_wt) == 0)
+v_drop_states  <- dt[statefp %in% v_price_states,
+                      .(placements_base = placements_base[1]), by = statefp][
+    is.na(placements_base), statefp]
+n_dropped_states <- length(v_drop_states)
+dt <- dt[!statefp %in% v_drop_states]
+
+v_price_states <- dt[!is.na(avg_sales_price), unique(statefp)]
+stopifnot(!anyNA(dt[statefp %in% v_price_states,
+                     .(placements_base = placements_base[1]),
+                     by = statefp]$placements_base))
 
 # section-type long panel ----
 # One row per state-year-section-type. Estimating on this recovers the
@@ -266,12 +266,12 @@ message(sprintf(
     "index defined for %d of %d state-years (raw avg price: %d)",
     dt[!is.na(avg_sales_price_fw), .N], nrow(dt),
     dt[!is.na(avg_sales_price), .N]))
-n_fb <- uniqueN(dt[statefp %in% v_price_states &
-                    year %in% v_base_years, .(has = any(!is.na(placements))),
-                    by = statefp][has == FALSE, statefp])
 message(sprintf(
-    "placements_base: defined for all %d price-reporting states (%d via the 1985-1993 fallback)",
-    length(v_price_states), n_fb))
+    "placements_base: defined for all %d price-reporting states (%d states dropped for no 1988-1993 shipments)",
+    length(v_price_states), n_dropped_states))
 
 # export ----
 saveRDS(dt, here("derived", "sample-mhs.Rds"))
+saveRDS(list(n_dropped_states = n_dropped_states,
+             states = v_drop_states),
+        here("derived", "mhs-dropped-states.Rds"))

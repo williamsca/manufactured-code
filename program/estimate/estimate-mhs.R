@@ -19,6 +19,8 @@ dt <- dt[between(year, MIN_YEAR_MHS, MAX_YEAR_MHS)]
 dt_type <- readRDS(here("derived", "sample-mhs-type.Rds"))
 dt_type <- dt_type[between(year, MIN_YEAR_MHS, MAX_YEAR_MHS)]
 
+n_dropped_states <- readRDS(here("derived", "mhs-dropped-states.Rds"))$n_dropped_states
+
 # Every MHS regression below is weighted by `placements_base`, the state's
 # mean 1988-1993 placements (databuild-mhs.R), a fixed pre-reform measure
 # of state size. Verify it is defined for every state that could actually
@@ -93,9 +95,10 @@ fmla_q <- as.formula(paste0(
 ))
 
 # All MHS estimates are weighted by placements_base, the state's fixed
-# pre-reform (1988-1993 mean, or 1985-1993 where that window is entirely
-# suppressed) placement count, so a state placing a few hundred homes a
-# year does not count as much as one placing tens of thousands.
+# pre-reform (1988-1993 mean) placement count, so a state placing a few
+# hundred homes a year does not count as much as one placing tens of
+# thousands. States with no recorded shipments over 1988-1993 have no
+# defined weight and are dropped in databuild-mhs.R.
 est_p <- feols(fmla_p, data = dt, weights = ~placements_base, cluster = ~statefp)
 est_q <- feols(fmla_q, data = dt_common, weights = ~placements_base,
                cluster = ~statefp)
@@ -573,7 +576,8 @@ fwrite(
                       "price_effect_comp_static", "share_double_effect",
                       "price_effect_unwtd_static", "price_effect_single_level",
                       "price_effect_double_level", "price_effect_type_pool",
-                      "n_index", "n_raw", "base_wt_single", "base_wt_double",
+                      "n_index", "n_raw", "n_dropped_states",
+                      "base_wt_single", "base_wt_double",
                       "idx_base_1993", "mean_price_single",
                       "mean_price_double", "price_ratio_double_single",
                       "placements_effect_level", "placements_effect_static",
@@ -591,6 +595,7 @@ fwrite(
                       price_effect_double_level, price_effect_type_pool,
                       dt[!is.na(avg_sales_price_fw), .N],
                       dt[!is.na(avg_sales_price), .N],
+                      n_dropped_states,
                       base_wt_single, base_wt_double, idx_base_1993,
                       mean_price_single, mean_price_double,
                       price_ratio_double_single,

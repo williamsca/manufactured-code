@@ -26,9 +26,10 @@ theme_map <- function(base_size = 14) {
 }
 
 # import ----
-dt <- as.data.table(readRDS(here("derived", "sample-mhs.Rds")))
-
-dt_map <- unique(dt[, .(statefp, state_name, treated)])
+# Full state x treatment-status table (databuild-mhs.R), independent of
+# the price-sample base-period-weight drop, so states with no 1988-1993
+# shipment data still appear on the map.
+dt_map <- as.data.table(readRDS(here("derived", "mhs-state-treatment.Rds")))
 
 stopifnot(uniqueN(dt_map$statefp) == nrow(dt_map))
 
