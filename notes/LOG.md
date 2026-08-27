@@ -4,6 +4,146 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk M — Log building damage event study, and the scale problem in the levels spec (2026-08-27)
+
+Branch `chunk-m-log-damage-es`. Started from Colin's question about whether a
+quantile regression on claim-level building damage would show the decline
+concentrated in the upper tail — economically interesting, since the insurance
+value of avoiding a total loss exceeds that of avoiding a small one. Answering
+it surfaced a problem with the levels specification, and the chunk ended as a
+diagnostic pass plus one new figure.
+
+### The quantile question, and why it is not the right tool
+
+Quantile effects do not aggregate to the mean effect, so they cannot decompose
+the headline. The estimator that can is an exactly additive band decomposition:
+write `Y = sum_k max(0, min(Y, c_k) - c_{k-1})` and run the same static spec on
+each piece, so the coefficients sum to `building_damage_static` by construction,
+on the same sample, FE, and clustering. That gives:
+
+| Band ($000) | Coef | SE | % of effect | MH pre-1994 mean in band |
+|---|---|---|---|---|
+| [0,10) | −0.294 | 0.135 | 5.1 | 6.38 |
+| [10,25) | −0.344 | 0.302 | 6.0 | 3.31 |
+| [25,50) | −1.039 | 0.463 | 18.1 | 1.70 |
+| [50,100) | −1.958 | 0.447 | 34.0 | 0.41 |
+| [100,200) | −1.727 | 0.493 | 30.0 | 0.04 |
+| [200,1000) | −0.392 | 0.230 | 6.8 | 0.02 |
+
+Sums to −5.754, matching the headline exactly. 89% of the effect comes from
+bands above $25k. A RIF unconditional-quantile version tells the same story
+more dramatically (−$17.0k at p90, t = −4.76, flat below the median).
+
+That is the figure Colin had in mind, and it is an artifact. The $100–200k band
+supplies 30% of the effect from an MH pre-1994 base of $40, because the sample
+contains **3 pre-1994 and 4 post-1994 MH claims above $100k in total**.
+
+### Root cause: the levels spec is not identified in its own units
+
+§1's parallel-vintage-trends assumption is that the common vintage effect is the
+same for both housing types. In levels that requires it to hold **in dollars**.
+The data reject that and support the proportional version:
+
+| | Pre-1994 | Post-1994 | Change |
+|---|---|---|---|
+| Site-built median repl. cost | 143.6 | 165.8 | +15.4% |
+| MH median repl. cost | 39.9 | 46.6 | +16.7% |
+| Site-built mean bldg. damage | 28.95 | 33.46 | +15.6% |
+| MH mean bldg. damage | 11.86 | 13.36 | +12.7% |
+
+Same DiD, two units: on log replacement cost `post_mh` = −0.031 (SE 0.027);
+on the level of replacement cost, −20.58 (SE 2.89). Newer homes of both types
+are bigger and worth more, and dollar damage scales with what is at risk. A
+common proportional gradient on bases differing by 2.4× mechanically yields
+`11.86 × 0.156 − 28.95 × 0.156 = −2.67` with **no resilience effect at all**,
+against a raw level DiD of −3.00 and the FE headline of −5.75.
+
+Two confirmations. (a) Trimming site-built claims to below the MH 90th
+percentile of replacement cost, **retaining every MH claim**, moves the levels
+estimate from −5.754 (1.451) to +0.099 (0.783) and Poisson from −13.4% to
++2.3%; the trim gradient is monotone (−5.51 → −1.85 → −0.46 → +0.02). (b) A
+placebo on simulated claims with a TRUE effect of zero and a common
+proportional vintage gradient returns −5.31 (t = −5.44) in levels while Poisson
+recovers zero, and reproduces the FE amplification (analytic bias −2.67, FE
+estimate −5.31, ratio 1.99; real data −3.00 and −5.75, ratio 1.92).
+
+This extends Chunk L's own diagnosis to the outcome it exempted. Chunk L found
+the contaminated value fields "sit in the comparison group and destabilize the
+MH × vintage interaction," then reasoned the payment fields are safe because
+statutory limits censor them. `building_damage` is a loss estimate, not a
+payment — no statutory bound applies, and its site-built tail runs to $1M.
+
+### What was built
+
+One new figure, `output/event-study/countyfp/es-log-building-damage.pdf`, per
+Colin's request, dropping zeros. In `estimate-nfip.R`: `log_building_damage` at
+data construction; `est_claim_es_log` and `est_static_log`, estimated separately
+from `s_claim` so the four columns of `claims-outcomes.tex` and
+`claims-outcomes-static.tex` are untouched; the `plot_es` call; nine scalars.
+`plot_es` gained an optional `ylab` argument, defaulted so every existing call
+behaves identically. Full spec in `notes/specs.md` §17.
+
+**Result:** static `post_mh` = **−0.145 (SE 0.0635), t = −2.28** (−13.5%),
+against Poisson's −13.4% on the same spec — the two proportional estimators
+agree closely. Event-study post-1994 coefficients −0.056, −0.075, −0.158:
+monotone in vintage, consistent with the compliance ramp, individually noisy.
+Pre-period flat but not perfectly (1988 bin +0.13, wide CI). Zeros cost 1.5% of
+the sample (201,054 → 197,967).
+
+### Why log damage rather than damage / replacement value
+
+Colin's instinct was that the ratio removes the value-at-risk problem. It does,
+for the estimand — but the ratio inherits the denominator's contamination, which
+is where its noise comes from. Same static spec:
+
+| Outcome | post_mh | SE | t | R2 |
+|---|---|---|---|---|
+| `100 × damage / repl_cost` | +4.745 | 54.248 | 0.09 | 0.009 |
+| `log(damage / repl_cost)` | −0.1255 | 0.0582 | −2.16 | 0.409 |
+| `log(damage)` | −0.1452 | 0.0635 | −2.28 | 0.398 |
+
+The levels ratio has sd 19,828 and exceeds 100% — impossible by construction —
+for 1.1% of claims. In logs the identity `log(ratio) = log(damage) −
+log(repl_cost)` holds exactly in the estimates (−0.1579 − (−0.0324) = −0.1255),
+and since the denominator term is small and insignificant, subtracting it mostly
+adds noise. Log damage is the more precisely measured version of the same
+object and does not condition on a contaminated field.
+
+### Verified
+
+- `make test` passes (4 suites).
+- `building_damage_static` unchanged, byte-identical: −5.75370154734659. No
+  existing table, figure, or scalar moved.
+- Band decomposition asserted to sum to the raw outcome row-wise, and its
+  coefficients verified to sum to the headline.
+- Log/level identity check above reproduces to 4 decimal places.
+
+### Open questions
+
+1. **Does the paper's headline move to a proportional estimator?** Poisson
+   targets `E[Y|X]` directly, so it escapes all three of Chunk L's objections to
+   logs — no retransformation, zeros handled natively, and the vintage effect
+   enters proportionally, as the data say it operates. The framing in §15 was
+   levels-vs-logs; Poisson is the third option. −13.5% on the MH pre-1994 mean
+   of 11.86 implies ≈ **−1.6 per claim vs the current −5.75**, a factor of 3.6,
+   which would take the BCR from ~0.52 to roughly 0.15. Sits with Chunk C's
+   compliance-cost decision and Chunk I's static-vs-event-study delta question.
+2. **The proportional estimate is not nailed down either.** Poisson's −13.4%
+   is much larger than the raw proportional DiD of −2.5%, so the county ×
+   loss-year FE do heavy lifting. Not necessarily wrong — composition across
+   counties and storms is real — but it deserves the same scrutiny.
+3. **The common-support estimate is not the truth.** Conditioning on a value
+   window while the whole value distribution shifts up induces its own
+   selection: a $68k post-1994 site-built home is a more unusual home than a
+   $68k pre-1994 one. Use as a diagnostic, not a headline.
+4. **The placebo is not in `program/tests/`.** Verified in simulation and
+   described in a code comment, but not added to the fake-data harness. Should
+   be, before the levels headline is defended in print.
+5. **The figure is not wired into `paper.Rmd`**, and `estimate-welfare.R` still
+   uses the levels deltas.
+
+---
+
 ## Chunk L — Levels vs. logs on the NFIP outcomes, and table presentation (2026-08-26)
 
 Branch `chunk-k-water-depth-robustness` (continued from Chunk K rather than

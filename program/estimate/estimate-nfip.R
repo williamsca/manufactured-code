@@ -80,6 +80,7 @@ v_dict <- c(
     "claims_n" = "Claims (#)",
     "policies_n" = "Policies (#)",
     "building_damage" = "Building damage",
+    "log_building_damage" = "Log building damage",
     "net_building_pmt" = "Net building pmt.",
     "contents_damage" = "Contents damage",
     "net_contents_pmt" = "Net contents pmt.",
@@ -327,6 +328,46 @@ dt_claims[, contents_damage_unw := contents_damage]
 dt_claims[, (v_loss) := lapply(
     .SD, function(x) pmin(x, MAX_CLAIM_LOSS)), .SDcols = v_loss]
 
+# Log building damage (Chunk M). A proportional counterpart to the levels
+# outcome above, added because the levels specification's identifying
+# assumption does not hold in the units it is estimated in.
+#
+# Equation (2)'s parallel-vintage-trends assumption is that the common
+# vintage effect lambda_nu is the same for both housing types. In a levels
+# regression that requires the vintage profile to be common *in dollars*.
+# The data reject that and support the proportional version instead: across
+# the 1994 boundary, median recorded replacement cost rises 15.4% for
+# site-built (143.6 -> 165.8) and 16.7% for MH (39.9 -> 46.6), so the DiD on
+# LOG replacement cost is -0.031 (SE 0.027), indistinguishable from zero,
+# while the same DiD on the LEVEL of replacement cost is -20.58 (SE 2.89).
+# Newer homes of both types are larger and more valuable, and dollar damage
+# scales with what is at risk.
+#
+# A common proportional vintage gradient applied to bases that differ by a
+# factor of 2.4 (mean pre-1994 building damage 28.95 site-built vs 11.86 MH)
+# mechanically produces a negative level DiD with no resilience effect at
+# all: 11.86 * 0.156 - 28.95 * 0.156 = -2.67, against a raw level DiD of
+# -3.00 and a fixed-effects estimate of -5.75. Verified in simulation but NOT
+# yet added to program/tests/: on fake claims with a TRUE post_mh effect of
+# zero and a common proportional vintage gradient, the levels specification
+# returns roughly -5.3 (t = -5.4) while Poisson recovers zero. Worth adding
+# to the fake-data harness before the levels headline is defended in print.
+#
+# Logs remove the base-scale term by construction, so the coefficients are
+# comparable across two housing types of very different value. The cost is
+# the zero claims, which are dropped: exact zeros are
+# `dt_zero_share$building_damage` of records (about 1.6%), exported as a
+# scalar below. This is a diagnostic outcome, not a replacement for the
+# levels headline -- the cost-benefit calculation needs a change in expected
+# dollars, which a log coefficient does not deliver without a
+# retransformation assumption. Poisson (`est_claim_pois`) is the estimator
+# that gives both, and Chunk L's levels-vs-logs discussion should be read
+# alongside this. Winsorization at MAX_CLAIM_LOSS is retained so the log
+# outcome sits on the same underlying values as every other claim-level
+# outcome; it binds for 8 records and is immaterial in logs.
+dt_claims[, log_building_damage := fifelse(
+    building_damage > 0, log(building_damage), NA_real_)]
+
 v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
 dt_claims[, (v_shares_names) := lapply(
@@ -404,6 +445,23 @@ fmla_claim_es <- as.formula(paste0(
 est_claim_es <- feols(fmla_claim_es, data = dt_claims_est, cluster = ~countyfp)
 etable(est_claim_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_claim_es[lhs = "building_pmt$"])
+
+# Log building damage (Chunk M), estimated separately rather than added to
+# `s_claim`, so the four columns of `claims-outcomes.tex` and
+# `claims-outcomes-static.tex` are unchanged. Identical specification,
+# fixed effects, and clustering to `fmla_claim_es`; the sample differs only
+# by the dropped zero-damage claims, so N is reported alongside the levels
+# fit below rather than assumed equal.
+est_claim_es_log <- feols(
+    log_building_damage ~ i(period_constr, mh, ref = ref_period) |
+        geo^year_loss + mh + period_constr,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_claim_es_log, fitstat = c("n", "r2", "my"))
+
+est_static_log <- feols(
+    log_building_damage ~ post_mh | geo^year_loss + mh + post1994,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_static_log, fitstat = c("n", "r2", "my"))
 
 # Paper table columns. `building_damage_share` is still estimated (its scalars
 # feed notes/apps/abstract-appam.Rmd) but is no longer a column of either paper
@@ -969,14 +1027,19 @@ theme_paper <- function(base_size = 14) {
 # Extracts interaction terms (:mh), appends a zero row at the reference period,
 # and draws point estimates with 95% CI ribbon.
 plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "mh",
-                    yscale = 1, ref = ref_period) {
+                    yscale = 1, ref = ref_period, ylab = NULL) {
     # [[]] extracts a single fixest object; [lhs=] returns fixest_multi,
     # whose coeftable() output has a different structure
     if (!is.null(outcome)) est <- est[lhs = outcome][[1]]
-    ylab <- if (!is.null(outcome) && outcome %in% names(v_dict)) {
-        unname(v_dict[[outcome]])
-    } else {
-        outcome
+    # `ylab` given explicitly wins, so a single-LHS fit (passed with
+    # outcome = NULL, which cannot be looked up in `v_dict`) can still be
+    # labeled.
+    if (is.null(ylab)) {
+        ylab <- if (!is.null(outcome) && outcome %in% names(v_dict)) {
+            unname(v_dict[[outcome]])
+        } else {
+            outcome
+        }
     }
     if (ylab %in% c("Building damage")) ylab <- paste0(ylab, " (000s)")
 
@@ -1110,6 +1173,13 @@ plot_es(est_claim_es, "net_building_pmt",
 plot_es(est_claim_es, "building_damage",
         path = file.path(out_dir, "es-building-damage.pdf"))
 
+# Log building damage (Chunk M). `est_claim_es_log` is a single-LHS fit, so
+# it is passed directly with outcome = NULL and the axis label given here
+# rather than looked up through `v_dict`.
+plot_es(est_claim_es_log, outcome = NULL, var = "mh",
+        ylab = "Log building damage",
+        path = file.path(out_dir, "es-log-building-damage.pdf"))
+
 plot_es(est_claim_es, "net_contents_pmt",
         path = file.path(out_dir, "es-net-contents-pmt.pdf"))
 
@@ -1162,6 +1232,24 @@ stc_net_bldg <- extract_static(est_static, "net_building_pmt")
 stc_cont_dmg <- extract_static(est_static, "contents_damage")
 stc_net_cont <- extract_static(est_static, "net_contents_pmt")
 stc_bldg_shr <- extract_static(est_static, "building_damage_share")
+
+# Log building damage (Chunk M): the static post_mh coefficient, the
+# event-study post-1994 average, and the sample cost of dropping zeros
+# relative to the levels fit on the same specification.
+stc_bldg_log <- local({
+    ct <- as.data.table(coeftable(est_static_log), keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    list(est = ct$Estimate, se = ct[["Std. Error"]], t = ct[["t value"]])
+})
+eff_bldg_log <- local({
+    ct <- as.data.table(coeftable(est_claim_es_log), keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    post <- ct[period >= 1994L, Estimate]
+    list(avg = mean(post), min = min(post), max = max(post))
+})
+n_lvl_est <- nobs(est_static[lhs = "building_damage$"][[1]])
+n_log_est <- nobs(est_static_log)
 
 # water-depth robustness (Chunk K): post_mh across the three single-LHS
 # columns of est_rob_list, so the text can report how the headline
@@ -1329,7 +1417,14 @@ fwrite(
             "zero_share_net_building_pmt", "zero_share_net_contents_pmt",
             "building_damage_static_unw",  "contents_damage_static_unw",
             "building_damage_r2",          "building_damage_r2_unw",
-            "contents_damage_r2",          "contents_damage_r2_unw"
+            "contents_damage_r2",          "contents_damage_r2_unw",
+            "log_building_damage_static",    "log_building_damage_static_se",
+            "log_building_damage_static_t",
+            "log_building_damage_avg",       "log_building_damage_min",
+            "log_building_damage_max",
+            "log_building_damage_r2",
+            "zero_share_building_damage",
+            "n_building_damage_levels",      "n_building_damage_log"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -1375,7 +1470,12 @@ fwrite(
             r2(est_static[lhs = "building_damage$"][[1]], "r2"),
             r2(est_static_unw[lhs = "building_damage_unw"][[1]], "r2"),
             r2(est_static[lhs = "contents_damage$"][[1]], "r2"),
-            r2(est_static_unw[lhs = "contents_damage_unw"][[1]], "r2")
+            r2(est_static_unw[lhs = "contents_damage_unw"][[1]], "r2"),
+            stc_bldg_log$est, stc_bldg_log$se, stc_bldg_log$t,
+            eff_bldg_log$avg, eff_bldg_log$min, eff_bldg_log$max,
+            r2(est_static_log, "r2"),
+            dt_zero_share$building_damage,
+            n_lvl_est, n_log_est
         )
     ),
     here("output", "results", "nfip-scalars.csv")

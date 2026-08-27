@@ -1109,3 +1109,98 @@ R2 column, the appendix now says this explicitly. New block after the
 `est_rob_list` N assertion computes `dt_wd_var` and exports
 `water_depth_bins_per_cell`, `water_depth_single_bin_share`, and
 `water_depth_n_bins`; the appendix paragraph reads them rather than hardcoding.
+
+## 17. Log building damage event study (Chunk M, 2026-08-27)
+
+Colin's request: add a log-damage event study to the `output/event-study/countyfp`
+suite, dropping zero-damage claims. Prompted by the finding below, and by his
+observation that building damage as a share of replacement value yields a noisy
+null in the dynamic TWFE.
+
+### Why the outcome exists: the levels spec is not identified in its own units
+
+§1's parallel-vintage-trends assumption is that the common vintage effect
+$\lambda_\nu$ is the same for manufactured and site-built homes. A regression in
+levels requires that profile to be common **in dollars**. The data reject that
+and support the proportional version instead:
+
+| | Pre-1994 vintage | Post-1994 vintage | Change |
+|---|---|---|---|
+| Site-built median repl. cost | 143.6 | 165.8 | +15.4% |
+| MH median repl. cost | 39.9 | 46.6 | +16.7% |
+| Site-built mean building damage | 28.95 | 33.46 | +15.6% |
+| MH mean building damage | 11.86 | 13.36 | +12.7% |
+
+Same DiD, two units: on **log** replacement cost, `post_mh` = −0.031 (SE 0.027),
+indistinguishable from zero; on the **level** of replacement cost, −20.58
+(SE 2.89). Newer homes of both types are larger and more valuable, and dollar
+damage scales with what is at risk.
+
+A common proportional vintage gradient applied to bases differing by a factor of
+2.4 mechanically produces a negative level DiD with no resilience effect at all:
+`11.86 × 0.156 − 28.95 × 0.156 = −2.67`, against a raw level DiD of −3.00 and the
+fixed-effects headline of −5.75. Trimming site-built claims to below the MH 90th
+percentile of replacement cost (**retaining every MH claim**) drives the levels
+estimate from −5.754 (1.451) to +0.099 (0.783), and Poisson from −13.4% to +2.3%;
+the gradient in the trim is monotone (−5.51 → −1.85 → −0.46 → +0.02).
+
+### Spec
+
+- **Outcome:** `log_building_damage = log(building_damage)` where
+  `building_damage > 0`, else NA. Winsorized at `MAX_CLAIM_LOSS` like every
+  other claim-level outcome (binds for 8 records, immaterial in logs).
+- **Event study:** `log_building_damage ~ i(period_constr, mh, ref = 1992) | geo^year_loss + mh + period_constr`
+  (`est_claim_es_log`) — identical FE, clustering (`countyfp`), and sample
+  construction to §1, estimated separately from `s_claim` so the four columns of
+  `claims-outcomes.tex` and `claims-outcomes-static.tex` are unchanged.
+- **Static:** `log_building_damage ~ post_mh | geo^year_loss + mh + post1994`
+  (`est_static_log`).
+- **Figure:** `output/event-study/countyfp/es-log-building-damage.pdf`.
+- **Sample cost of the zeros:** 201,054 → 197,967 (1.5%);
+  `zero_share_building_damage` = 0.0155.
+
+### Result
+
+Static `post_mh` = **−0.145 (SE 0.0635), t = −2.28**, i.e. −13.5%, against
+Poisson's −13.4% on the same specification — the two proportional estimators
+agree closely. Event-study post-1994 coefficients are −0.056, −0.075, −0.158:
+monotone in vintage, consistent with the compliance ramp, individually noisy.
+Pre-period is flat but not perfectly so (1988 bin at +0.13, CI wide).
+
+Applied to the MH pre-1994 mean of 11.86, −13.5% implies roughly **−1.6** per
+claim against the levels headline of −5.75, a factor of 3.6. This is not yet
+carried into `estimate-welfare.R` — see the open item in `TODO.md`.
+
+### Why log damage, not damage/replacement value
+
+The ratio outcome is not a power problem that a better estimator can fix; its
+denominator is contaminated (§15's diagnosis of the value fields). Same static
+spec, three candidate proportional outcomes:
+
+| Outcome | `post_mh` | SE | t | R2 |
+|---|---|---|---|---|
+| `100 × damage / repl_cost` | +4.745 | 54.248 | 0.09 | 0.009 |
+| `log(damage / repl_cost)` | −0.1255 | 0.0582 | −2.16 | 0.409 |
+| `log(damage)` | −0.1452 | 0.0635 | −2.28 | 0.398 |
+
+The ratio in levels has a standard deviation of 19,828 and exceeds 100% — which
+is impossible by construction — for 1.1% of claims. In logs the ratio becomes
+usable, and the identity `log(ratio) = log(damage) − log(repl_cost)` holds
+exactly in the estimates: on the common sample, −0.1579 − (−0.0324) = −0.1255.
+Because the denominator term is small and insignificant, subtracting it mostly
+adds noise. **Log damage is the more precisely measured version of the same
+object**, and it does not condition on a contaminated field.
+
+### Scalars added
+
+`log_building_damage_static{,_se,_t}`, `log_building_damage_{avg,min,max}`,
+`log_building_damage_r2`, `zero_share_building_damage`,
+`n_building_damage_{levels,log}`.
+
+### Not done in this pass
+
+The figure is written but not wired into `paper.Rmd`, and the levels headline is
+unchanged (`building_damage_static` = −5.75370154734659, byte-identical after
+this change). Whether the paper's headline moves to a proportional estimator is
+the open decision, alongside Chunk C's compliance-cost question and Chunk I's
+static-vs-event-study delta question.
