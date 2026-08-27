@@ -22,7 +22,13 @@
 # Inputs:  derived/census2000-mh-county-vintage.Rds
 #          census_mhs_state_year, census_mhs_national_year, census_bps
 #          (research-database, via rd_read() - see program/import/UPDATE.md)
-# Output:  derived/stock-county-vintage.Rds (countyfp x year_constr x mh, homes_n)
+# Output:  derived/stock-county-vintage.Rds
+#          (countyfp x year_constr x mh, homes_n, homes_flat_n)
+#
+# homes_flat_n is a companion denominator built from the same Census bin totals
+# with the annual sources replaced by an equal split over the bin's span. It is
+# a perturbation used to bound how much of a take-up specification's vintage
+# profile the annual imputation supplies; see section 4.
 
 rm(list = ls()); gc()
 library(here)
@@ -182,9 +188,33 @@ grid <- merge(
 grid[, mh_n := mh_units * share_mh]
 grid[, sb_n := sb_units * share_sb]
 
+# Companion denominator with the annual sources switched off: the same Census
+# bin totals split EQUALLY over every year the bin spans, which is exactly the
+# no-source fallback used above (`yr_wt / n_span_bin`) applied to every cell
+# rather than only where MHS or BPS is empty. It carries the same Census levels
+# and the same kept-year normalization as homes_n, and differs from it only in
+# the within-bin annual allocation.
+#
+# This is not an alternative estimate of the stock -- an equal split is a worse
+# description of a bin's true year profile than the placement and permit series
+# are. It is a perturbation: re-running a take-up specification on it says how
+# much of that specification's vintage profile is supplied by the annual
+# sources rather than by the policy data. Any vintage pattern that survives the
+# swap is not coming from the within-bin imputation; any pattern that does not
+# survive is.
+grid <- merge(
+    grid, bin_span[kept == TRUE, .(vintage_census, year_constr = year, yr_wt)],
+    by = c("vintage_census", "year_constr")
+)
+grid[, share_flat := yr_wt / n_span_bin[vintage_census]]
+grid[, mh_flat_n := mh_units * share_flat]
+grid[, sb_flat_n := sb_units * share_flat]
+
 dt_stock <- rbind(
-    grid[, .(countyfp, year_constr, mh = 1L, homes_n = mh_n, vintage_census)],
-    grid[, .(countyfp, year_constr, mh = 0L, homes_n = sb_n, vintage_census)]
+    grid[, .(countyfp, year_constr, mh = 1L, homes_n = mh_n,
+             homes_flat_n = mh_flat_n, vintage_census)],
+    grid[, .(countyfp, year_constr, mh = 0L, homes_n = sb_n,
+             homes_flat_n = sb_flat_n, vintage_census)]
 )
 setkey(dt_stock, countyfp, year_constr, mh)
 
@@ -197,6 +227,23 @@ stopifnot(uniqueN(dt_stock[, .(countyfp, year_constr, mh)]) == nrow(dt_stock))
 # no negative or missing homes_n
 stopifnot(!anyNA(dt_stock$homes_n))
 stopifnot(all(dt_stock$homes_n >= 0))
+# the flat companion must be defined on exactly the same cells, so that a
+# specification can be re-run on it without any change of sample
+stopifnot(!anyNA(dt_stock$homes_flat_n))
+stopifnot(all(dt_stock$homes_flat_n >= 0))
+# One-directional by construction: homes_n > 0 requires a positive Census bin
+# total, which is all homes_flat_n needs, so every cell the baseline uses has a
+# flat counterpart and the perturbation never changes the estimation sample. The
+# converse fails where a state reported zero placements (or a county zero
+# permits) in a single year of a bin that is otherwise positive -- there the
+# annual sources assign that year no stock at all while an equal split assigns
+# it a full share. Those cells are excluded from both denominators downstream,
+# since the estimation sample is defined by homes_n.
+stopifnot(all(dt_stock$homes_flat_n[dt_stock$homes_n > 0] > 0))
+message(sprintf(
+    "Cells with zero imputed stock but positive flat stock: %d of %d (%.2f%%)",
+    dt_stock[homes_n == 0 & homes_flat_n > 0, .N], nrow(dt_stock),
+    100 * dt_stock[homes_n == 0 & homes_flat_n > 0, .N] / nrow(dt_stock)))
 
 # adding-up: the retained years of a bin must never sum to MORE than the Census
 # bin total (they sum to exactly the total only where the whole span is retained).
@@ -217,6 +264,28 @@ stopifnot(all(abs(
 stopifnot(all(abs(
     chk_sb[vintage_census %in% full_bins, alloc_tot - sb_units]) < 1e-6))
 message("Adding-up test passed: retained years never exceed their Census bin total; fully retained bins match exactly.")
+
+# same bound for the flat companion, plus the exact year-count fraction it must
+# hit: with equal shares the retained fraction of a bin is kept_frac by
+# construction, whereas homes_n's is source-weighted (placements- or
+# permits-weighted) and so differs. That difference is part of the perturbation,
+# not a defect in it: switching the annual sources off changes both the within-
+# bin year profile and how much of a partly retained bin the kept years claim,
+# because both come from the same series. Printed below so the size of the
+# second channel is visible rather than implicit.
+chk_f <- dt_stock[, .(alloc_tot = sum(homes_flat_n)),
+                  by = .(countyfp, vintage_census, mh)]
+chk_f_mh <- merge(chk_f[mh == 1L], dt_vtg[, .(countyfp, vintage_census, mh_units)],
+                  by = c("countyfp", "vintage_census"))
+chk_f_sb <- merge(chk_f[mh == 0L], dt_vtg[, .(countyfp, vintage_census, sb_units)],
+                  by = c("countyfp", "vintage_census"))
+stopifnot(
+    all(abs(chk_f_mh$alloc_tot -
+            chk_f_mh$mh_units * kept_frac[chk_f_mh$vintage_census]) < 1e-6),
+    all(abs(chk_f_sb$alloc_tot -
+            chk_f_sb$sb_units * kept_frac[chk_f_sb$vintage_census]) < 1e-6)
+)
+message("Flat-split adding-up test passed: each bin retains exactly its year-count fraction.")
 # report the realized retained fraction against the year-count benchmark, so a
 # future change to bin_years or bin_span shows up here rather than silently
 realized <- rbind(
@@ -249,9 +318,21 @@ message(sprintf(
     "National MH stock 1986-1999 (imputed): %.0f units. Cumulative MHS shipments, same years: %.0f. Ratio: %.2f",
     stock_1986_99, ship_1986_99, stock_1986_99 / ship_1986_99))
 
+# How far the flat companion moves each construction year's national stock. A
+# year where the two agree has an annual imputation that is doing nothing; a
+# year where they diverge is one whose denominator is the annual sources'
+# handiwork, and so one whose take-up rate a specification cannot separate from
+# them.
+cmp <- dt_stock[, .(imputed = sum(homes_n), flat = sum(homes_flat_n)),
+                by = .(mh, year_constr)]
+cmp[, log_gap := log(flat / imputed)]
+message("National stock, flat split vs imputed (log gap by construction year):")
+print(dcast(cmp, year_constr ~ mh, value.var = "log_gap")[
+    , lapply(.SD, function(x) if (is.numeric(x)) round(x, 3) else x)])
+
 dt_stock[, statefp := NULL]
 dt_stock[, vintage_census := NULL]
-setcolorder(dt_stock, c("countyfp", "year_constr", "mh", "homes_n"))
+setcolorder(dt_stock, c("countyfp", "year_constr", "mh", "homes_n", "homes_flat_n"))
 
 saveRDS(dt_stock, here("derived", "stock-county-vintage.Rds"))
 message(sprintf(

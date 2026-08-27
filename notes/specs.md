@@ -104,15 +104,35 @@ Last verified: 2026-08-26, against commit at the top of `notes/LOG.md` (Chunk L)
     claim rate; `dt_cell` filters them out (`policies_n > 0`), so they leave
     the weighted composition/claim-rate regressions. `dt_pois` keeps them,
     since the take-up PPML models the policy count itself.
-- **Spec (take-up, PPML):** `c(policies_n, claims_n) ~ i(period_constr, mh, ref = 1993) | geo^period_loss + mh + period_constr`
+- **Spec (take-up, PPML with an exposure offset — rewritten in Chunk N,
+  2026-08-27):** three separate `fepois` fits on `dt_home_cell`, which is
+  rebuilt from the row level so numerator and denominator span the same
+  construction years (see §12.2):
+  - `policies_n ~ i(period_constr, mh, ref = 1992) | geo^period_loss + mh + period_constr`, `offset = ~log(homes_n * 5)`
+  - `claims_n ~ (same RHS)`, `offset = ~log(homes_n * 5)`
+  - `claims_n ~ (same RHS)`, `offset = ~log(policies_n)`
+  plus the static counterparts with `post_mh | geo^period_loss + mh + post1994`.
+  Every coefficient is a **log rate ratio**, not a level difference in policies
+  per 1,000 homes. Between Chunk E (2026-08-13) and Chunk N this block ran OLS
+  on the ratio itself, weighted by `homes_n`; §18 records why that was
+  reverted.
 - **Spec (policy composition, OLS):** `c(repl_cost_ppol, ...) ~ i(period_constr, mh, ref = 1993) | geo^period_loss + mh + period_constr`
   Five outcomes are reported (replacement cost, building coverage, contents
   coverage, elevated share, SFHA share); `primary_res_share` and
   `mandatory_purchase_share` are commented out of the outcome list, and
   Chunk I removed them from the Table 3 notes, which still described them.
-- **Weights:** cell-level OLS specs (composition, MH-share, claim-rate) are
-  weighted by `policies_n`; the take-up PPML is unweighted (counts model)
-- **Clustering: by county (`geo`)**, fixed in Chunk I (2026-08-26).
+- **Weights:** cell-level OLS specs (composition, MH-share) are weighted by
+  `policies_n`; the take-up PPML is unweighted, since exposure enters through
+  the offset rather than through a weight
+- **Clustering: by county (`geo`) everywhere EXCEPT the take-up block, which
+  clusters by state** (Chunk N). The take-up denominator's within-bin annual
+  allocation is a state-year MHS placement series broadcast to every county in
+  the state, so its error is close to one draw per state × vintage × housing
+  type; county clustering credits it with precision it does not have. County-
+  clustered SEs for the three static take-up fits are still exported as
+  scalars (`*_cty_se`) and reported in the paper. Everything below applies to
+  the non-take-up cell specs.
+- **Clustering fix,** Chunk I (2026-08-26).
   Previously no `cluster` argument was passed to the four cell-level fits
   (`est_pclaim_es`, `est_comp_post`, `est_share_es`, `est_pois_es`), so
   `fixest` reported IID SEs — while `paper.Rmd`'s notes for Tables 3 and 4
@@ -126,6 +146,8 @@ Last verified: 2026-08-26, against commit at the top of `notes/LOG.md` (Chunk L)
 - **Outputs:** `output/event-study/countyfp/take-up.tex` (Table
   `tab:take-up`, appendix), `output/event-study/countyfp/take-up-static.tex`
   (Table `tab:take-up-static`, appendix, new in Chunk I),
+  `output/event-study/countyfp/take-up-robust.tex` (Table
+  `tab:take-up-robust`, appendix, new in Chunk N),
   `output/event-study/countyfp/policy-composition.tex`
   (Table `tab:composition`)
 - **Fixed (Chunk E, 2026-08-13):** `policies_ppermit` (policies ÷
@@ -303,11 +325,22 @@ import layer is not similarly stale before the next check-in.
 - `test-mhs-price-did.R`: simulates a state-year panel with a known
   post-1994 treatment effect for treated states; confirms the production
   spec (§1) recovers it with flat pre-trends.
-- `test-take-up-imputation.R`: two groups. (i) The take-up SPEC (§12):
-  simulates a `geo x period_constr x mh` panel with a known per-home rate
-  shift and a small share of near-zero-stock cells; confirms the
-  `homes_n`-weighted OLS recovers the effect and that dropping the weights
-  lets those cells dominate. (ii) The take-up DENOMINATOR (§12.2, added
+- `test-take-up-imputation.R`: three groups. (i) The take-up SPEC (§12, §18):
+  simulates a `geo x period_loss x period_constr x mh` panel whose per-home
+  rate is multiplicative in a county effect spanning two orders of magnitude,
+  with the post-1994 MH stock tilted toward high-take-up counties. Confirms
+  that PPML with a `log(home-years)` offset recovers a known proportional
+  effect, and that on a **zero-effect** draw the level-rate specification
+  returns a coefficient of about −25% of the mean rate while PPML returns
+  ≈0 — the placebo for §18.2. Also confirms the level bias shrinks when the
+  composition tilt is switched off and when each county gets its own `mh`
+  effect, which identifies the tilt and the additive `mh` effect as its two
+  ingredients. Rewritten in Chunk N; before that it tested the
+  `homes_n`-weighted OLS the paper no longer runs. (iii) The `homes_flat_n`
+  companion denominator (§18.7): the equal split retains exactly the
+  year-count fraction of a bin rather than the source-weighted one, and is
+  positive wherever the imputed stock is, so swapping it cannot change the
+  estimation sample. (ii) The take-up DENOMINATOR (§12.2, added
   2026-08-26 after both defects there slipped past the harness): confirms
   that within-bin shares normalized over the Census bin's full span recover
   the true retained stock while normalizing over retained years only inflates
@@ -316,6 +349,11 @@ import layer is not similarly stale before the next check-in.
   rate built from matched construction years is not inflated by a numerator
   covering a year the denominator omits, the way a row filter on an
   already-aggregated bin is.
+  Chunk O adds the scale placebo to this file (§19.7): on claims built with a
+  multiplicative housing-type gap, a proportional vintage gradient, and a
+  treatment effect of exactly zero, the dollar specification returns about −21%
+  of the MH mean at t ≈ −10 while Poisson returns ≈0; a second test confirms the
+  cost-benefit conversion recovers a known dollar effect to within 10%.
 - `test-welfare-arithmetic.R`: unit-tests `npv_annuity()` against
   closed-form annuity values; recomputes claim rate / annual benefit / NPV /
   BCR from a small synthetic county × vintage panel with known parameters
@@ -1204,3 +1242,269 @@ unchanged (`building_damage_static` = −5.75370154734659, byte-identical after
 this change). Whether the paper's headline moves to a proportional estimator is
 the open decision, alongside Chunk C's compliance-cost question and Chunk I's
 static-vs-event-study delta question.
+
+## 18. Take-up moved to PPML with an exposure offset (Chunk N, 2026-08-27)
+
+Colin's question (2026-08-27): the dynamic take-up coefficients swing between
+large positive and large negative in adjacent vintage bins, several of them
+significant, and the significance looks overstated relative to how much the
+point estimates move. Three separate problems, each of which is enough on its
+own to invalidate the old table.
+
+### 18.1 The dynamic profile was the imputed denominator
+
+Decomposing the level event study into its two halves with the identical
+interaction and fixed effects — `log(policies_n)` and `log(homes_n)`, both on
+`i(period_constr, mh) | geo^period_loss + mh + period_constr`:
+
+| bin  | log policies | log homes (imputed) | level coef |
+|------|-------------:|--------------------:|-----------:|
+| 1984 | −0.005 | **+0.201** (t=7.4)  | −6.20** |
+| 1986 | −0.189 | **−0.063** (t=−2.3) | +1.76   |
+| 1988 | −0.097 | **−0.155** (t=−5.1) | +6.56** |
+| 1990 | +0.060 | **−0.081** (t=−3.1) | +3.05   |
+| 1994 | +0.273 | **+0.282** (t=9.9)  | −3.01   |
+| 1996 | +0.258 | **+0.272** (t=10.8) | +7.50***|
+| 1998 | +0.394 | **+0.286** (t=10.7) | +5.79***|
+
+`homes_n` — a quantity containing no policy data — carries a vintage × MH
+profile with county-clustered t-statistics of 5 to 11. Two components: a
+sawtooth inside the 1980-89 Census bin, where every year-to-year movement comes
+from MHS placements versus BPS permits with no attrition adjustment; and a flat
++0.28 step at 1994 that is *identical* across the 1994/1996/1998 bins because it
+is the Census bin boundary 1990_1994 → 1995_1998, not an event. The numerator's
++0.27 jump at 1994 nearly cancels the denominator's +0.28, so the rate is flat
+across the boundary in logs.
+
+Decisive check, now Table `tab:take-up-robust`: swap the imputed within-bin
+annual shares for an equal split (correlation of the two logs is 0.97, so this
+is a mild perturbation). The pre-1994 level profile moves from
+(−6.2, +1.8, +6.6, +3.0) to (−5.4, −4.8, −4.3, +2.1) — the 1988 bin flips from
++6.56** to −4.3 — and the static estimate moves +4.65 → +8.22. The post-1994
+bins barely move, because the 1995-1998 Census bin is retained in full and its
+placement and permit shares are near-uniform within it. In the PPML version the
+largest pre-1994 movement is 0.29 log points, larger than any coefficient in
+that part of the profile.
+
+### 18.2 The level spec was not identified in its own units (same as §17)
+
+The MH/site-built take-up gap is proportional, not additive: weighted take-up
+runs 3.97 annual policies per 1,000 homes in the bottom county tercile to 107.91
+in the top, a factor of 27. One additive `mh` fixed effect cannot fit both ends,
+and `post_mh` absorbs the misfit.
+
+| static, policies per 1,000 homes | estimate |
+|---|---|
+| common `mh` + `post1994` FE (the old spec) | **+4.65** (2.24 county / 3.83 state) |
+| estimated separately within each tercile   | −0.17 / −1.67 / **−11.18** — negative in all three |
+| `mh`, `post1994` FE × tercile              | **−5.52** |
+| county-specific `mh` FE                    | **−1.46** |
+| five-year construction bins                | **+0.42** |
+
+PPML with `offset = log(home-years)` over the same perturbations: 0.007 → 0.164
+→ 0.052. Sign-stable and small throughout. Trimming thin `homes_n` cells does
+nothing (`homes_n ≥ 25` gives +4.74), so the thin-cell weighting rationale
+recorded in §12 was not what the weights were actually doing — the scale was.
+
+### 18.3 County clustering overstated precision
+
+MHS placements are a **state**-year series broadcast to every county in a state,
+so the denominator's error is close to one draw per state × vintage × type, not
+2,866 county draws. Static level estimate: +4.65 (SE 2.24) clustered by county
+versus (SE 3.83) clustered by state — significant at 5% becomes t = 1.21. All
+take-up columns now cluster by state; `*_cty_se` scalars keep both visible in
+the paper. Column (3) uses no imputed input and is unaffected either way
+(0.046 county vs 0.050 state).
+
+### 18.4 What the data say once the scale is right
+
+PPML with offsets, state-clustered, static: policies/home **+0.007 (0.086)**,
+claims/home +0.176 (0.115), claims/policy +0.059 (0.050). All null. Dynamic
+policies/home: −0.08, 0.00, +0.19, +0.19, [ref], 0.00, +0.01, +0.11 — the
+largest coefficient in the profile is pre-reform (1990-91). The appendix now
+reports a noisy null: enough to rule out the crowding-out prediction, which
+requires a *fall*, and not enough to claim a rise. The previous text's "the
+reform is associated with higher insurance demand" is gone.
+
+The **mandatory-purchase split reverses** on the new scale. Old (levels):
+mandated +0.79 (0.20), non-mandated +7.33 (2.56) — "nine-tenths of the movement
+is in policies the homeowner was not required to buy." New (PPML): mandated
+**+0.275 (0.057)**, non-mandated −0.011 (0.090). The mandated component rose
+about 32%, which is what NFIRA 1994 predicts, but mandated policies are only
+7.7% of pre-1994 MH policy-years, so the contribution to the total is ≈ +0.021
+log points against a total of +0.007. NFIRA is visible where it should be and is
+too small to move the aggregate. Under PPML the two components do not add to the
+total, so the paper states this as a share-weighted approximation.
+
+### 18.5 Costs of the change, recorded honestly
+
+- **The exact decomposition identity is lost.** `claims/home = policies/home ×
+  claims/policy` holds cell by cell in the data but not among the fitted
+  coefficients: on a common sample, (1)+(3) = 0.048 against (2) = 0.176. Each
+  column solves its own Poisson score equation against its own offset. The
+  paper's "Three margins" section now says three margins, not a decomposition.
+- **The three columns no longer share a sample.** Poisson drops FE groups whose
+  outcome is zero throughout, so columns (2)-(3) run on 44,551 cells against
+  column (1)'s 68,497. Column (1) re-estimated on the claims sample is −0.011
+  (0.098) against +0.007 (0.086), so the sample difference is not what separates
+  the columns; exported as `takeup_ppml_static_clmsample`.
+
+### 18.6 Scalar renaming
+
+Every take-up estimate is now a log rate ratio, so the scalar names carry a
+`_ppml` marker (`takeup_ppml_static`, `claims_home_ppml_static`,
+`claim_rate_ppml_static`, …) and the old level names are gone. This is
+deliberate: a coefficient on a new scale under an old name is the one failure
+mode a rename prevents. Descriptive *level* rates that are statistics rather
+than estimates keep their unsuffixed names (`policies_per_1k_homes_yr_base_mh`,
+`policies_per_1k_homes_yr_mh_pre`, …) and the paper quotes them to give the log
+effects a magnitude.
+
+### 18.7 New in the build
+
+- `impute-stock.R` emits a second column, `homes_flat_n`: the same Census bin
+  totals normalized over the same span but split equally across the years each
+  bin covers. It is a perturbation for §18.1, not an alternative stock estimate.
+  Asserted positive wherever `homes_n` is, so swapping it never changes the
+  estimation sample; the reverse direction fails for 2.87% of cells (a year in
+  which a state reported no placements gets no imputed stock but a full equal
+  share), and those cells are outside the sample either way.
+- `estimate-nfip.R` reads `stock-county-vintage.Rds` directly for that column
+  rather than through the panel, so the robustness block needs no panel
+  rebuild; the merge is asserted against the panel's own `homes_n`.
+- Two new fake-data tests (§8): PPML with an offset recovers a known
+  proportional effect, and the level-rate spec returns a spurious −25%-of-mean
+  coefficient on a zero-effect DGP where PPML returns ≈0. The DGP tilts the
+  post-1994 MH stock toward high-take-up counties, which is the second half of
+  the real pathology — a proportional effect is invariant to that reweighting,
+  a level difference is not. Two more tests pin the `homes_flat_n` invariants.
+
+## 19. Claim-level headline moved to PPML, and the cost-benefit conversion (Chunk O, 2026-08-27)
+
+Colin's decision 2026-08-27, after §17 (Chunk M) diagnosed the levels problem on
+claim-level damages and §18 (Chunk N) found the same failure independently on the
+take-up outcomes: report the proportional estimates as the headline.
+
+### 19.1 Specification
+
+All four claim-level loss outcomes — `building_damage`, `net_building_pmt`,
+`contents_damage`, `net_contents_pmt` — are estimated by PPML on the same
+sample, fixed effects, and clustering as the levels fits they replace:
+
+- event study: `c(...) ~ i(period_constr, mh, ref = 1992) | geo^year_loss + mh + period_constr`
+- static: `c(...) ~ post_mh | geo^year_loss + mh + post1994`
+- `cluster = ~countyfp` (unchanged; the take-up block's state clustering in §18
+  is specific to the imputed denominator and does not apply here)
+
+Coefficients are log rate ratios. Static results: building damage −0.1434
+(0.0564) = **−13.4%**; contents damage −0.1422 (0.0568) = −13.3%; net building
+payment −0.1201 (0.0628) = −11.3%; net contents payment −0.2045 (0.0759) =
+−18.5%. All four significant.
+
+Sample sizes differ across columns (200,994 / 260,774 / 105,611 / 248,790)
+because Poisson drops county × loss-year cells whose outcome is zero throughout,
+and the four outcomes are zero for different sets of claims. Stated in the table
+notes.
+
+The levels fits (`est_static`, `est_claim_es`) are still run and their scalars
+still exported. They are no longer paper tables, but the paper quotes them to
+report the divergence between the scales, and `notes/apps/abstract-appam.Rmd`
+still consumes `building_damage_avg` and friends.
+
+### 19.2 Why PPML and not log OLS
+
+Three reasons, the third decisive:
+
+1. **Zeros are native.** 30% of claims record a zero net building payment and
+   67% a zero net contents payment. A log specification drops them and would
+   estimate the damage and payment columns on different samples.
+2. **No retransformation.** The estimate is stated without an assumption about
+   the shape of the loss distribution.
+3. **The conversion in §19.3 is only valid under PPML.** Poisson models E[Y|X],
+   so exp(b) is a ratio of CONDITIONAL MEANS and an observed mean times exp(b)
+   is that mean's counterfactual. Under log OLS exp(b) is a ratio of GEOMETRIC
+   means, and converting it into a change in the mean requires exactly the
+   distributional assumption the levels specification was originally chosen to
+   avoid. Chunk M built a log-OLS spec (`est_static_log`); this is why it is not
+   the one that became the headline.
+
+### 19.3 The cost-benefit conversion, and why it takes two baselines
+
+`estimate-welfare.R` turns each proportional estimate back into dollars per
+claim. The two calculations in that script have different counterfactuals, so
+they take different baselines:
+
+| calculation | counterfactual | baseline | formula | value |
+|---|---|---|---|---|
+| private per-unit NPV | pre-1994 home facing pre-1994 hazard | pre-1994 MH mean | ȳ_pre (1 − e^b) | building **$1,583**, contents $796 |
+| fiscal savings | claims post-1994 homes actually filed | post-1994 MH mean | ȳ_post (e^−b − 1) | net bldg **$1,307**, net contents $456 |
+
+The private calculation already applies the *pre-1994* claim rate as its
+counterfactual hazard, so pairing it with a post-1994 damage level would be
+internally inconsistent; the fiscal calculation multiplies *observed post-1994*
+claim counts, so the reverse holds. The two conversions differ by roughly 30%.
+Before Chunk O the script used one delta for both.
+
+Both means are computed in `estimate-nfip.R` on the estimation sample after
+winsorization (`dt_mh_base`), so they are means of exactly the variable the
+coefficient describes. The conversion assumes the proportional effect is
+homogeneous across claims — the same assumption the Poisson specification makes.
+
+**BCR moves 0.435 → 0.163.** NPV $529 against a $3,241 cost.
+
+### 19.4 Break-even for the omitted wind channel
+
+New scalars `wind_breakeven_npv` ($2,711) and `wind_breakeven_mult` (5.1×). The
+1994 standard is a *wind* standard; the flood channel is what these data
+identify. At a BCR of 0.16 the paper needs to say what the ratio covers, and a
+stated break-even threshold does that better than a qualitative caveat.
+
+### 19.5 Scrutiny of the proportional estimate (§17's second open item)
+
+`geo^mh` — a county-specific housing-type effect, which in PPML is a
+multiplicative baseline per county × housing type and absorbs the `mh` main
+effect — moves building damage to −5.3% (n.s.) and net building payment to
++0.5%. This is **attenuation, not a bias correction**: 515 of the 887 counties
+with any MH claim have MH claims on only one side of 1994, so they cannot
+identify a within-county vintage contrast. On counties where it is identified the
+two specifications converge and both grow:
+
+```
+all counties            base -13.4%   geo^mh  -5.3% (n.s.)
+>=1  MH claim each side       -12.7%           -5.4%     372 counties, 85% of MH claims
+>=5  each side                -16.4%          -10.4%      87 counties
+>=20 each side                -25.7%          -18.0%      16 counties, 1,767 MH claims
+```
+
+Scalars exported as `pois_*_ctymh`. Not tabled; whether it becomes a robustness
+column is open (TODO Chunk O).
+
+### 19.6 Winsorization on the new scale
+
+The old paragraph quoted levels R² and levels coefficients. Re-run on PPML
+(`est_static_pois_unw`): the $1M cap moves building damage 12.7% → 13.4% and
+contents 14.6% → 13.3%. Poisson weights an observation by its fitted mean rather
+than by its squared deviation, so extreme *level* records move it less than they
+move OLS.
+
+### 19.7 Harness (§8)
+
+`test-nfip-claims-es.R` gains the zero-effect placebo §17 left open, now
+load-bearing because the paper cites it in the main text. The DGP has a
+multiplicative housing-type gap (site-built ≈ 2.4× MH), a proportional common
+vintage gradient, and a treatment effect of exactly zero: the dollar spec returns
+−21% of the MH mean at t ≈ −10, Poisson returns −0.012 (n.s.). A second test
+confirms the §19.3 conversion — Poisson coefficient × pre-period MH mean —
+recovers a known dollar effect to within 10%.
+
+### 19.8 Slides
+
+`program/write-slide-macros.R` emits one `\newcommand` per quoted number to
+`output/results/slide-numbers.tex`; `make slides.pdf` regenerates it first, so no
+estimate is typed into `slides.tex` by hand. Chunk O brought its claim-level
+block onto the PPML scale and fixed a formatting bug: the water-depth macros ran
+PPML log coefficients through `fmt_d` (which multiplies by 1,000 for the $000
+scalars), so `\vWdDepth` rendered −0.116 as "$116". Damage outcomes now emit
+`*Pct` / `*LP` / `*Dol` and `fmt_d` is never applied to a coefficient. The
+"Why levels and not logs" backup frame is replaced by "Why proportional and not
+dollars".

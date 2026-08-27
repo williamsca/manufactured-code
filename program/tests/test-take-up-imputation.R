@@ -1,20 +1,15 @@
-# Fake-data test for the housing-stock take-up denominator (Chunk E,
-# estimate-nfip.R's homes_n-weighted OLS take-up spec).
+# Fake-data test for the housing-stock take-up denominator and the take-up
+# specification (Chunk E; moved to Poisson counts with an exposure offset in
+# Chunk N).
 #
-# Simulates a geo x period_constr x mh panel where `policies_n` is drawn
-# from a Poisson process with a known per-home RATE (flat pre-1994, a
-# known MH x post-1994 level shift) applied to a `homes_n` stock -- and
-# where a small share of cells have a near-zero imputed stock (as some
-# real county x period x mh cells do, mostly in the flagged 1994
-# construction-year bin), producing extreme `policies_per_home` ratios.
-# Confirms the production spec
-#   policies_per_home ~ i(period_constr, mh, ref = ref_period) |
+# The first block covers the SPEC. The production specification is
+#   policies_n ~ i(period_constr, mh, ref = ref_period) |
 #       geo^period + mh + period_constr,
-#   weights = homes_n, cluster = geo
-# recovers the true level effect despite those outlier cells, and
-# demonstrates that dropping the homes_n weights lets a handful of
-# near-zero-stock cells dominate the fit -- the reason the take-up spec is
-# weighted (TODO.md Chunk E).
+#   offset = log(home-years), cluster = state
+# and the two tests below establish, on data with a known answer, that it
+# recovers a true proportional effect and that the level-rate specification it
+# replaced does not. The second block covers how `homes_n` and the per-home
+# ratio are BUILT. The third covers the equal-split companion denominator.
 
 library(data.table)
 library(fixest)
@@ -22,63 +17,119 @@ library(testthat)
 
 set.seed(20260813)
 
+# Take-up counts drawn from a Poisson process with a known per-home RATE. The
+# panel mirrors the production one: county x calendar period x construction
+# vintage x housing type, so that the county x calendar-period fixed effect
+# spans every vintage and housing type rather than a single pair of cells.
+#
+# The rate is MULTIPLICATIVE in a county effect, which is what the real data
+# look like: take-up per home differs across counties by more than an order of
+# magnitude, and the MH/site-built gap is proportional rather than a constant
+# number of policies per 1,000 homes. `true_effect` is a log-scale MH x
+# post-1994 shift, so a value of 0 is a genuine zero-effect placebo.
+#
+# `tilt` shifts the vintage composition of the MH stock toward high-take-up
+# counties after 1994. This is the second half of the real pathology: the
+# manufactured-housing boom of the mid-1990s was not spread evenly across
+# counties, so the set of counties carrying the post-1994 comparison is
+# weighted differently from the set carrying the pre-1994 one. A proportional
+# effect is invariant to that reweighting; a level difference in policies per
+# home is not, because the same proportional gap is a different number of
+# policies in a high-rate county than in a low-rate one.
 simulate_takeup_dgp <- function(
-    n_geo = 60, periods = seq(1984, 1998, 2), ref_period = 1992L,
-    true_effect = 0.05, base_rate = 0.3, thin_share = 0.02,
-    homes_lo = 150, homes_hi = 400, thin_lo = 0.05, thin_hi = 0.5
+    n_geo = 400, periods = seq(1984, 1998, 2), n_period_loss = 3L,
+    true_effect = log(1.05), base_rate = 0.03, geo_spread = 3,
+    mh_gap = log(0.3), homes_lo = 500, homes_hi = 5000, tilt = 1
 ) {
-    grid <- CJ(geo = seq_len(n_geo), period_constr = periods, mh = c(0L, 1L))
+    grid <- CJ(geo = seq_len(n_geo), period_loss = seq_len(n_period_loss),
+               period_constr = periods, mh = c(0L, 1L))
+    # county take-up levels spread over about two orders of magnitude, as in
+    # the real panel, and independent of anything treatment-related
+    geo_fe <- data.table(
+        geo = seq_len(n_geo),
+        geo_z = runif(n_geo, -geo_spread / 2, geo_spread / 2))
+    geo_fe[, geo_mult := exp(geo_z)]
+    grid <- merge(grid, geo_fe, by = "geo")
 
-    grid[, thin := runif(.N) < thin_share]
-    grid[, homes_n := fifelse(
-        thin, runif(.N, thin_lo, thin_hi), runif(.N, homes_lo, homes_hi))]
+    # stock varies by county, vintage and housing type but not by calendar
+    # period, as the Census-anchored imputation does
+    stock <- unique(grid[, .(geo, period_constr, mh, geo_z)])
+    stock[, homes_n := runif(.N, homes_lo, homes_hi)]
+    stock[, homes_n := homes_n *
+        exp(tilt * geo_z * mh * (period_constr >= 1994L))]
+    grid <- merge(grid, stock[, .(geo, period_constr, mh, homes_n)],
+                  by = c("geo", "period_constr", "mh"))
 
-    grid[, true_rate := base_rate + ifelse(period_constr >= 1994L, true_effect, 0) * mh]
-    grid[, policies_n := rpois(.N, homes_n * true_rate)]
+    grid[, log_rate := log(base_rate) + log(geo_mult) + mh_gap * mh +
+             true_effect * mh * (period_constr >= 1994L)]
+    grid[, policies_n := rpois(.N, homes_n * exp(log_rate))]
     grid[, policies_per_home := policies_n / homes_n]
+    grid[, log_homes := log(homes_n)]
     grid[]
 }
 
-dt <- simulate_takeup_dgp()
-ref_period <- 1992L
-
-test_that("homes_n-weighted OLS recovers the true post-1994 policies-per-home level effect", {
-    est <- feols(
+fit_ppml <- function(dt, ref_period = 1992L) {
+    fepois(
+        policies_n ~ i(period_constr, mh, ref = ref_period) |
+            geo^period_loss + mh + period_constr,
+        data = dt, offset = ~log_homes, cluster = ~geo)
+}
+fit_level <- function(dt, ref_period = 1992L) {
+    feols(
         policies_per_home ~ i(period_constr, mh, ref = ref_period) |
-            geo^period_constr + mh + period_constr,
-        data = dt, weights = ~homes_n, cluster = ~geo
-    )
+            geo^period_loss + mh + period_constr,
+        data = dt, weights = ~homes_n, cluster = ~geo)
+}
+post_pre <- function(est) {
     ct <- as.data.table(coeftable(est), keep.rownames = TRUE)
     ct <- ct[grepl(":mh$", rn)]
     ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    list(pre = ct[period < 1994L, mean(Estimate)],
+         post = ct[period >= 1994L, mean(Estimate)])
+}
 
-    pre  <- ct[period < 1994L]
-    post <- ct[period >= 1994L]
-
-    # averaging over periods cancels sampling noise so the check is about
-    # whether the thin-stock outliers are neutralized, not a single draw
-    expect_true(abs(mean(pre$Estimate)) < 0.02)
-    expect_true(abs(mean(post$Estimate) - 0.05) < 0.02)
+test_that("Poisson with an exposure offset recovers the true proportional take-up effect", {
+    dt <- simulate_takeup_dgp(true_effect = log(1.05))
+    e <- post_pre(fit_ppml(dt))
+    # averaging over periods cancels sampling noise, so this is a check on the
+    # estimator rather than on a single draw
+    expect_lt(abs(e$pre), 0.02)
+    expect_lt(abs(e$post - log(1.05)), 0.02)
 })
 
-test_that("unweighted OLS is distorted by near-zero-stock outlier cells", {
-    est_unw <- feols(
-        policies_per_home ~ i(period_constr, mh, ref = ref_period) |
-            geo^period_constr + mh + period_constr,
-        data = dt, cluster = ~geo
-    )
-    ct <- as.data.table(coeftable(est_unw), keep.rownames = TRUE)
-    ct <- ct[grepl(":mh$", rn)]
-    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+test_that("the level-rate specification is biased when the true effect is zero", {
+    dt <- simulate_takeup_dgp(true_effect = 0)
 
-    pre <- ct[period < 1994L]
-    # thin cells (homes_n well under 1) can produce policies_per_home
-    # ratios in the tens even though the true rate is ~0.3; with equal
-    # weight per cell, this pulls the (true zero) pre-period dummies away
-    # from zero -- the same failure mode as the take-up table before it
-    # was weighted by homes_n
-    expect_true(abs(mean(pre$Estimate)) > 0.02)
+    # Poisson returns the truth: no pre-period profile and no post-1994 shift
+    e_ppml <- post_pre(fit_ppml(dt))
+    expect_lt(abs(e_ppml$pre), 0.02)
+    expect_lt(abs(e_ppml$post), 0.02)
+
+    # The level specification cannot fit a proportional MH gap with a single
+    # additive MH fixed effect, so its post-1994 coefficient is not zero even
+    # though the truth is. Stated relative to the mean rate, so the threshold
+    # does not depend on the arbitrary units of base_rate.
+    e_lvl <- post_pre(fit_level(dt))
+    mean_rate <- dt[, weighted.mean(policies_per_home, homes_n)]
+    expect_gt(abs(e_lvl$post) / mean_rate, 0.10)
+
+    # switching the composition tilt off shrinks the level bias, which
+    # identifies the tilt as its source rather than the proportional gap alone
+    e_lvl_flat <- post_pre(fit_level(simulate_takeup_dgp(
+        true_effect = 0, tilt = 0)))
+    expect_lt(abs(e_lvl_flat$post) / mean_rate, abs(e_lvl$post) / mean_rate)
+
+    # and the bias is a property of the additive MH effect: giving each county
+    # its own MH effect, which is what a proportional gap needs, removes it
+    est_ctymh <- feols(
+        policies_per_home ~ i(period_constr, mh, ref = 1992L) |
+            geo^period_loss + geo^mh + period_constr,
+        data = dt, weights = ~homes_n, cluster = ~geo)
+    e_ctymh <- post_pre(est_ctymh)
+    expect_lt(abs(e_ctymh$post) / mean_rate, abs(e_lvl$post) / mean_rate)
 })
+
+ref_period <- 1992L
 
 # ---------------------------------------------------------------------------
 # Denominator-construction failure modes (Chunk I-b, notes/specs.md 12.2).
@@ -180,4 +231,46 @@ test_that("per-home rates built from matched construction years are not inflated
     # the inflation is proportional to the dropped year's share of the bin's
     # policy-years, which in the real data is ~45-49% -- i.e. ~1.9x
     expect_gt(rate_mixed / rate_matched, 1.5)
+})
+
+
+# ---------------------------------------------------------------------------
+# Equal-split companion denominator (Chunk N). impute-stock.R emits a second
+# stock column built from the same Census bin totals with the annual sources
+# switched off, used in estimate-nfip.R to bound how much of a take-up
+# coefficient the annual imputation supplies. These tests pin the two
+# properties the estimation relies on: it is defined on the same cells as the
+# imputed stock, and it retains exactly the year-count fraction of each bin.
+# ---------------------------------------------------------------------------
+
+test_that("the equal split retains the year-count fraction of a bin, not the source-weighted one", {
+    dt <- simulate_bin_span()
+    bin_total <- 1000
+
+    dt[, share_flat := 1 / .N]
+    expect_equal(sum(dt$share_flat), 1)
+    alloc_flat <- bin_total * dt[kept == TRUE, sum(share_flat)]
+    expect_equal(alloc_flat, bin_total * dt[, sum(kept) / .N])
+
+    # it differs from the imputed allocation, which is the point of running it:
+    # a specification that gives the same answer on both is not relying on the
+    # annual sources
+    dt[, share_span := src / sum(src)]
+    alloc_span <- bin_total * dt[kept == TRUE, sum(share_span)]
+    expect_false(isTRUE(all.equal(alloc_flat, alloc_span)))
+})
+
+test_that("the equal split is positive wherever the imputed stock is, so the sample is unchanged", {
+    # a year in which the annual source reports nothing gets no imputed stock
+    # but a full equal share; the reverse cannot happen, because a positive
+    # imputed stock requires a positive bin total, which is all the equal
+    # split needs. estimate-nfip.R defines its sample by the imputed stock, so
+    # only this direction matters.
+    dt <- simulate_bin_span(source_by_year = c(300, 0, 200, 150, 100))
+    bin_total <- 1000
+    dt[, imputed := bin_total * src / sum(src)]
+    dt[, flat    := bin_total / .N]
+
+    expect_true(all(dt[imputed > 0, flat] > 0))
+    expect_true(any(dt$imputed == 0 & dt$flat > 0))
 })
