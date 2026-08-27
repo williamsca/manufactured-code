@@ -6,7 +6,7 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ## Chunk O — Claim-level headline moved to PPML, and the cost-benefit conversion (2026-08-27)
 
-Uncommitted in the working tree at time of writing. Colin's decision, after
+Merged to `main` as `113e60c`. Colin's decision, after
 Chunk N: "the levels spec gives statistical precision and a clean event study
 but exaggerates the magnitude due to the vastly different home values... I don't
 think I can show or report the level effects in good conscience given that model
@@ -135,7 +135,7 @@ generated.
 
 ## Chunk N — Take-up moved to PPML with an exposure offset (2026-08-27)
 
-Uncommitted in the working tree on `chunk-m-log-damage-es` at time of writing. Colin flagged that the dynamic take-up
+Merged to `main` as `113e60c`. Colin flagged that the dynamic take-up
 coefficients swing between large positive and large negative in adjacent
 vintage bins, several of them significant, and that the significance looked
 overstated relative to how much the point estimates moved. Full technical
