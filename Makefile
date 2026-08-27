@@ -4,6 +4,18 @@
 paper.pdf: paper.Rmd manufactured-code.bib
 	Rscript -e "rmarkdown::render('$<')"
 
+# slides.pdf refreshes the quoted numbers first: every estimate on a slide is a
+# macro from output/results/slide-numbers.tex, never typed in by hand.
+slides.pdf: slides.tex manufactured-code.bib output/results/slide-numbers.tex
+	pdflatex slides
+	bibtex slides
+	pdflatex slides
+	pdflatex slides
+
+.PHONY: output/results/slide-numbers.tex
+output/results/slide-numbers.tex:
+	Rscript program/write-slide-macros.R
+
 %.pdf: %.tex manufactured-code.bib
 	pdflatex $*
 	bibtex $*

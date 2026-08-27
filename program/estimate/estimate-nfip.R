@@ -80,6 +80,7 @@ v_dict <- c(
     "claims_n" = "Claims (#)",
     "policies_n" = "Policies (#)",
     "building_damage" = "Building damage",
+    "log_building_damage" = "Log building damage",
     "net_building_pmt" = "Net building pmt.",
     "contents_damage" = "Contents damage",
     "net_contents_pmt" = "Net contents pmt.",
@@ -168,6 +169,23 @@ dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 # program/import/impute-stock.R) has no finer geographic detail, so at
 # tractfp/statefp aggregation homes_n is left NA and the per-home specs
 # below are skipped for that run.
+#
+# The companion denominator homes_flat_n comes straight from the stock file
+# rather than from the panel, so the take-up robustness block below can run
+# without a panel rebuild. The merge is asserted against the panel's own
+# homes_n, which is the same file's other column, so a stale panel or a
+# mis-keyed merge fails here rather than silently producing two denominators
+# built on different cells.
+dt_flat <- readRDS(here("derived", "stock-county-vintage.Rds"))
+dt_flat <- dt_flat[, .(countyfp, year_constr, mh,
+                       homes_n_chk = homes_n, homes_flat_n)]
+if ("homes_flat_n" %in% names(dt)) dt[, homes_flat_n := NULL]
+dt <- merge(dt, dt_flat, by = c("countyfp", "year_constr", "mh"), all.x = TRUE)
+stopifnot(dt[!is.na(homes_n) | !is.na(homes_n_chk),
+             all(!is.na(homes_n) & !is.na(homes_n_chk) &
+                 abs(homes_n - homes_n_chk) < 1e-9)])
+dt[, homes_n_chk := NULL]
+
 dt_homes_cell <- unique(dt[, .(countyfp, year_constr, mh, homes_n)])
 dt_homes_cell[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 # a period_constr bin whose year_constr members are ALL missing stock (e.g.
@@ -327,6 +345,46 @@ dt_claims[, contents_damage_unw := contents_damage]
 dt_claims[, (v_loss) := lapply(
     .SD, function(x) pmin(x, MAX_CLAIM_LOSS)), .SDcols = v_loss]
 
+# Log building damage (Chunk M). A proportional counterpart to the levels
+# outcome above, added because the levels specification's identifying
+# assumption does not hold in the units it is estimated in.
+#
+# Equation (2)'s parallel-vintage-trends assumption is that the common
+# vintage effect lambda_nu is the same for both housing types. In a levels
+# regression that requires the vintage profile to be common *in dollars*.
+# The data reject that and support the proportional version instead: across
+# the 1994 boundary, median recorded replacement cost rises 15.4% for
+# site-built (143.6 -> 165.8) and 16.7% for MH (39.9 -> 46.6), so the DiD on
+# LOG replacement cost is -0.031 (SE 0.027), indistinguishable from zero,
+# while the same DiD on the LEVEL of replacement cost is -20.58 (SE 2.89).
+# Newer homes of both types are larger and more valuable, and dollar damage
+# scales with what is at risk.
+#
+# A common proportional vintage gradient applied to bases that differ by a
+# factor of 2.4 (mean pre-1994 building damage 28.95 site-built vs 11.86 MH)
+# mechanically produces a negative level DiD with no resilience effect at
+# all: 11.86 * 0.156 - 28.95 * 0.156 = -2.67, against a raw level DiD of
+# -3.00 and a fixed-effects estimate of -5.75. Verified in simulation but NOT
+# yet added to program/tests/: on fake claims with a TRUE post_mh effect of
+# zero and a common proportional vintage gradient, the levels specification
+# returns roughly -5.3 (t = -5.4) while Poisson recovers zero. Worth adding
+# to the fake-data harness before the levels headline is defended in print.
+#
+# Logs remove the base-scale term by construction, so the coefficients are
+# comparable across two housing types of very different value. The cost is
+# the zero claims, which are dropped: exact zeros are
+# `dt_zero_share$building_damage` of records (about 1.6%), exported as a
+# scalar below. This is a diagnostic outcome, not a replacement for the
+# levels headline -- the cost-benefit calculation needs a change in expected
+# dollars, which a log coefficient does not deliver without a
+# retransformation assumption. Poisson (`est_claim_pois`) is the estimator
+# that gives both, and Chunk L's levels-vs-logs discussion should be read
+# alongside this. Winsorization at MAX_CLAIM_LOSS is retained so the log
+# outcome sits on the same underlying values as every other claim-level
+# outcome; it binds for 8 records and is immaterial in logs.
+dt_claims[, log_building_damage := fifelse(
+    building_damage > 0, log(building_damage), NA_real_)]
+
 v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
 dt_claims[, (v_shares_names) := lapply(
@@ -405,6 +463,106 @@ est_claim_es <- feols(fmla_claim_es, data = dt_claims_est, cluster = ~countyfp)
 etable(est_claim_es, fitstat = c("n", "r2", "wr2", "my"))
 iplot(est_claim_es[lhs = "building_pmt$"])
 
+# Log building damage (Chunk M), estimated separately rather than added to
+# `s_claim`, so the four columns of `claims-outcomes.tex` and
+# `claims-outcomes-static.tex` are unchanged. Identical specification,
+# fixed effects, and clustering to `fmla_claim_es`; the sample differs only
+# by the dropped zero-damage claims, so N is reported alongside the levels
+# fit below rather than assumed equal.
+est_claim_es_log <- feols(
+    log_building_damage ~ i(period_constr, mh, ref = ref_period) |
+        geo^year_loss + mh + period_constr,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_claim_es_log, fitstat = c("n", "r2", "my"))
+
+est_static_log <- feols(
+    log_building_damage ~ post_mh | geo^year_loss + mh + post1994,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_static_log, fitstat = c("n", "r2", "my"))
+
+# ---------------------------------------------------------------------------
+# Claim-level PPML: the paper's headline scale (Chunk O) ----
+# ---------------------------------------------------------------------------
+# The four loss outcomes are non-negative claim-level amounts whose conditional
+# mean differs across housing types by a factor of roughly two and a half, so
+# the vintage effect they share is proportional rather than additive. Chunk M
+# established that the levels specification is not identified in its own units
+# for exactly that reason (a common proportional gradient on bases differing by
+# 2.4x mechanically produces about -2.67 with zero true effect, and a
+# zero-effect simulation returns -5.31 in levels against zero under Poisson).
+# Chunk N found the same failure independently on the take-up outcomes. Colin's
+# decision 2026-08-27: report the proportional estimates as the headline.
+#
+# PPML rather than log OLS, for three reasons, the third of which is decisive
+# for the cost-benefit calculation:
+#   1. Zeros enter natively; the log specification drops every zero-damage
+#      claim and so changes the sample as well as the scale.
+#   2. No retransformation is required to state the result.
+#   3. PPML models E[Y|X] directly, so exp(beta) is a ratio of CONDITIONAL
+#      MEANS. Multiplying an observed mean by it is therefore valid, which is
+#      what `estimate-welfare.R` does to turn the proportional estimate back
+#      into dollars per claim. Under log OLS exp(beta) is a ratio of geometric
+#      means and that conversion would be biased downward.
+#
+# The levels fits above are retained, and their scalars still exported, so the
+# paper can report how far the two scales diverge rather than asserting it.
+v_loss <- c("building_damage", "net_building_pmt",
+            "contents_damage", "net_contents_pmt")
+s_loss <- paste0("c(", paste0(v_loss, collapse = ", "), ")")
+
+fmla_claim_es_pois <- as.formula(paste0(
+    s_loss, " ~ i(period_constr, mh, ref = ref_period)",
+    " | geo^year_loss + mh + period_constr"
+))
+est_claim_es_pois <- fepois(
+    fmla_claim_es_pois, data = dt_claims_est, cluster = ~countyfp)
+etable(est_claim_es_pois, fitstat = c("n", "pr2"))
+iplot(est_claim_es_pois[lhs = "building_damage"])
+
+fmla_static_pois <- as.formula(paste0(
+    s_loss, " ~ post_mh | geo^year_loss + mh + post1994"
+))
+est_static_pois <- fepois(
+    fmla_static_pois, data = dt_claims_est, cluster = ~countyfp)
+etable(est_static_pois, fitstat = c("n", "pr2"))
+
+# County-specific housing-type effect. `geo^mh` gives every county x housing
+# type its own baseline, which in PPML is a MULTIPLICATIVE scale on that cell's
+# mean rather than an additive intercept, and it absorbs the `mh` main effect
+# (nested). `post_mh` is then identified only from vintage variation WITHIN a
+# county and housing type, so the between-county comparison is discarded.
+#
+# This is a robustness diagnostic, not the headline, because the design is thin
+# on exactly the margin it demands: 515 of the 887 counties with any MH claim
+# have MH claims on only one side of 1994, and those cells cannot contribute to
+# `post_mh` at all. The estimate is correspondingly attenuated on the full
+# sample, and converges back toward the headline as the sample is restricted to
+# counties where the within-county contrast exists (base/geo^mh: -12.7%/-5.4%
+# at one MH claim each side, -16.4%/-10.4% at five, -25.7%/-18.0% at twenty).
+# Read the gap as a statement about where the identifying variation lives, not
+# as a bias correction. Scalars exported; not tabled.
+est_static_pois_ctymh <- fepois(
+    as.formula(paste0(s_loss, " ~ post_mh | geo^year_loss + geo^mh + post1994")),
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_static_pois_ctymh, fitstat = c("n", "pr2"))
+
+# Baseline MH means for the cost-benefit conversion. `estimate-welfare.R` turns
+# each proportional estimate back into dollars per claim, and the two
+# calculations there need DIFFERENT baselines because they have different
+# counterfactuals:
+#   private per-unit NPV applies the PRE-1994 claim rate as the counterfactual
+#     hazard, so it pairs with the pre-1994 MH mean damage;
+#   fiscal savings multiplies OBSERVED post-1994 claims, so it pairs with the
+#     observed post-1994 MH mean grossed up to its counterfactual.
+# Both are computed on the estimation sample, after winsorization, so they are
+# means of the same variable the coefficient describes.
+dt_mh_base <- dt_claims_est[mh == 1L, c(
+    lapply(.SD, mean, na.rm = TRUE), .(n = .N)),
+    by = post1994, .SDcols = v_loss]
+setorder(dt_mh_base, post1994)
+stopifnot(nrow(dt_mh_base) == 2L, all(dt_mh_base$n > 0))
+print(dt_mh_base)
+
 # Paper table columns. `building_damage_share` is still estimated (its scalars
 # feed notes/apps/abstract-appam.Rmd) but is no longer a column of either paper
 # table. Two reasons, in order of importance. First, its denominator
@@ -427,12 +585,15 @@ v_alt <- c(
 etable(
     est_claim_es[lhs = v_alt], fitstat = c("n", "r2", "wr2", "my"))
 
+# Paper table: the PPML fits, in log points. The levels fit above stays in the
+# console output and its scalars stay exported, so the appendix can quote how
+# far the two scales diverge.
 etable(
-    est_claim_es[lhs = v_alt],
+    est_claim_es_pois,
     tex = TRUE, se.below = FALSE,
     file = file.path(out_dir, "claims-outcomes.tex"),
-    fitstat = c("n", "r2", "my"),
-    digits = 2, digits.stats = 2, replace = TRUE
+    fitstat = c("n", "pr2", "my"),
+    digits = 3, digits.stats = 2, replace = TRUE
 )
 
 # Poisson event study on damages/payments
@@ -575,15 +736,10 @@ etable(est_pois_es)
 
 iplot(est_pois_es)
 
-# Take-up per housing-unit stock (Chunk E): OLS on the ratio outcomes
-# themselves (policies_per_1k_homes_yr, claims_per_1k_homes_yr), clustered by
-# county (geo == countyfp under the default agg_geo), replacing the
-# policies-per-SF-permit ratio (wrong housing type, badly non-random BPS
-# coverage -- see TODO.md Chunk E).
-#
-# Chunk I adds the third margin, claims per policy-year (`claim_rate`), so the
-# table now reports a complete decomposition of the benefit side's extensive
-# margin:
+# Take-up per housing-unit stock (Chunk E; Chunk N moves it to PPML). The three
+# margins are counts of policy-years and claims relative to an exposure
+# denominator, so they are estimated as Poisson counts with the log denominator
+# as an offset:
 #
 #     claims per home = policies per home x claims per policy
 #     (hazard realized      (take-up:        (claim frequency
@@ -593,25 +749,43 @@ iplot(est_pois_es)
 # with payment conditional on a claim -- the intensive margin -- reported
 # separately in the claim-level damage tables above (`est_claim_es`,
 # `est_static`), which need no stock denominator. p(claim | policy) is also the
-# object `estimate-welfare.R` uses as its hazard rate, so this column says
+# object `estimate-welfare.R` uses as its hazard rate, so that column says
 # directly whether the reform moved the number the cost-benefit rests on.
 #
-# All three outcomes are annual (see the `_yr` construction above), so the
-# decomposition holds in consistent units. Weights differ by column and cannot
-# be pooled into one fit: the per-home columns weight by homes_n (a handful of
-# thin county x period x mh cells have imputed stock well under 1 home,
-# producing rates in the thousands that would otherwise dominate an unweighted
-# fit), while the claim
-# rate weights by policies_n, its own denominator, as the other cell-level
-# specs above do. Hence two feols calls, combined in one etable.
+# WHY COUNTS RATHER THAN OLS ON THE RATIO (Chunk N). These columns previously
+# ran OLS on the ratio itself, weighted by the denominator, so the coefficients
+# were level differences in policies per 1,000 homes. That specification is not
+# identified in its own units, for the same reason the levels damage spec is not
+# (Chunk M): the MH/site-built take-up gap is proportional, not additive.
+# Weighted take-up runs from about 4 annual policies per 1,000 homes in the
+# bottom third of counties to about 108 in the top third, so a single additive
+# `mh` fixed effect cannot fit both ends, and `post_mh` absorbs the misfit. The
+# diagnostics below (`est_home_diag_*`) quantify it: the pooled level estimate
+# is +4.65, but it is NEGATIVE in each of the three take-up terciles estimated
+# separately, and flips to about -5.5 as soon as the `mh` and `post1994` main
+# effects are allowed to vary by tercile, to about -1.5 with a county-specific
+# `mh` effect, and to about +0.4 at five-year construction bins. The PPML
+# coefficient moves from 0.007 to 0.170 across the same perturbations -- small
+# and sign-stable throughout. Poisson also takes the zeros natively and needs no
+# weighting rule, which retires the thin-cell weighting the level fit required.
 #
-# Samples also differ: the per-home columns require a defined homes_n, the
-# claim rate requires policies_n > 0. Both are pooled across all three policy
-# periods (2009-2023) -- an earliest-period-only (2009-2013) restriction was
-# checked and dropped: point estimates were extremely similar to the pooled
-# column, so it added a column without adding information. See notes/specs.md
-# for the caveat on the Census-2000-vs-policy-data time gap this restriction
-# was meant to address.
+# WHY STATE CLUSTERING (Chunk N). The stock denominator's within-bin annual
+# allocation is a STATE-year series (MHS placements) broadcast to every county
+# in the state, and county permit shares within a state move together. Its error
+# is therefore close to a single draw per state x vintage x housing type, not
+# 2,866 independent county draws, and county clustering credits it with
+# precision it does not have. Regressing log(homes_n) on the same interaction
+# and fixed effects returns a vintage profile with county-clustered t-statistics
+# of 5 to 11 on a quantity that contains no policy data at all. Every column
+# here clusters by state; the county-clustered standard errors are exported as
+# scalars so the appendix can report both. Column (3) uses no imputed input and
+# so is not exposed to this, which is why the appendix reports it as the one
+# result that does not rest on the imputation.
+#
+# The exact rate identity above holds cell by cell in the data but NOT in the
+# fitted coefficients: each column solves its own Poisson score equation against
+# its own offset, so (1) + (3) need not equal (2). The appendix says so rather
+# than claiming a decomposition the estimator does not deliver.
 #
 # The per-home cells are rebuilt from the row level rather than filtered out of
 # dt_cell, because numerator and denominator must span the SAME construction
@@ -626,155 +800,266 @@ iplot(est_pois_es)
 # entirely on the comparison group, and appears as a large negative coefficient
 # at exactly the treatment boundary. Restricting both sides to construction
 # years with a stock denominator removes it.
-home_key <- c("countyfp", "year_constr", "mh")
-dt_home_ok <- unique(dt[!is.na(homes_n) & homes_n > 0, ..home_key])
+#
+# Built as a function of the bin width so the five-year-bin diagnostic below
+# rebuilds the panel properly instead of re-binning an already-aggregated one.
+build_home_cell <- function(binw) {
+    home_key <- c("countyfp", "year_constr", "mh")
+    ok <- unique(dt[!is.na(homes_n) & homes_n > 0, ..home_key])
 
-dt_home_num <- merge(
-    dt[!is.na(policies_n) & policies_n > 0L], dt_home_ok, by = home_key)
-dt_home_cell <- dt_home_num[
-    , .(claims_n   = sum(claims_n,   na.rm = TRUE),
-        policies_n = sum(policies_n, na.rm = TRUE),
-        mand_n     = sum(mandatory_purchase_policy_n, na.rm = TRUE)),
-    by = .(geo, period_loss, mh, period_constr)]
+    num <- merge(dt[!is.na(policies_n) & policies_n > 0L], ok, by = home_key)
+    num[, pc := bin_constr(year_constr, binw)]
+    cell <- num[
+        , .(claims_n   = sum(claims_n,   na.rm = TRUE),
+            policies_n = sum(policies_n, na.rm = TRUE),
+            mand_n     = sum(mandatory_purchase_policy_n, na.rm = TRUE)),
+        by = .(geo, period_loss, mh, pc)]
 
-# denominator over the same construction years; homes_n is a county-level value
-# duplicated across tract rows, so dedupe on the county key before summing
-dt_home_den <- unique(dt[!is.na(homes_n) & homes_n > 0,
-                         .(countyfp, year_constr, mh, homes_n)])
-dt_home_den[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
-dt_home_den <- dt_home_den[
-    , .(homes_n = sum(homes_n)), by = .(countyfp, period_constr, mh)]
+    # denominator over the same construction years; homes_n is a county-level
+    # value duplicated across tract rows, so dedupe on the county key before
+    # summing. homes_flat_n is carried alongside so the robustness block runs on
+    # exactly the same cells -- impute-stock.R asserts it is positive wherever
+    # homes_n is, so no cell is gained or lost by the swap.
+    den <- unique(dt[!is.na(homes_n) & homes_n > 0,
+                     .(countyfp, year_constr, mh, homes_n, homes_flat_n)])
+    den[, pc := bin_constr(year_constr, binw)]
+    den <- den[, .(homes_n      = sum(homes_n),
+                   homes_flat_n = sum(homes_flat_n)),
+               by = .(countyfp, pc, mh)]
 
-dt_home_cell <- merge(
-    dt_home_cell, dt_home_den,
-    by.x = c("geo", "period_constr", "mh"),
-    by.y = c("countyfp", "period_constr", "mh"))
+    cell <- merge(cell, den,
+                  by.x = c("geo", "pc", "mh"),
+                  by.y = c("countyfp", "pc", "mh"))
+    setnames(cell, "pc", "period_constr")
 
-dt_home_cell[, post1994 := as.integer(period_constr >= 1994L)]
-dt_home_cell[, post_mh  := post1994 * mh]
-dt_home_cell[, claim_rate := claims_n / policies_n]
-dt_home_cell[, policies_per_1k_homes_yr :=
-    1000 * policies_n / (homes_n * N_YEARS_PERIOD)]
-dt_home_cell[, claims_per_1k_homes_yr :=
-    1000 * claims_n / (homes_n * N_YEARS_PERIOD)]
+    cell[, statefp := substr(geo, 1L, 2L)]
+    cell[, post1994 := as.integer(period_constr >= 1994L)]
+    cell[, post_mh  := post1994 * mh]
 
-# Take-up split by mandatory-purchase status, same denominator. The two split
-# outcomes sum to policies_per_1k_homes_yr by construction, so their post_mh
-# coefficients sum to the total one and say how much of the take-up response
-# occurs where the homeowner was choosing rather than complying. The flag is
-# reported by the insurer and is almost certainly under-recorded (it marks only
-# 4-9% of policy-years, well below the SFHA share), so read the split as a lower
-# bound on the mandated part, not a clean partition.
-dt_home_cell[, nonmand_n := policies_n - mand_n]
-stopifnot(all(dt_home_cell$nonmand_n >= 0))
-dt_home_cell[, policies_mand_per_1k_homes_yr :=
-    1000 * mand_n / (homes_n * N_YEARS_PERIOD)]
-dt_home_cell[, policies_nonmand_per_1k_homes_yr :=
-    1000 * nonmand_n / (homes_n * N_YEARS_PERIOD)]
+    # exposure offsets: home-years for the two per-home margins, policy-years
+    # for the claim rate. N_YEARS_PERIOD is asserted against the data above.
+    cell[, log_home_yrs      := log(homes_n * N_YEARS_PERIOD)]
+    cell[, log_home_yrs_flat := log(homes_flat_n * N_YEARS_PERIOD)]
+    cell[, log_policy_yrs    := log(policies_n)]
 
-# the 1994 bin must now be construction year 1995 alone on BOTH sides
-stopifnot(
-    nrow(dt_home_cell) > 0L,
-    !anyNA(dt_home_cell$homes_n), all(dt_home_cell$homes_n > 0),
-    dt_home_ok[, !any(year_constr == 1994L)],
-    dt_home_num[, !any(year_constr == 1994L)]
-)
+    # level rates, retained for the descriptive baselines the appendix quotes
+    # and for the levels-vs-counts diagnostics below -- not for the tables.
+    cell[, claim_rate := claims_n / policies_n]
+    cell[, policies_per_1k_homes_yr :=
+        1000 * policies_n / (homes_n * N_YEARS_PERIOD)]
+    cell[, claims_per_1k_homes_yr :=
+        1000 * claims_n / (homes_n * N_YEARS_PERIOD)]
 
-fmla_home_ols <- as.formula(paste0(
-    "c(policies_per_1k_homes_yr, claims_per_1k_homes_yr)",
+    # Take-up split by mandatory-purchase status, same denominator and offset.
+    # Under PPML the two components no longer sum to the total the way the level
+    # coefficients did; each is a proportional change in its own component rate,
+    # and the appendix combines them with the pre-period mandated share instead
+    # of adding them. The flag is reported by the insurer and is almost
+    # certainly under-recorded (it marks only 4-9% of policy-years, well below
+    # the SFHA share), so read the split as a lower bound on the mandated part,
+    # not a clean partition.
+    cell[, nonmand_n := policies_n - mand_n]
+    stopifnot(all(cell$nonmand_n >= 0))
+
+    stopifnot(
+        nrow(cell) > 0L,
+        !anyNA(cell$homes_n), all(cell$homes_n > 0),
+        !anyNA(cell$homes_flat_n), all(cell$homes_flat_n > 0),
+        ok[, !any(year_constr == 1994L)],
+        num[, !any(year_constr == 1994L)]
+    )
+    cell[]
+}
+
+dt_home_cell <- build_home_cell(BIN_CONSTR_YEAR)
+
+CLUSTER_TAKEUP <- ~statefp
+
+# --- dynamic: vintage profile, three margins ------------------------------
+takeup_es_rhs <- paste0(
     " ~ i(period_constr, mh, ref = ref_period)",
-    " | geo^period_loss + mh + period_constr"
-))
+    " | geo^period_loss + mh + period_constr")
 
-est_home_ols <- feols(
-    fmla_home_ols, data = dt_home_cell, cluster = ~geo,
-    weights = ~homes_n, lean = TRUE
-)
-etable(est_home_ols, fitstat = c("n", "r2", "my"))
-iplot(est_home_ols[lhs = "policies_per_1k_homes_yr"])
+fit_takeup <- function(lhs, offset_var, rhs, data = dt_home_cell,
+                       cluster = CLUSTER_TAKEUP) {
+    fepois(as.formula(paste0(lhs, rhs)), data = data,
+           offset = as.formula(paste0("~", offset_var)), cluster = cluster)
+}
 
-# p(claim | policy): same FE structure and clustering, policies_n weights.
-# Estimated on dt_home_cell, not dt_cell: the claim rate needs no stock
-# denominator, but running it on the wider sample would make the three columns
-# of the table three different samples and break the decomposition identity
-# above.
-est_claimrate_ols <- feols(
-    claim_rate ~ i(period_constr, mh, ref = ref_period) |
-        geo^period_loss + mh + period_constr,
-    data = dt_home_cell, cluster = ~geo, weights = ~policies_n
-)
-etable(est_claimrate_ols, fitstat = c("n", "r2", "my"))
+est_ppl_home_es <- fit_takeup("policies_n", "log_home_yrs",   takeup_es_rhs)
+est_clm_home_es <- fit_takeup("claims_n",   "log_home_yrs",   takeup_es_rhs)
+est_claimrate_es <- fit_takeup("claims_n",  "log_policy_yrs", takeup_es_rhs)
 
 takeup_headers <- c(
-    "Policies per 1,000 homes",
-    "Claims per 1,000 homes",
+    "Policies per home",
+    "Claims per home",
     "Claims per policy"
 )
-est_takeup_list <- list(
-    est_home_ols[lhs = "policies_per_1k_homes_yr"][[1]],
-    est_home_ols[lhs = "claims_per_1k_homes_yr"][[1]],
-    est_claimrate_ols
-)
+est_takeup_list <- list(est_ppl_home_es, est_clm_home_es, est_claimrate_es)
+etable(est_takeup_list, fitstat = c("n", "pr2"))
+iplot(est_ppl_home_es)
 
 etable(
     est_takeup_list,
-    digits = 3, digits.stats = 2, fitstat = c("n", "r2", "my"),
+    digits = 3, digits.stats = 2, fitstat = c("n", "pr2"),
     tex = TRUE, replace = TRUE, depvar = FALSE,
-    headers = list("Annual rate" = takeup_headers),
+    headers = list("Log annual rate" = takeup_headers),
     file = file.path(out_dir, "take-up.tex"))
 
-# Static counterpart: one post-1994 x MH coefficient per margin, same
-# samples/weights/clustering, collapsing the vintage profile the way
-# `est_static` does for the claim-level damage outcomes.
-fmla_home_static <- as.formula(paste0(
-    "c(policies_per_1k_homes_yr, claims_per_1k_homes_yr)",
-    " ~ post_mh | geo^period_loss + mh + post1994"
-))
+# --- static: one post-1994 x MH coefficient per margin --------------------
+takeup_static_rhs <- " ~ post_mh | geo^period_loss + mh + post1994"
 
-est_home_static <- feols(
-    fmla_home_static, data = dt_home_cell, cluster = ~geo,
-    weights = ~homes_n, lean = TRUE
-)
-
-est_claimrate_static <- feols(
-    claim_rate ~ post_mh | geo^period_loss + mh + post1994,
-    data = dt_home_cell, cluster = ~geo, weights = ~policies_n
-)
-
-# Two diagnostics on the take-up column, reported in the text rather than the
-# table. (a) The mandatory/non-mandatory split described above. (b) The same
-# static contrast with the geographic fixed effects removed, which is the raw
-# pre/post difference-in-differences across all counties. The two differ in
-# sign: the sign of the take-up estimate rests entirely on comparing MH to
-# site-built WITHIN a county and period, since MH stock is concentrated in
-# counties whose overall post-1994 take-up rose least. Reporting both keeps that
-# dependence visible instead of resting on the fixed effects silently.
-est_home_mand_static <- feols(
-    c(policies_mand_per_1k_homes_yr, policies_nonmand_per_1k_homes_yr) ~
-        post_mh | geo^period_loss + mh + post1994,
-    data = dt_home_cell, cluster = ~geo, weights = ~homes_n, lean = TRUE
-)
-etable(est_home_mand_static, fitstat = c("n", "my"))
-
-est_home_static_nogeo <- feols(
-    policies_per_1k_homes_yr ~ post_mh | mh + post1994,
-    data = dt_home_cell, cluster = ~geo, weights = ~homes_n
-)
-etable(est_home_static_nogeo, fitstat = c("n", "my"))
+est_ppl_home_static <- fit_takeup("policies_n", "log_home_yrs",   takeup_static_rhs)
+est_clm_home_static <- fit_takeup("claims_n",   "log_home_yrs",   takeup_static_rhs)
+est_claimrate_static <- fit_takeup("claims_n",  "log_policy_yrs", takeup_static_rhs)
 
 est_takeup_static_list <- list(
-    est_home_static[lhs = "policies_per_1k_homes_yr"][[1]],
-    est_home_static[lhs = "claims_per_1k_homes_yr"][[1]],
-    est_claimrate_static
-)
-etable(est_takeup_static_list, fitstat = c("n", "r2", "my"))
+    est_ppl_home_static, est_clm_home_static, est_claimrate_static)
+etable(est_takeup_static_list, fitstat = c("n", "pr2"))
 
 etable(
     est_takeup_static_list,
-    digits = 3, digits.stats = 2, fitstat = c("n", "r2", "my"),
+    digits = 3, digits.stats = 2, fitstat = c("n", "pr2"),
     tex = TRUE, replace = TRUE, depvar = FALSE, se.below = FALSE,
-    headers = list("Annual rate" = takeup_headers),
+    headers = list("Log annual rate" = takeup_headers),
     file = file.path(out_dir, "take-up-static.tex"))
+
+# Column (1) re-estimated on the two claims columns' sample. Poisson drops
+# fixed-effect groups whose outcome is zero throughout, and a county x calendar
+# period with no claims at all is such a group for the claims columns but not
+# for the policy column, so the three columns of the table do not share a
+# sample. Those cells carry take-up information and are not dropped from column
+# (1) for that reason; this fit says what column (1) would be if they were, so
+# the appendix can state that the sample difference does not drive the contrast
+# between the columns.
+est_ppl_home_static_clm <- fit_takeup(
+    "policies_n", "log_home_yrs", takeup_static_rhs,
+    data = dt_home_cell[obs(est_clm_home_static)])
+
+# County-clustered counterparts of the same three static fits, so the appendix
+# can report how much of the old table's significance was the clustering choice
+# rather than the estimates.
+est_ppl_home_static_cty <- fit_takeup(
+    "policies_n", "log_home_yrs", takeup_static_rhs, cluster = ~geo)
+est_clm_home_static_cty <- fit_takeup(
+    "claims_n", "log_home_yrs", takeup_static_rhs, cluster = ~geo)
+est_claimrate_static_cty <- fit_takeup(
+    "claims_n", "log_policy_yrs", takeup_static_rhs, cluster = ~geo)
+
+# --- robustness: switch the annual imputation off -------------------------
+# Same specification, same cells, same numerator; only the offset changes, from
+# the placement- and permit-allocated stock to the equal within-bin split
+# (impute-stock.R section 4). What moves between the two columns is what the
+# annual sources supply. The claim-rate column has no such counterpart because
+# its offset is observed policy-years, which is the point of including it.
+est_ppl_home_es_flat <- fit_takeup(
+    "policies_n", "log_home_yrs_flat", takeup_es_rhs)
+est_clm_home_es_flat <- fit_takeup(
+    "claims_n", "log_home_yrs_flat", takeup_es_rhs)
+est_ppl_home_static_flat <- fit_takeup(
+    "policies_n", "log_home_yrs_flat", takeup_static_rhs)
+est_clm_home_static_flat <- fit_takeup(
+    "claims_n", "log_home_yrs_flat", takeup_static_rhs)
+
+est_takeup_flat_list <- list(
+    est_ppl_home_es, est_ppl_home_es_flat,
+    est_clm_home_es, est_clm_home_es_flat)
+etable(est_takeup_flat_list, fitstat = c("n", "pr2"))
+
+etable(
+    est_takeup_flat_list,
+    digits = 3, digits.stats = 2, fitstat = c("n", "pr2"),
+    tex = TRUE, replace = TRUE, depvar = FALSE,
+    headers = list(
+        "Log annual rate" = rep(c("Policies per home", "Claims per home"),
+                                each = 2),
+        "Stock denominator" = rep(c("Imputed", "Flat"), 2)),
+    file = file.path(out_dir, "take-up-robust.tex"))
+
+# How far the swap moves the imputed denominator itself, by vintage bin and
+# housing type, so the appendix can say which bins the annual sources are doing
+# the work in rather than only that some of them are.
+dt_flat_gap <- dt_home_cell[
+    , .(imputed = sum(homes_n), flat = sum(homes_flat_n)),
+    by = .(mh, period_constr)]
+dt_flat_gap[, log_gap := log(flat / imputed)]
+dt_flat_gap <- dcast(dt_flat_gap, period_constr ~ mh, value.var = "log_gap")
+setnames(dt_flat_gap, c("0", "1"), c("gap_sb", "gap_mh"))
+dt_flat_gap[, gap_diff := gap_mh - gap_sb]
+print(dt_flat_gap)
+
+# --- diagnostics reported in the appendix text, not tabled ----------------
+# (a) The level specification this block used to run, plus the three
+#     perturbations that show it is not identified in its own units. Each is the
+#     same static contrast; only the fixed effects (or the bin width) change.
+est_home_diag_lvl <- feols(
+    policies_per_1k_homes_yr ~ post_mh | geo^period_loss + mh + post1994,
+    data = dt_home_cell, cluster = CLUSTER_TAKEUP, weights = ~homes_n)
+
+# take-up tercile of the county, on its own pooled all-vintage rate
+dt_cty_rate <- dt_home_cell[
+    , .(rate = 1000 * sum(policies_n) / (sum(homes_n) * N_YEARS_PERIOD)),
+    by = geo]
+dt_cty_rate[, tercile := cut(
+    rate, quantile(rate, 0:3 / 3), include.lowest = TRUE,
+    labels = c("low", "mid", "high"))]
+dt_home_cell <- merge(dt_home_cell, dt_cty_rate[, .(geo, tercile)], by = "geo")
+
+est_home_diag_tercile <- feols(
+    policies_per_1k_homes_yr ~ post_mh | geo^period_loss + mh^tercile +
+        post1994^tercile,
+    data = dt_home_cell, cluster = CLUSTER_TAKEUP, weights = ~homes_n)
+est_home_diag_ctymh <- feols(
+    policies_per_1k_homes_yr ~ post_mh | geo^period_loss + geo^mh + post1994,
+    data = dt_home_cell, cluster = CLUSTER_TAKEUP, weights = ~homes_n)
+est_home_diag_ppml_ctymh <- fit_takeup(
+    "policies_n", "log_home_yrs",
+    " ~ post_mh | geo^period_loss + geo^mh + post1994")
+
+# five-year construction bins, panel rebuilt from the row level
+dt_home_cell5 <- build_home_cell(5L)
+est_home_diag_bin5 <- feols(
+    policies_per_1k_homes_yr ~ post_mh | geo^period_loss + mh + post1994,
+    data = dt_home_cell5, cluster = CLUSTER_TAKEUP, weights = ~homes_n)
+est_home_diag_bin5_ppml <- fit_takeup(
+    "policies_n", "log_home_yrs", takeup_static_rhs, data = dt_home_cell5)
+
+# the same level contrast estimated separately within each tercile
+diag_tercile_by <- rbindlist(lapply(c("low", "mid", "high"), function(t) {
+    s <- dt_home_cell[tercile == t]
+    m <- feols(policies_per_1k_homes_yr ~ post_mh |
+                   geo^period_loss + mh + post1994,
+               data = s, cluster = CLUSTER_TAKEUP, weights = ~homes_n)
+    data.table(tercile = t,
+               mean_rate = weighted.mean(s$policies_per_1k_homes_yr, s$homes_n),
+               est = coef(m)[["post_mh"]], se = se(m)[["post_mh"]])
+}))
+print(diag_tercile_by)
+
+# (b) The imputed denominator's own vintage profile, run through the identical
+#     interaction and fixed effects as the outcome. It contains no policy data,
+#     so every coefficient here is imputation; the county-clustered t-statistics
+#     are what the state-clustering paragraph above refers to.
+est_home_den_profile <- feols(
+    log(homes_n) ~ i(period_constr, mh, ref = ref_period) |
+        geo^period_loss + mh + period_constr,
+    data = dt_home_cell, cluster = ~geo)
+etable(est_home_den_profile, fitstat = c("n", "r2"))
+
+# (c) The same static contrast with the geographic fixed effects removed, which
+#     is the raw pre/post difference-in-differences across all counties. MH
+#     stock is concentrated in counties whose overall post-1994 take-up rose
+#     least, so the two differ; reporting both keeps that dependence visible
+#     instead of resting on the fixed effects silently.
+est_home_static_nogeo <- fit_takeup(
+    "policies_n", "log_home_yrs", " ~ post_mh | mh + post1994")
+
+# (d) Mandatory vs non-mandatory purchase, as described above.
+est_home_mand_static <- fit_takeup(
+    "mand_n", "log_home_yrs", takeup_static_rhs)
+est_home_nonmand_static <- fit_takeup(
+    "nonmand_n", "log_home_yrs", takeup_static_rhs)
+etable(list(est_home_mand_static, est_home_nonmand_static), fitstat = c("n"))
 
 # ---------------------------------------------------------------------------
 # water-depth robustness: building damage (Chunk K) ----
@@ -805,10 +1090,12 @@ fmla_rob_c <- building_damage ~ post_mh +
     i(water_depth_bin, mh, ref = "[0,1) ft") |
     geo^year_loss + mh + post1994 + water_depth_bin
 
+# PPML, matching the headline scale (Chunk O). Column (1) reproduces the
+# headline building-damage coefficient exactly, which is asserted below.
 est_rob_list <- list(
-    "Baseline"                   = feols(fmla_rob_a, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
-    "+ Water depth"              = feols(fmla_rob_b, data = dt_claims_est, lean = TRUE, cluster = ~countyfp),
-    "+ Water depth $\\times$ MH" = feols(fmla_rob_c, data = dt_claims_est, lean = TRUE, cluster = ~countyfp)
+    "Baseline"                   = fepois(fmla_rob_a, data = dt_claims_est, cluster = ~countyfp),
+    "+ Water depth"              = fepois(fmla_rob_b, data = dt_claims_est, cluster = ~countyfp),
+    "+ Water depth $\\times$ MH" = fepois(fmla_rob_c, data = dt_claims_est, cluster = ~countyfp)
 )
 
 stopifnot(length(unique(vapply(est_rob_list, nobs, numeric(1)))) == 1L)
@@ -870,11 +1157,11 @@ est_static <- feols(fmla_static, data = dt_claims_est, cluster = ~countyfp)
 etable(est_static[lhs = v_alt], fitstat = c("n", "r2", "my"))
 
 etable(
-    est_static[lhs = v_alt],
+    est_static_pois,
     tex = TRUE, se.below = FALSE,
     file = file.path(out_dir, "claims-outcomes-static.tex"),
-    fitstat = c("n", "r2", "my"),
-    digits = 2, digits.stats = 2, replace = TRUE
+    fitstat = c("n", "pr2", "my"),
+    digits = 3, digits.stats = 2, replace = TRUE
 )
 
 # Same static specification on the UNWINSORIZED damage fields, so the paper can
@@ -885,6 +1172,17 @@ est_static_unw <- feols(
         geo^year_loss + mh + post1994,
     data = dt_claims_est, cluster = ~countyfp)
 etable(est_static_unw, fitstat = c("n", "r2", "my"))
+
+# Same comparison on the headline PPML scale. Poisson weights observations by
+# their fitted mean rather than by squared deviation, so a handful of extreme
+# LEVELS records move it far less than they move the OLS fit -- which is worth
+# reporting rather than asserting, since it is one of the reasons the
+# proportional specification is the headline.
+est_static_pois_unw <- fepois(
+    c(building_damage_unw, contents_damage_unw) ~ post_mh |
+        geo^year_loss + mh + post1994,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_static_pois_unw, fitstat = c("n", "pr2", "my"))
 
 # ---------------------------------------------------------------------------
 # mechanism decomposition (Chunk D) ----
@@ -969,14 +1267,19 @@ theme_paper <- function(base_size = 14) {
 # Extracts interaction terms (:mh), appends a zero row at the reference period,
 # and draws point estimates with 95% CI ribbon.
 plot_es <- function(est, outcome = NULL, vline_x = 1992.5, path = NULL, var = "mh",
-                    yscale = 1, ref = ref_period) {
+                    yscale = 1, ref = ref_period, ylab = NULL) {
     # [[]] extracts a single fixest object; [lhs=] returns fixest_multi,
     # whose coeftable() output has a different structure
     if (!is.null(outcome)) est <- est[lhs = outcome][[1]]
-    ylab <- if (!is.null(outcome) && outcome %in% names(v_dict)) {
-        unname(v_dict[[outcome]])
-    } else {
-        outcome
+    # `ylab` given explicitly wins, so a single-LHS fit (passed with
+    # outcome = NULL, which cannot be looked up in `v_dict`) can still be
+    # labeled.
+    if (is.null(ylab)) {
+        ylab <- if (!is.null(outcome) && outcome %in% names(v_dict)) {
+            unname(v_dict[[outcome]])
+        } else {
+            outcome
+        }
     }
     if (ylab %in% c("Building damage")) ylab <- paste0(ylab, " (000s)")
 
@@ -1107,8 +1410,21 @@ ggsave(file.path(out_dir, "damage-function.pdf"), p_dmgfn, width = 9, height = 5
 plot_es(est_claim_es, "net_building_pmt",
         path = file.path(out_dir, "es-net-building-pmt.pdf"))
 
-plot_es(est_claim_es, "building_damage",
+# Paper figure: the PPML event study, matching the headline scale. The levels
+# version is kept alongside under a distinct filename so the two can be compared
+# without either overwriting the other.
+plot_es(est_claim_es_pois, "building_damage", ylab = "Building damage (log points)",
         path = file.path(out_dir, "es-building-damage.pdf"))
+
+plot_es(est_claim_es, "building_damage",
+        path = file.path(out_dir, "es-building-damage-levels.pdf"))
+
+# Log building damage (Chunk M). `est_claim_es_log` is a single-LHS fit, so
+# it is passed directly with outcome = NULL and the axis label given here
+# rather than looked up through `v_dict`.
+plot_es(est_claim_es_log, outcome = NULL, var = "mh",
+        ylab = "Log building damage",
+        path = file.path(out_dir, "es-log-building-damage.pdf"))
 
 plot_es(est_claim_es, "net_contents_pmt",
         path = file.path(out_dir, "es-net-contents-pmt.pdf"))
@@ -1163,6 +1479,60 @@ stc_cont_dmg <- extract_static(est_static, "contents_damage")
 stc_net_cont <- extract_static(est_static, "net_contents_pmt")
 stc_bldg_shr <- extract_static(est_static, "building_damage_share")
 
+# Log building damage (Chunk M): the static post_mh coefficient, the
+# event-study post-1994 average, and the sample cost of dropping zeros
+# relative to the levels fit on the same specification.
+stc_bldg_log <- local({
+    ct <- as.data.table(coeftable(est_static_log), keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    list(est = ct$Estimate, se = ct[["Std. Error"]], t = ct[["t value"]])
+})
+eff_bldg_log <- local({
+    ct <- as.data.table(coeftable(est_claim_es_log), keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    post <- ct[period >= 1994L, Estimate]
+    list(avg = mean(post), min = min(post), max = max(post))
+})
+n_lvl_est <- nobs(est_static[lhs = "building_damage$"][[1]])
+n_log_est <- nobs(est_static_log)
+
+# Claim-level PPML (Chunk O): the headline scale. Coefficients are log rate
+# ratios on the conditional mean, so exp(b) - 1 is the proportional change and
+# an observed mean multiplied by exp(b) is the counterfactual mean.
+extract_static_lhs <- function(est_obj, lhs) {
+    ct <- as.data.table(coeftable(est_obj[lhs = paste0("^", lhs, "$")][[1]]),
+                        keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    stopifnot(nrow(ct) == 1L)
+    list(est = ct$Estimate, se = ct[[3L]], t = ct[[4L]])
+}
+extract_post_lhs <- function(est_obj, lhs) {
+    ct <- as.data.table(coeftable(est_obj[lhs = paste0("^", lhs, "$")][[1]]),
+                        keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    post <- ct[period >= 1994L, Estimate]
+    list(avg = mean(post), min = min(post), max = max(post))
+}
+
+pois_bldg  <- extract_static_lhs(est_static_pois, "building_damage")
+pois_cont  <- extract_static_lhs(est_static_pois, "contents_damage")
+pois_nbldg <- extract_static_lhs(est_static_pois, "net_building_pmt")
+pois_ncont <- extract_static_lhs(est_static_pois, "net_contents_pmt")
+pois_bldg_es  <- extract_post_lhs(est_claim_es_pois, "building_damage")
+pois_cont_es  <- extract_post_lhs(est_claim_es_pois, "contents_damage")
+
+# county-specific housing-type effect, the robustness diagnostic
+poisc_bldg  <- extract_static_lhs(est_static_pois_ctymh, "building_damage")
+poisc_cont  <- extract_static_lhs(est_static_pois_ctymh, "contents_damage")
+poisc_nbldg <- extract_static_lhs(est_static_pois_ctymh, "net_building_pmt")
+poisc_ncont <- extract_static_lhs(est_static_pois_ctymh, "net_contents_pmt")
+
+# MH baseline means feeding the cost-benefit conversion in estimate-welfare.R
+mh_base <- function(outcome, is_post) dt_mh_base[post1994 == is_post][[outcome]]
+n_pois_est <- nobs(est_static_pois[lhs = "^building_damage$"][[1]])
+
 # water-depth robustness (Chunk K): post_mh across the three single-LHS
 # columns of est_rob_list, so the text can report how the headline
 # coefficient moves as the non-parametric depth control is added.
@@ -1184,29 +1554,22 @@ wd_miss_mh_post <- get_wd_miss(1L, 1L)
 wd_miss_sb_pre  <- get_wd_miss(0L, 0L)
 wd_miss_sb_post <- get_wd_miss(0L, 1L)
 
-# take-up per housing-unit stock (Chunk E): OLS coefficients on the ratio
-# outcomes themselves, so these are LEVEL differences in annual policies (or
-# claims) per 1,000 homes, not log rate ratios. Chunk I adds the third margin,
-# claims per policy-year, and static counterparts for all three.
-eff_ppl_home <- extract_post_stats(est_home_ols, "policies_per_1k_homes_yr", 1)
-eff_clm_home <- extract_post_stats(est_home_ols, "claims_per_1k_homes_yr",   1)
+# Take-up per housing-unit stock (Chunk E; PPML from Chunk N). Every take-up
+# coefficient below is now a LOG rate ratio -- a proportional change in the
+# annual rate -- not the level difference in policies per 1,000 homes the
+# earlier OLS-on-the-ratio version produced. The `_ppml` suffix marks that, so a
+# stale scalar name cannot silently be read on the old scale. The level rates
+# themselves are still exported (unsuffixed, as `*_base_mh` and the four
+# `*_mh_pre`/`_sb_post` quantities) because they are descriptive statistics, not
+# estimates, and the appendix quotes them to give the log effects a magnitude.
 
-# earliest PRE-reform vintage bin of the take-up column. The paper cites it
-# because it is large and significant, which is what disqualifies the take-up
-# event study as a level-break design -- the profile trends rather than steps.
-extract_bin <- function(est_obj, outcome, bin) {
-    ct <- as.data.table(coeftable(est_obj[lhs = outcome][[1]]),
-                        keep.rownames = TRUE)
-    ct <- ct[grepl(":mh$", rn)]
-    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
-    stopifnot(ct[period == bin, .N] == 1L)
-    list(est = ct[period == bin, Estimate],
-         se  = ct[period == bin][["Std. Error"]])
+# single-coefficient PPML fits, so coeftable() applies directly
+extract_static_single <- function(est_obj) {
+    ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
+    ct <- ct[rn == "post_mh"]
+    stopifnot(nrow(ct) == 1L)
+    list(est = ct$Estimate, se = ct[[3L]], t = ct[[4L]])
 }
-bin_ppl_first <- extract_bin(
-    est_home_ols, "policies_per_1k_homes_yr", MIN_YEAR_CONSTR)
-
-# single-LHS fits, so coeftable() applies directly rather than via [lhs = ]
 extract_post_stats_single <- function(est_obj) {
     ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
     ct <- ct[grepl(":mh$", rn)]
@@ -1214,40 +1577,107 @@ extract_post_stats_single <- function(est_obj) {
     post <- ct[period >= 1994L, Estimate]
     list(avg = mean(post), min = min(post), max = max(post))
 }
-extract_static_single <- function(est_obj) {
+# one named vintage bin, with its standard error. The appendix cites the
+# earliest PRE-reform bin because a large coefficient there is what disqualifies
+# the event study as a level-break design -- the profile trends rather than
+# steps.
+extract_bin_single <- function(est_obj, bin) {
     ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
-    ct <- ct[rn == "post_mh"]
-    list(est = ct$Estimate, se = ct[["Std. Error"]], t = ct[["t value"]])
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    stopifnot(ct[period == bin, .N] == 1L)
+    list(est = ct[period == bin, Estimate], se = ct[period == bin][[3L]])
 }
 
-eff_claim_rate <- extract_post_stats_single(est_claimrate_ols)
+eff_ppl_home   <- extract_post_stats_single(est_ppl_home_es)
+eff_clm_home   <- extract_post_stats_single(est_clm_home_es)
+eff_claim_rate <- extract_post_stats_single(est_claimrate_es)
+
+stc_ppl_home   <- extract_static_single(est_ppl_home_static)
+stc_clm_home   <- extract_static_single(est_clm_home_static)
 stc_claim_rate <- extract_static_single(est_claimrate_static)
-stc_ppl_home   <- extract_static(est_home_static, "policies_per_1k_homes_yr")
-stc_clm_home   <- extract_static(est_home_static, "claims_per_1k_homes_yr")
-stc_ppl_mand    <- extract_static(
-    est_home_mand_static, "policies_mand_per_1k_homes_yr")
-stc_ppl_nonmand <- extract_static(
-    est_home_mand_static, "policies_nonmand_per_1k_homes_yr")
-stc_ppl_nogeo   <- extract_static_single(est_home_static_nogeo)
+
+# county-clustered counterparts: same point estimates, so only the SEs differ
+stc_ppl_home_cty   <- extract_static_single(est_ppl_home_static_cty)
+stc_clm_home_cty   <- extract_static_single(est_clm_home_static_cty)
+stc_claim_rate_cty <- extract_static_single(est_claimrate_static_cty)
+stopifnot(all(abs(c(
+    stc_ppl_home$est   - stc_ppl_home_cty$est,
+    stc_clm_home$est   - stc_clm_home_cty$est,
+    stc_claim_rate$est - stc_claim_rate_cty$est)) < 1e-12))
+
+# largest pre-1994 bin of column (1) in absolute value, with the vintage bin it
+# sits in. The appendix cites it because a coefficient this size before the
+# reform is what rules the profile out as a level break at 1994.
+extract_pre_max_single <- function(est_obj) {
+    ct <- as.data.table(coeftable(est_obj), keep.rownames = TRUE)
+    ct <- ct[grepl(":mh$", rn)]
+    ct[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    ct <- ct[period < 1994L]
+    stopifnot(nrow(ct) > 0L)
+    r <- ct[which.max(abs(Estimate))]
+    list(est = r$Estimate, se = r[[3L]], period = r$period)
+}
+pre_max_ppl <- extract_pre_max_single(est_ppl_home_es)
+
+bin_ppl_first      <- extract_bin_single(est_ppl_home_es, MIN_YEAR_CONSTR)
+bin_ppl_first_flat <- extract_bin_single(est_ppl_home_es_flat, MIN_YEAR_CONSTR)
+
+stc_ppl_home_clm  <- extract_static_single(est_ppl_home_static_clm)
+stc_ppl_home_flat <- extract_static_single(est_ppl_home_static_flat)
+stc_clm_home_flat <- extract_static_single(est_clm_home_static_flat)
+stc_ppl_nogeo     <- extract_static_single(est_home_static_nogeo)
+stc_ppl_mand      <- extract_static_single(est_home_mand_static)
+stc_ppl_nonmand   <- extract_static_single(est_home_nonmand_static)
+
+# Largest movement between the imputed and flat denominators anywhere in the
+# pre-1994 vintage profile of column (1), which is the single number the
+# appendix uses to say the pre-period profile is the imputation's.
+gap_pre_max <- local({
+    b <- as.data.table(coeftable(est_ppl_home_es), keep.rownames = TRUE)
+    f <- as.data.table(coeftable(est_ppl_home_es_flat), keep.rownames = TRUE)
+    m <- merge(b[, .(rn, base = Estimate)], f[, .(rn, flat = Estimate)], by = "rn")
+    m[, period := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+    m[period < 1994L, max(abs(base - flat))]
+})
+
+# Specification diagnostics for the levels-vs-counts paragraph. The level fits
+# are in policies per 1,000 homes; the PPML ones in log points.
+stc_diag_lvl      <- extract_static_single(est_home_diag_lvl)
+stc_diag_tercile  <- extract_static_single(est_home_diag_tercile)
+stc_diag_ctymh    <- extract_static_single(est_home_diag_ctymh)
+stc_diag_bin5     <- extract_static_single(est_home_diag_bin5)
+stc_diag_ppml_ctymh <- extract_static_single(est_home_diag_ppml_ctymh)
+stc_diag_ppml_bin5  <- extract_static_single(est_home_diag_bin5_ppml)
+
+# The three within-tercile level estimates, and the take-up rates they are
+# estimated against, which is the spread a single additive `mh` effect has to
+# span.
+diag_terc <- function(t, col) diag_tercile_by[tercile == t][[col]]
+# Largest county-clustered |t| anywhere in the imputed denominator's own vintage
+# profile: a quantity with no policy content in it at all.
+den_profile_max_t <- max(abs(coeftable(est_home_den_profile)[, 3L]))
 
 # Pre-1994 MH baselines for the three take-up margins, so the coefficients can
-# be read against the level they move from (the paper quotes them this way).
+# be read against the level they move from (the appendix quotes them this way).
 base_ppl_home  <- dt_home_cell[
     mh == 1L & period_constr < 1994L,
     sum(policies_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
 base_clm_home  <- dt_home_cell[
     mh == 1L & period_constr < 1994L,
     sum(claims_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
+base_claim_rate <- dt_home_cell[
+    mh == 1L & period_constr < 1994L, sum(claims_n) / sum(policies_n)]
+# pre-1994 mandated share of MH policy-years, used to weight the two components
+# of the mandatory/non-mandatory split into a contribution to the total
+base_mand_share <- dt_home_cell[
+    mh == 1L & period_constr < 1994L, sum(mand_n) / sum(policies_n)]
 
-# Both sides of the policies-per-home comparison, in pooled levels. Weighting
-# the cell ratios by homes_n makes each of these equal to the pooled ratio of
-# summed policies to summed home-years. These are NOT what the fitted
-# coefficient differences: the raw pre/post contrast they imply is negative
-# while the fitted post_mh is positive, because the fit is within county x
-# calendar period and MH stock sits disproportionately in counties whose overall
-# take-up rose least across the vintage boundary. They are reported as context
-# for the magnitudes, with est_home_static_nogeo above supplying the raw
-# contrast the paper cites alongside the fitted one.
+# Both sides of the policies-per-home comparison, in pooled levels. These are
+# NOT what the fitted coefficients difference: the fit is within county x
+# calendar period, and MH stock sits disproportionately in counties whose
+# overall take-up rose least across the vintage boundary, which is what
+# est_home_static_nogeo above quantifies.
 ppl_home_level <- function(is_mh, is_post) dt_home_cell[
     mh == is_mh & (period_constr >= 1994L) == is_post,
     sum(policies_n) / (sum(homes_n) * N_YEARS_PERIOD) * 1000]
@@ -1255,8 +1685,6 @@ lvl_ppl_mh_pre  <- ppl_home_level(1L, FALSE)
 lvl_ppl_mh_post <- ppl_home_level(1L, TRUE)
 lvl_ppl_sb_pre  <- ppl_home_level(0L, FALSE)
 lvl_ppl_sb_post <- ppl_home_level(0L, TRUE)
-base_claim_rate <- dt_home_cell[
-    mh == 1L & period_constr < 1994L, sum(claims_n) / sum(policies_n)]
 
 fwrite(
     data.table(
@@ -1282,20 +1710,17 @@ fwrite(
             "net_contents_pmt_static_t",
             "building_damage_share_static", "building_damage_share_static_se",
             "building_damage_share_static_t",
-            "policies_per_1k_homes_yr_avg", "policies_per_1k_homes_yr_min",
-            "policies_per_1k_homes_yr_max",
-            "claims_per_1k_homes_yr_avg",   "claims_per_1k_homes_yr_min",
-            "claims_per_1k_homes_yr_max",
-            "claim_rate_avg",             "claim_rate_min",
-            "claim_rate_max",
-            "policies_per_1k_homes_yr_static",
-            "policies_per_1k_homes_yr_static_se",
-            "policies_per_1k_homes_yr_static_t",
-            "claims_per_1k_homes_yr_static",
-            "claims_per_1k_homes_yr_static_se",
-            "claims_per_1k_homes_yr_static_t",
-            "claim_rate_static",          "claim_rate_static_se",
-            "claim_rate_static_t",
+            "takeup_ppml_avg", "takeup_ppml_min", "takeup_ppml_max",
+            "claims_home_ppml_avg", "claims_home_ppml_min",
+            "claims_home_ppml_max",
+            "claim_rate_ppml_avg", "claim_rate_ppml_min",
+            "claim_rate_ppml_max",
+            "takeup_ppml_static", "takeup_ppml_static_se",
+            "takeup_ppml_static_t", "takeup_ppml_static_cty_se",
+            "claims_home_ppml_static", "claims_home_ppml_static_se",
+            "claims_home_ppml_static_t", "claims_home_ppml_static_cty_se",
+            "claim_rate_ppml_static", "claim_rate_ppml_static_se",
+            "claim_rate_ppml_static_t", "claim_rate_ppml_static_cty_se",
             "policies_per_1k_homes_yr_base_mh",
             "claims_per_1k_homes_yr_base_mh",
             "claim_rate_base_mh",
@@ -1303,14 +1728,29 @@ fwrite(
             "policies_per_1k_homes_yr_mh_post",
             "policies_per_1k_homes_yr_sb_pre",
             "policies_per_1k_homes_yr_sb_post",
-            "policies_mand_per_1k_homes_yr_static",
-            "policies_mand_per_1k_homes_yr_static_se",
-            "policies_nonmand_per_1k_homes_yr_static",
-            "policies_nonmand_per_1k_homes_yr_static_se",
-            "policies_per_1k_homes_yr_static_nogeo",
-            "policies_per_1k_homes_yr_static_nogeo_se",
-            "policies_per_1k_homes_yr_pre_first",
-            "policies_per_1k_homes_yr_pre_first_se",
+            "takeup_ppml_mand_static", "takeup_ppml_mand_static_se",
+            "takeup_ppml_nonmand_static", "takeup_ppml_nonmand_static_se",
+            "takeup_mand_share_pre_mh",
+            "takeup_ppml_static_nogeo", "takeup_ppml_static_nogeo_se",
+            "takeup_ppml_pre_first", "takeup_ppml_pre_first_se",
+            "takeup_ppml_pre_max", "takeup_ppml_pre_max_se",
+            "takeup_ppml_pre_max_bin",
+            "takeup_ppml_static_flat", "takeup_ppml_static_flat_se",
+            "claims_home_ppml_static_flat",
+            "claims_home_ppml_static_flat_se",
+            "takeup_ppml_pre_first_flat", "takeup_ppml_pre_first_flat_se",
+            "takeup_flat_pre_max_gap",
+            "takeup_ppml_static_clmsample",
+            "takeup_ppml_static_clmsample_se",
+            "takeup_lvl_static", "takeup_lvl_static_se",
+            "takeup_lvl_static_tercile", "takeup_lvl_static_tercile_se",
+            "takeup_lvl_static_ctymh", "takeup_lvl_static_ctymh_se",
+            "takeup_lvl_static_bin5", "takeup_lvl_static_bin5_se",
+            "takeup_ppml_static_ctymh", "takeup_ppml_static_bin5",
+            "takeup_lvl_static_terc_low", "takeup_lvl_static_terc_mid",
+            "takeup_lvl_static_terc_high",
+            "takeup_rate_terc_low", "takeup_rate_terc_high",
+            "takeup_den_profile_max_t",
             "water_depth_missing_mh_pre",  "water_depth_missing_mh_post",
             "water_depth_missing_sb_pre",  "water_depth_missing_sb_post",
             "water_depth_bins_per_cell", "water_depth_single_bin_share",
@@ -1329,7 +1769,33 @@ fwrite(
             "zero_share_net_building_pmt", "zero_share_net_contents_pmt",
             "building_damage_static_unw",  "contents_damage_static_unw",
             "building_damage_r2",          "building_damage_r2_unw",
-            "contents_damage_r2",          "contents_damage_r2_unw"
+            "contents_damage_r2",          "contents_damage_r2_unw",
+            "pois_building_damage_static", "pois_building_damage_static_se",
+            "pois_building_damage_static_t",
+            "pois_contents_damage_static", "pois_contents_damage_static_se",
+            "pois_contents_damage_static_t",
+            "pois_net_building_pmt_static", "pois_net_building_pmt_static_se",
+            "pois_net_contents_pmt_static", "pois_net_contents_pmt_static_se",
+            "pois_building_damage_avg", "pois_contents_damage_avg",
+            "pois_building_damage_ctymh", "pois_building_damage_ctymh_se",
+            "pois_contents_damage_ctymh", "pois_contents_damage_ctymh_se",
+            "pois_net_building_pmt_ctymh", "pois_net_building_pmt_ctymh_se",
+            "pois_net_contents_pmt_ctymh", "pois_net_contents_pmt_ctymh_se",
+            "mh_pre_building_damage",  "mh_post_building_damage",
+            "mh_pre_contents_damage",  "mh_post_contents_damage",
+            "mh_pre_net_building_pmt", "mh_post_net_building_pmt",
+            "mh_pre_net_contents_pmt", "mh_post_net_contents_pmt",
+            "n_building_damage_pois",
+            "pois_building_damage_static_unw",
+            "pois_contents_damage_static_unw",
+            "pois_building_damage_pr2", "pois_building_damage_pr2_unw",
+            "log_building_damage_static",    "log_building_damage_static_se",
+            "log_building_damage_static_t",
+            "log_building_damage_avg",       "log_building_damage_min",
+            "log_building_damage_max",
+            "log_building_damage_r2",
+            "zero_share_building_damage",
+            "n_building_damage_levels",      "n_building_damage_log"
         ),
         value = c(
             eff_bldg_dmg$avg, eff_bldg_dmg$min, eff_bldg_dmg$max,
@@ -1346,16 +1812,35 @@ fwrite(
             eff_ppl_home$avg, eff_ppl_home$min, eff_ppl_home$max,
             eff_clm_home$avg, eff_clm_home$min, eff_clm_home$max,
             eff_claim_rate$avg, eff_claim_rate$min, eff_claim_rate$max,
-            stc_ppl_home$est,   stc_ppl_home$se,   stc_ppl_home$t,
-            stc_clm_home$est,   stc_clm_home$se,   stc_clm_home$t,
+            stc_ppl_home$est, stc_ppl_home$se, stc_ppl_home$t,
+            stc_ppl_home_cty$se,
+            stc_clm_home$est, stc_clm_home$se, stc_clm_home$t,
+            stc_clm_home_cty$se,
             stc_claim_rate$est, stc_claim_rate$se, stc_claim_rate$t,
+            stc_claim_rate_cty$se,
             base_ppl_home, base_clm_home, base_claim_rate,
             lvl_ppl_mh_pre, lvl_ppl_mh_post,
             lvl_ppl_sb_pre, lvl_ppl_sb_post,
             stc_ppl_mand$est,    stc_ppl_mand$se,
             stc_ppl_nonmand$est, stc_ppl_nonmand$se,
+            base_mand_share,
             stc_ppl_nogeo$est,   stc_ppl_nogeo$se,
             bin_ppl_first$est,   bin_ppl_first$se,
+            pre_max_ppl$est, pre_max_ppl$se, pre_max_ppl$period,
+            stc_ppl_home_flat$est, stc_ppl_home_flat$se,
+            stc_clm_home_flat$est, stc_clm_home_flat$se,
+            bin_ppl_first_flat$est, bin_ppl_first_flat$se,
+            gap_pre_max,
+            stc_ppl_home_clm$est, stc_ppl_home_clm$se,
+            stc_diag_lvl$est,     stc_diag_lvl$se,
+            stc_diag_tercile$est, stc_diag_tercile$se,
+            stc_diag_ctymh$est,   stc_diag_ctymh$se,
+            stc_diag_bin5$est,    stc_diag_bin5$se,
+            stc_diag_ppml_ctymh$est, stc_diag_ppml_bin5$est,
+            diag_terc("low", "est"), diag_terc("mid", "est"),
+            diag_terc("high", "est"),
+            diag_terc("low", "mean_rate"), diag_terc("high", "mean_rate"),
+            den_profile_max_t,
             wd_miss_mh_pre,  wd_miss_mh_post,
             wd_miss_sb_pre,  wd_miss_sb_post,
             wd_bins_per_cell, wd_single_bin_shr,
@@ -1375,7 +1860,30 @@ fwrite(
             r2(est_static[lhs = "building_damage$"][[1]], "r2"),
             r2(est_static_unw[lhs = "building_damage_unw"][[1]], "r2"),
             r2(est_static[lhs = "contents_damage$"][[1]], "r2"),
-            r2(est_static_unw[lhs = "contents_damage_unw"][[1]], "r2")
+            r2(est_static_unw[lhs = "contents_damage_unw"][[1]], "r2"),
+            pois_bldg$est,  pois_bldg$se,  pois_bldg$t,
+            pois_cont$est,  pois_cont$se,  pois_cont$t,
+            pois_nbldg$est, pois_nbldg$se,
+            pois_ncont$est, pois_ncont$se,
+            pois_bldg_es$avg, pois_cont_es$avg,
+            poisc_bldg$est,  poisc_bldg$se,
+            poisc_cont$est,  poisc_cont$se,
+            poisc_nbldg$est, poisc_nbldg$se,
+            poisc_ncont$est, poisc_ncont$se,
+            mh_base("building_damage", 0L),  mh_base("building_damage", 1L),
+            mh_base("contents_damage", 0L),  mh_base("contents_damage", 1L),
+            mh_base("net_building_pmt", 0L), mh_base("net_building_pmt", 1L),
+            mh_base("net_contents_pmt", 0L), mh_base("net_contents_pmt", 1L),
+            n_pois_est,
+            extract_static_lhs(est_static_pois_unw, "building_damage_unw")$est,
+            extract_static_lhs(est_static_pois_unw, "contents_damage_unw")$est,
+            r2(est_static_pois[lhs = "^building_damage$"][[1]], "pr2"),
+            r2(est_static_pois_unw[lhs = "^building_damage_unw$"][[1]], "pr2"),
+            stc_bldg_log$est, stc_bldg_log$se, stc_bldg_log$t,
+            eff_bldg_log$avg, eff_bldg_log$min, eff_bldg_log$max,
+            r2(est_static_log, "r2"),
+            dt_zero_share$building_damage,
+            n_lvl_est, n_log_est
         )
     ),
     here("output", "results", "nfip-scalars.csv")
