@@ -21,4 +21,4 @@ right. Just state your assumptions, methods, and findings.
 - Be plain: The robot does not understand fancy talk and is not impressed by it.
 - Be formal: The robot has no problem with mathematics as long as it is correct.
 
-Do NOT refer to specific fields, packages, or functions in the paper. The robot does not care about your workflow, your tools, or the backstory of the analyses that are in the paper.
+Do NOT refer to specific fields, packages, or functions in the paper. The robot does not care about your workflow, your tools, or the backstory of the analyses that are in the paper. Do NOT say "an earlier version of..." in public-facing text (i.e., paper.Rmd or slides.tex).
