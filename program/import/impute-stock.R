@@ -2,9 +2,10 @@
 # take-up denominator in estimate-nfip.R (`policies_per_home`) in place of the
 # mismatched policies-per-SF-permit ratio (see TODO.md Chunk E).
 #
-# Levels come from Census 2000 (mh_units / total_units - mh_units, by county x
-# vintage bin). Census counts a mobile home as a housing unit regardless of
-# titling, so there is no chattel-titling gap in the levels.
+# Levels are type-matched Census 2000 occupied vintage counts, adjusted for
+# vacancy using the county x type all-age ratio (import-census-takeup.R).
+# Site-built is one-unit attached/detached housing, not all non-mobile units.
+# homes_occupied_n retains the matched occupied anchor for the change audit.
 #
 # Within-bin YEAR allocation only is driven by lower-quality annual sources.
 # Shares are normalized over every year the Census bin spans, not over the
@@ -19,7 +20,7 @@
 # bias (BPS undercounts non-permitting rural counties; MHS placements are a
 # national/state series, not a county one) divides out of the ratio.
 #
-# Inputs:  derived/census2000-mh-county-vintage.Rds
+# Inputs:  derived/census2000-takeup-county-vintage.Rds
 #          census_mhs_state_year, census_mhs_national_year, census_bps
 #          (research-database, via rd_read() - see program/import/UPDATE.md)
 # Output:  derived/stock-county-vintage.Rds
@@ -83,9 +84,9 @@ stopifnot(
 # 1. Census 2000 levels, by county x vintage bin ----
 # ---------------------------------------------------------------------------
 
-dt_vtg <- readRDS(here("derived", "census2000-mh-county-vintage.Rds"))
+dt_vtg <- readRDS(here("derived", "census2000-takeup-county-vintage.Rds"))
 dt_vtg[, vintage_census := as.character(vintage_census)]
-dt_vtg[, sb_units := total_units - mh_units]
+stopifnot(all(c("sb_units", "mh_occupied", "sf_occupied") %in% names(dt_vtg)))
 stopifnot(all(dt_vtg$mh_units >= 0, na.rm = TRUE))
 stopifnot(all(dt_vtg$sb_units >= 0, na.rm = TRUE))
 stopifnot(uniqueN(dt_vtg[, .(countyfp, vintage_census)]) == nrow(dt_vtg))
@@ -182,7 +183,7 @@ stopifnot(!anyNA(grid$share_mh))
 # ---------------------------------------------------------------------------
 
 grid <- merge(
-    grid, dt_vtg[, .(countyfp, vintage_census, mh_units, sb_units)],
+    grid, dt_vtg[, .(countyfp, vintage_census, mh_units, sb_units, mh_occupied, sf_occupied)],
     by = c("countyfp", "vintage_census")
 )
 grid[, mh_n := mh_units * share_mh]
@@ -212,9 +213,9 @@ grid[, sb_flat_n := sb_units * share_flat]
 
 dt_stock <- rbind(
     grid[, .(countyfp, year_constr, mh = 1L, homes_n = mh_n,
-             homes_flat_n = mh_flat_n, vintage_census)],
+             homes_flat_n = mh_flat_n, homes_occupied_n = mh_occupied * share_mh, vintage_census)],
     grid[, .(countyfp, year_constr, mh = 0L, homes_n = sb_n,
-             homes_flat_n = sb_flat_n, vintage_census)]
+             homes_flat_n = sb_flat_n, homes_occupied_n = sf_occupied * share_sb, vintage_census)]
 )
 setkey(dt_stock, countyfp, year_constr, mh)
 
@@ -332,7 +333,7 @@ print(dcast(cmp, year_constr ~ mh, value.var = "log_gap")[
 
 dt_stock[, statefp := NULL]
 dt_stock[, vintage_census := NULL]
-setcolorder(dt_stock, c("countyfp", "year_constr", "mh", "homes_n", "homes_flat_n"))
+setcolorder(dt_stock, c("countyfp", "year_constr", "mh", "homes_n", "homes_flat_n", "homes_occupied_n"))
 
 saveRDS(dt_stock, here("derived", "stock-county-vintage.Rds"))
 message(sprintf(

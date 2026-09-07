@@ -274,3 +274,27 @@ test_that("the equal split is positive wherever the imputed stock is, so the sam
     expect_true(all(dt[imputed > 0, flat] > 0))
     expect_true(any(dt$imputed == 0 & dt$flat > 0))
 })
+
+# Exercise the production constructor, including missing policy cells and
+# claims in tracts without policies. The stock frame determines exposure.
+source(file.path("program", "lib", "takeup-panel.R"))
+test_that("stock frame preserves zero-policy cells and all matched claims", {
+    stock <- CJ(countyfp = c("01001", "01003"),
+                year_constr = c(1992L, 1993L, 1994L, 1995L), mh = 0:1)
+    stock[, `:=`(homes_n = 10, homes_flat_n = 10)]
+    p <- data.table(countyfp = "01001", year_constr = c(1992L, 1994L),
+                    mh = 1L, period_loss = 2009L, policies_n = c(5, 99),
+                    mandatory_purchase_policy_n = c(1, 0))
+    cl <- data.table(countyfp = c("01001", "01003"),
+                     year_constr = c(1992L, 1995L), mh = 1L,
+                     period_loss = 2009L, claims_n = c(1, 2))
+    d <- build_takeup_panel(p, cl, stock, c(2009L, 2014L))
+    expect_equal(nrow(d), 16L)
+    expect_equal(sum(d$policies_n), 5)
+    expect_equal(sum(d$claims_n), 3)
+    expect_equal(d[period_loss == 2009, sum(homes_n)], 120)
+    expect_equal(d[period_constr == 1994, unique(homes_n)], 10)
+    expect_equal(d[countyfp == "01003", sum(policies_n)], 0)
+    expect_true(all(is.na(d[policies_n == 0, log_policy_yrs])))
+    expect_true(all(is.finite(d$log_home_yrs)))
+})

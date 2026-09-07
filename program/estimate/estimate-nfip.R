@@ -168,21 +168,12 @@ dt[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 # tractfp/statefp aggregation homes_n is left NA and the per-home specs
 # below are skipped for that run.
 #
-# The companion denominator homes_flat_n comes straight from the stock file
-# rather than from the panel, so the take-up robustness block below can run
-# without a panel rebuild. The merge is asserted against the panel's own
-# homes_n, which is the same file's other column, so a stale panel or a
-# mis-keyed merge fails here rather than silently producing two denominators
-# built on different cells.
-dt_flat <- readRDS(here("derived", "stock-county-vintage.Rds"))
-dt_flat <- dt_flat[, .(countyfp, year_constr, mh,
-                       homes_n_chk = homes_n, homes_flat_n)]
-if ("homes_flat_n" %in% names(dt)) dt[, homes_flat_n := NULL]
-dt <- merge(dt, dt_flat, by = c("countyfp", "year_constr", "mh"), all.x = TRUE)
-stopifnot(dt[!is.na(homes_n) | !is.na(homes_n_chk),
-             all(!is.na(homes_n) & !is.na(homes_n_chk) &
-                 abs(homes_n - homes_n_chk) < 1e-9)])
-dt[, homes_n_chk := NULL]
+# Read the current stock independently of the policy panel. This also avoids
+# requiring a large NFIP rebuild when only the Census denominator changes.
+dt_stock <- readRDS(here("derived", "stock-county-vintage.Rds"))
+dt_stock <- dt_stock[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
+dt[, intersect(c("homes_n", "homes_flat_n", "homes_occupied_n"), names(dt)) := NULL]
+dt <- merge(dt, dt_stock, by = c("countyfp", "year_constr", "mh"), all.x = TRUE)
 
 dt_homes_cell <- unique(dt[, .(countyfp, year_constr, mh, homes_n)])
 dt_homes_cell[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
@@ -789,88 +780,18 @@ iplot(est_pois_es)
 # its own offset, so (1) + (3) need not equal (2). The appendix says so rather
 # than claiming a decomposition the estimator does not deliver.
 #
-# The per-home cells are rebuilt from the row level rather than filtered out of
-# dt_cell, because numerator and denominator must span the SAME construction
-# years. dt_cell sums policies_n and claims_n over every year_constr in a
-# period_constr bin, while homes_n is undefined for construction year 1994
-# (impute-stock.R drops it as ambiguously pre/post). Filtering dt_cell would
-# therefore leave the 1994 bin with a two-year numerator (1994 and 1995) over a
-# one-year denominator (1995 alone), which nearly doubles that bin's measured
-# take-up rate -- construction year 1994 supplies about 49% of the bin's
-# site-built policy-years and 45% of its MH policy-years. Since the site-built
-# take-up rate is roughly four times the MH rate, that inflation lands almost
-# entirely on the comparison group, and appears as a large negative coefficient
-# at exactly the treatment boundary. Restricting both sides to construction
-# years with a stock denominator removes it.
-#
-# Built as a function of the bin width so the five-year-bin diagnostic below
-# rebuilds the panel properly instead of re-binning an already-aggregated one.
+# Construct the denominator from every eligible Census stock cell, then join
+# counts. Match numerator construction years to positive stock, excluding 1994.
+# The shared helper also builds five-year vintage bins for the diagnostic.
+source(here("program", "lib", "takeup-panel.R"))
+# Claims are aggregated directly so tracts without policies are not silently
+# lost from the claims-per-home numerator. The policy panel already contains
+# every observed policy; zero-policy county/vintage/type cells come from stock.
+takeup_claims <- dt_claims[period_loss %in% periods_obs,
+    .(claims_n = .N), by = .(countyfp, period_loss, year_constr, mh)]
 build_home_cell <- function(binw) {
-    home_key <- c("countyfp", "year_constr", "mh")
-    ok <- unique(dt[!is.na(homes_n) & homes_n > 0, ..home_key])
-
-    num <- merge(dt[!is.na(policies_n) & policies_n > 0L], ok, by = home_key)
-    num[, pc := bin_constr(year_constr, binw)]
-    cell <- num[
-        , .(claims_n   = sum(claims_n,   na.rm = TRUE),
-            policies_n = sum(policies_n, na.rm = TRUE),
-            mand_n     = sum(mandatory_purchase_policy_n, na.rm = TRUE)),
-        by = .(geo, period_loss, mh, pc)]
-
-    # denominator over the same construction years; homes_n is a county-level
-    # value duplicated across tract rows, so dedupe on the county key before
-    # summing. homes_flat_n is carried alongside so the robustness block runs on
-    # exactly the same cells -- impute-stock.R asserts it is positive wherever
-    # homes_n is, so no cell is gained or lost by the swap.
-    den <- unique(dt[!is.na(homes_n) & homes_n > 0,
-                     .(countyfp, year_constr, mh, homes_n, homes_flat_n)])
-    den[, pc := bin_constr(year_constr, binw)]
-    den <- den[, .(homes_n      = sum(homes_n),
-                   homes_flat_n = sum(homes_flat_n)),
-               by = .(countyfp, pc, mh)]
-
-    cell <- merge(cell, den,
-                  by.x = c("geo", "pc", "mh"),
-                  by.y = c("countyfp", "pc", "mh"))
-    setnames(cell, "pc", "period_constr")
-
-    cell[, statefp := substr(geo, 1L, 2L)]
-    cell[, post1994 := as.integer(period_constr >= 1994L)]
-    cell[, post_mh  := post1994 * mh]
-
-    # exposure offsets: home-years for the two per-home margins, policy-years
-    # for the claim rate. N_YEARS_PERIOD is asserted against the data above.
-    cell[, log_home_yrs      := log(homes_n * N_YEARS_PERIOD)]
-    cell[, log_home_yrs_flat := log(homes_flat_n * N_YEARS_PERIOD)]
-    cell[, log_policy_yrs    := log(policies_n)]
-
-    # level rates, retained for the descriptive baselines the appendix quotes
-    # and for the levels-vs-counts diagnostics below -- not for the tables.
-    cell[, claim_rate := claims_n / policies_n]
-    cell[, policies_per_1k_homes_yr :=
-        1000 * policies_n / (homes_n * N_YEARS_PERIOD)]
-    cell[, claims_per_1k_homes_yr :=
-        1000 * claims_n / (homes_n * N_YEARS_PERIOD)]
-
-    # Take-up split by mandatory-purchase status, same denominator and offset.
-    # Under PPML the two components no longer sum to the total the way the level
-    # coefficients did; each is a proportional change in its own component rate,
-    # and the appendix combines them with the pre-period mandated share instead
-    # of adding them. The flag is reported by the insurer and is almost
-    # certainly under-recorded (it marks only 4-9% of policy-years, well below
-    # the SFHA share), so read the split as a lower bound on the mandated part,
-    # not a clean partition.
-    cell[, nonmand_n := policies_n - mand_n]
-    stopifnot(all(cell$nonmand_n >= 0))
-
-    stopifnot(
-        nrow(cell) > 0L,
-        !anyNA(cell$homes_n), all(cell$homes_n > 0),
-        !anyNA(cell$homes_flat_n), all(cell$homes_flat_n > 0),
-        ok[, !any(year_constr == 1994L)],
-        num[, !any(year_constr == 1994L)]
-    )
-    cell[]
+    build_takeup_panel(dt, takeup_claims, dt_stock, periods_obs, binw,
+                       N_YEARS_PERIOD)
 }
 
 dt_home_cell <- build_home_cell(BIN_CONSTR_YEAR)
@@ -884,6 +805,7 @@ takeup_es_rhs <- paste0(
 
 fit_takeup <- function(lhs, offset_var, rhs, data = dt_home_cell,
                        cluster = CLUSTER_TAKEUP) {
+    if (offset_var == "log_policy_yrs") data <- data[policies_n > 0]
     fepois(as.formula(paste0(lhs, rhs)), data = data,
            offset = as.formula(paste0("~", offset_var)), cluster = cluster)
 }
@@ -891,6 +813,13 @@ fit_takeup <- function(lhs, offset_var, rhs, data = dt_home_cell,
 est_ppl_home_es <- fit_takeup("policies_n", "log_home_yrs",   takeup_es_rhs)
 est_clm_home_es <- fit_takeup("claims_n",   "log_home_yrs",   takeup_es_rhs)
 est_claimrate_es <- fit_takeup("claims_n",  "log_policy_yrs", takeup_es_rhs)
+
+source(here("program", "lib", "plot-takeup.R"))
+plot_takeup_event_study(
+    list("Policies per home" = est_ppl_home_es,
+         "Claims per policy" = est_claimrate_es),
+    ref_period, file.path(out_dir, "es-takeup-claim-frequency.pdf"))
+
 
 takeup_headers <- c(
     "Policies per home",
