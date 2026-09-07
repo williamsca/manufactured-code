@@ -121,7 +121,7 @@
     \frametitle{This paper}
 
     \begin{enumerate}\setlength{\itemsep}{1.0em}
-        \item \begin{large}\textbf{Cost.} The 1994 wind standard raised MH prices by \al{\$\vPriceEff} (\vPriceEffPct\%) in treated states
+        \item \begin{large}\textbf{Cost.} The 1994 wind standard raised MH prices by \al{\$\vPriceEff} (\vPriceEffPct\%) in treated states\end{large}
 
         \item \begin{large}\textbf{Benefit.} Post-1994 MH sustain \al{\vBldgDmgPct\%} less building damage per flood claim \gc{(s.e.\ \vBldgDmgSELP\ log points)}\end{large}
         \begin{itemize}
@@ -462,8 +462,6 @@
         \item \textbf{Not composition.} Valuing each state-year's actual size mix at fixed national prices gives \al{\$\vPriceEffComp} --- essentially nothing. \hfill \hyperlink{frame:composition-decomp}{\beamerbutton{decomposition}}
 
         \item \textbf{It scales with size.} \$\vPriceEffSingle\ for single-section, \al{\$\vPriceEffDouble} for multi-section \so\ part of the cost varies with the structure, not a fixed charge per home. \hfill \hyperlink{frame:section-type}{\beamerbutton{by size}}
-
-        \item \textbf{Dose-response.} Weighting treatment by the share of a state's MH stock actually in Zone II/III gives \$\vPriceEffDose, or \al{\vDoseRatio$\times$} the binary estimate. \hfill \hyperlink{frame:dose}{\beamerbutton{dose}}
     \end{itemize}
 
     \vspace{0.6em}
@@ -690,7 +688,6 @@
     \textbf{Cost side}
     \begin{itemize}
         \item fixed-weight index vs.\ all-homes average vs.\ mix-only counterfactual \hfill \hyperlink{frame:composition-decomp}{\beamerbutton{decomposition}}
-        \item continuous wind-zone treatment intensity \hfill \hyperlink{frame:dose}{\beamerbutton{dose}}
         \item single- vs.\ multi-section \hfill \hyperlink{frame:section-type}{\beamerbutton{by size}}
         \item weighting and the \vNDroppedStates\ dropped no-shipment states
     \end{itemize}
@@ -962,27 +959,6 @@
     \vspace{0.3em}
 
     \scriptsize{Two readings the data do not separate: compliance requires more material on a larger structure, or multi-section homes are placed disproportionately in the higher wind zones within treated states.}
-
-    \vfill
-
-    \hfill \hyperlink{frame:robustness}{\beamerbutton{back}}
-\end{frame}
-
-\begin{frame}\label{frame:dose}
-    \frametitle{Binary vs.\ continuous treatment intensity}
-
-    \vspace{-0.5em}
-
-    \scriptsize{
-        \begin{table}
-        \centering
-        \resizebox{.52\linewidth}{!}{\input{output/event-study/mhs-dose-response-static.tex}}
-        \end{table}
-    }
-
-    \vspace{0.3em}
-
-    \footnotesize{Column (2) replaces the binary indicator with the share of the state's 1980--2000 MH stock sitting in a Zone II/III county. The continuous estimate is \al{\vDoseRatio$\times$} the binary one --- the direction attenuation bias predicts.}
 
     \vfill
 

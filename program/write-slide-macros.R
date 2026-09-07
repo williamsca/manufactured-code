@@ -91,8 +91,6 @@ mac("vPriceEffPct",     fmt_f(get_mhs("price_effect_pct"), 1))
 mac("vPriceBase",       fmt_d(price_base))
 mac("vPriceEffSingle",  fmt_d(get_mhs("price_effect_single_level")))
 mac("vPriceEffDouble",  fmt_d(get_mhs("price_effect_double_level")))
-mac("vPriceEffDose",    fmt_d(get_mhs("price_effect_dose_level")))
-mac("vDoseRatio",       fmt_f(get_mhs("dose_binary_ratio"), 2))
 
 # Composition decomposition: the all-homes average on the index sample, and
 # the mix-only counterfactual that holds prices fixed at national levels.

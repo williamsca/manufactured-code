@@ -54,7 +54,6 @@ stopifnot(!anyNA(dt_type$reg_wt), all(dt_type$reg_wt > 0),
 # below so that `dt_common` inherits them.
 dt[, post1994 := as.numeric(year >= 1994)]
 dt[, post_treated      := post1994 * treated]
-dt[, post_treated_dose := post1994 * treated_intensity]
 
 # The index sample. Constructing the fixed-weight index requires both
 # size-specific prices, which Census suppresses for small states, so the
@@ -116,54 +115,15 @@ pick_lhs <- function(est, lhs) {
 etable(est_p, digits = 3)
 etable(est_q, digits = 3)
 
-# Chunk C: wind-zone dose-response ----
-# The binary `treated` above codes a state as treated if it contains any
-# Zone II/III county, which badly dilutes the design: pooled across
-# treated states only ~30% of the 1980-2000 MH stock actually sits in a
-# Zone II/III county (range: FL 97% down to VA 3%; see
-# derived/mhs-windzone-intensity.Rds). `treated_intensity` replaces the
-# binary indicator with the MH-stock-weighted share of a state's stock in
-# Zone II/III, so beta_k is directly comparable to the binary spec's
-# coefficient: it is the implied price effect of moving a state from 0%
-# to 100% zone II/III MH stock.
-fmla_p_dose <- as.formula(paste0(
-    s_out_p, " ~ i(year, treated_intensity, ref = 1993) | statefp + year"
-))
-est_p_dose <- feols(fmla_p_dose, data = dt, weights = ~placements_base,
-                    cluster = ~statefp)
-etable(est_p_dose, digits = 3)
+# Static (single-coefficient) price spec ----
+# Collapses the event study's per-year interactions to one post-1994
+# coefficient, the same simplification `post_mh` makes for the NFIP claim
+# spec. Feeds the weighting-robustness check below; `dict_static` is also
+# reused by the composition decomposition.
+fmla_static_bin <- avg_sales_price_fw ~ post_treated | statefp + year
 
-# Same substitution on the quantity side: does the placements event study
-# also steepen under continuous intensity, or does it stay flat/null like
-# the binary version?
-fmla_q_dose <- as.formula(paste0(
-    s_out_q, " ~ i(year, treated_intensity, ref = 1993) | statefp + year"
-))
-est_q_dose <- feols(fmla_q_dose, data = dt_common, weights = ~placements_base,
-                    cluster = ~statefp)
-etable(est_q_dose, digits = 3)
-
-# Binary spec, restricted to the three high-intensity treated states
-# (FL, LA, MA) vs. the zone I controls, so any dilution from partially
-# treated states (e.g. GA at 6% intensity) cannot attenuate the estimate.
-dt_hi <- dt[high_intensity == TRUE | treated == FALSE]
-est_p_hi <- feols(fmla_p, data = dt_hi, weights = ~placements_base,
-                  cluster = ~statefp)
-etable(est_p_hi, digits = 3)
-
-# Static (single-coefficient) comparison table: binary vs. continuous
-# treatment, same outcome, same sample/FE/clustering, so the two columns
-# differ only in how "treated" is coded. Collapses the event study's
-# per-year interactions to one post-1994 coefficient, the same
-# simplification `post_mh` makes for the NFIP claim spec. The post-1994
-# interactions are built above, with `dt_common`.
-fmla_static_bin  <- avg_sales_price_fw ~ post_treated      | statefp + year
-fmla_static_dose <- avg_sales_price_fw ~ post_treated_dose | statefp + year
-
-est_static_bin  <- feols(fmla_static_bin,  data = dt, weights = ~placements_base,
-                         cluster = ~statefp)
-est_static_dose <- feols(fmla_static_dose, data = dt, weights = ~placements_base,
-                         cluster = ~statefp)
+est_static_bin <- feols(fmla_static_bin, data = dt, weights = ~placements_base,
+                        cluster = ~statefp)
 
 # Quantity-side counterpart of `est_static_bin`: one post-1994 coefficient
 # on log placements, on the same index sample as the price estimates, so
@@ -175,7 +135,6 @@ est_q_static <- feols(placements_ln ~ post_treated | statefp + year,
 
 dict_static <- c(
     "post_treated"          = "Post 1994 x Treated",
-    "post_treated_dose"     = "Post 1994 x Treated",
     "avg_sales_price_fw"    = "Fixed-weight price index (\\$)",
     "avg_sales_price_fw_idx" = "Fixed-weight price index (1993 = 100)",
     "avg_sales_price_comp"  = "Composition-only index (\\$)",
@@ -187,23 +146,9 @@ dict_static <- c(
     "year"                  = "Year"
 )
 
-etable(
-    list(est_static_bin, est_static_dose),
-    dict = dict_static,
-    headers = list("Treatment" = list("Binary" = 1, "Continuous intensity" = 1)),
-    fitstat = c("n", "r2", "my"), digits = 3
-)
-
 dir.create(here("output", "event-study"), showWarnings = FALSE, recursive = TRUE)
-etable(
-    list(est_static_bin, est_static_dose),
-    dict = dict_static,
-    headers = list("Treatment" = list("Binary" = 1, "Continuous intensity" = 1)),
-    tex = TRUE, se.below = FALSE,
-    file = here("output", "event-study", "mhs-dose-response-static.tex"),
-    fitstat = c("n", "r2", "my"),
-    digits = 2, digits.stats = 2, replace = TRUE
-)
+etable(est_static_bin, dict = dict_static, fitstat = c("n", "r2", "my"),
+       digits = 3)
 
 # Composition decomposition ----
 # Four static DiDs that separate two distinct reasons the headline number
@@ -424,24 +369,6 @@ for (out in v_out_q) {
             path = here("output", "event-study", paste0("es-mhs-", out, ".pdf")))
 }
 
-# Chunk C dose-response plots ----
-# Dynamic (per-year) continuous-treatment event study, same var = "treated"
-# in plot_es because i(year, treated_intensity, ref = 1993) still names its
-# interaction terms "...:treated" internally via fixest's i() — the
-# treated_intensity variable is what varies, not the term name.
-for (out in v_out_p) {
-    plot_es(est_p_dose, out, yscale = yscale_for(out), var = "treated_intensity",
-            path = here("output", "event-study", paste0("es-mhs-", out, "-dose.pdf")))
-}
-
-for (out in v_out_q) {
-    plot_es(est_q_dose, out, var = "treated_intensity",
-            path = here("output", "event-study", paste0("es-mhs-", out, "-dose.pdf")))
-}
-
-plot_es(est_p_hi, "avg_sales_price_fw_idx", yscale = 1,
-        path = here("output", "event-study", "es-mhs-avg_sales_price_fw_idx-hi.pdf"))
-
 # Export key scalars ----
 dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
 
@@ -514,40 +441,6 @@ price_effect_single_level <- ct_type[["post_treated:section_typesingle"]] / 1000
 price_effect_double_level <- ct_type[["post_treated:section_typedouble"]] / 1000
 price_effect_type_pool    <- coef(est_type_pool)[["post_treated"]] / 1000
 
-# Chunk C dose-response scalars ----
-# `price_effect_dose_level` is the implied price effect of moving a state
-# from 0% to 100% Zone II/III MH stock (fully comparable to
-# `price_effect_level`'s binary treated/control contrast). A flat
-# gradient (dose ~ binary) supports regional production standardization;
-# a steep gradient (dose >> binary) means the true per-unit compliance
-# cost is larger than the binary design implies.
-ct_price_dose <- as.data.table(
-    coeftable(pick_lhs(est_p_dose, "avg_sales_price_fw")),
-    keep.rownames = TRUE)
-ct_price_dose[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
-ct_price_dose <- ct_price_dose[grepl(":treated_intensity$", rn)]
-price_effect_dose_level <- ct_price_dose[year >= 1994, mean(Estimate) / 1000]
-
-ct_price_hi <- as.data.table(
-    coeftable(pick_lhs(est_p_hi, "avg_sales_price_fw")),
-    keep.rownames = TRUE)
-ct_price_hi[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
-ct_price_hi <- ct_price_hi[grepl(":treated$", rn)]
-price_effect_hi_level <- ct_price_hi[year >= 1994, mean(Estimate) / 1000]
-
-dose_binary_ratio <- price_effect_dose_level / price_effect_level
-
-# Quantity-side dose-response scalar, same construction as
-# `price_effect_dose_level`: average of the post-1994 treated_intensity
-# interactions, i.e. the implied log-placements effect of moving a state
-# from 0% to 100% Zone II/III MH stock.
-ct_placements_dose <- as.data.table(
-    coeftable(pick_lhs(est_q_dose, "placements_ln")),
-    keep.rownames = TRUE)
-ct_placements_dose[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
-ct_placements_dose <- ct_placements_dose[grepl(":treated_intensity$", rn)]
-placements_effect_dose_level <- ct_placements_dose[year >= 1994, mean(Estimate)]
-
 # Binary-treatment quantity effects, on the index sample. The event-study
 # average is the counterpart of `price_effect_level`; the static
 # coefficient and its standard error are what the text reports, since a
@@ -567,8 +460,6 @@ fwrite(
     data.table(
         statistic = c("price_effect_level", "price_effect_1994",
                       "avg_price_treated_pre", "price_effect_pct",
-                      "price_effect_dose_level", "price_effect_hi_level",
-                      "dose_binary_ratio", "placements_effect_dose_level",
                       "price_effect_idx", "price_effect_raw_level",
                       "price_effect_comp_level", "price_effect_raw_cmn_level",
                       "price_effect_raw_static",
@@ -584,8 +475,6 @@ fwrite(
                       "placements_effect_static_se", "n_placements"),
         value     = c(price_effect_level, price_effect_1994,
                       avg_price_treated_pre, price_effect_pct,
-                      price_effect_dose_level, price_effect_hi_level,
-                      dose_binary_ratio, placements_effect_dose_level,
                       price_effect_idx, price_effect_raw_level,
                       price_effect_comp_level, price_effect_raw_cmn_level,
                       price_effect_raw_static,

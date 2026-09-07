@@ -1125,8 +1125,8 @@ etable(est_static_pois_unw, fitstat = c("n", "pr2", "my"))
 # call 2026-08-13 was that they're second-order to the damage question and
 # not worth a paper table, but the code is kept for reference.)
 
-# --- wind-zone exposure (coordinate with Chunk C) ---
-# Reuse the same eCFR crosswalk as the Chunk C cost-side dose-response
+# --- wind-zone exposure ---
+# Reuse the same eCFR crosswalk as the cost-side wind-zone treatment
 # (`ecfr_wind_zone`, research-database) rather than an independently defined
 # coastal/hurricane county list, so the benefit-side split lines up with the
 # cost-side treatment definition. No NYC-borough fallback needed: verified
@@ -1150,10 +1150,9 @@ dt_claims_est[, treated_wz3 := as.integer(wind_zone == 3L)]
 # resilience effect operating on non-elevated construction.
 # SFHA (review target 3): splits the mandatory-purchase population from
 # the voluntary-market population.
-# Wind-zone-3 (coordinate with Chunk C): a benefit-side companion to the
-# cost-side dose-response — Zone III MH should show a larger post-1994
-# improvement than Zone I/II if the wind channel, not just general
-# construction-quality upgrading, is doing the work.
+# Wind-zone-3: Zone III MH should show a larger post-1994 improvement than
+# Zone I/II if the wind channel, not just general construction-quality
+# upgrading, is doing the work.
 fmla_mech <- building_damage ~ post_mh | geo^year_loss + mh + post1994
 
 est_mech_split <- list(

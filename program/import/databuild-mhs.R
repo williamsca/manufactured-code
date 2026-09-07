@@ -23,13 +23,13 @@ dt_treat[, statefp := substr(countyfp, 1, 2)]
 
 dt_treat <- dt_treat[, .(wind_zone = max(wind_zone)), by = .(statefp)]
 
-# continuous treatment intensity: MH-stock-weighted share of a state's
-# 1980-2000 MH stock sitting in a Zone II/III county. Binary `treated`
-# above is diluted (e.g. GA has one WZ2/3 county but is coded fully
-# treated); this recovers within-treated-group variation in how much of
-# the state's MH stock the reform actually bound on. AK is not in
-# ecfr_wind_zone at all (see its catalog notes); any renamed/consolidated
-# FIPS code with no match there defaults to Zone I.
+# MH-stock-weighted share of a state's 1980-2000 MH stock sitting in a
+# Zone II/III county. Binary `treated` above is diluted (e.g. GA has one
+# WZ2/3 county but is coded fully treated); this quantifies how much of
+# each treated state's MH stock the reform actually bound on, and feeds
+# the descriptive wind-zone-intensity table in the paper appendix. AK is
+# not in ecfr_wind_zone at all (see its catalog notes); any
+# renamed/consolidated FIPS code with no match there defaults to Zone I.
 dt_stock <- readRDS(here("derived", "census2000-mh-county-vintage.Rds"))
 dt_stock <- dt_stock[, .(mh_stock = sum(mh_units)), by = countyfp]
 
@@ -70,15 +70,6 @@ assert_geo_coverage(dt, "wind_zone", "statefp", "databuild-mhs.R: MHS panel x ec
 
 dt[, treated := (wind_zone >= 2)]
 dt[, treated_wz3 := (wind_zone == 3)]
-
-dt <- merge(
-    dt, dt_intensity[, .(statefp, treated_intensity)],
-    by = "statefp", all.x = TRUE)
-dt[is.na(treated_intensity), treated_intensity := 0]
-
-# high-intensity treated states only: FL, LA, MA (see notes/specs.md
-# Chunk C for the state table with all intensities)
-dt[, high_intensity := statefp %in% c("12", "22", "25")]
 
 # Full state x treatment-status table, saved before the base-period-weight
 # drop below removes a few small states from `dt`. Wind-zone treatment
@@ -210,12 +201,11 @@ stopifnot(!anyNA(dt[statefp %in% v_price_states,
 # state-years where Census suppresses one type's price, and it allows the
 # treatment effect to differ by section type.
 dt_type <- melt(
-    dt[, .(statefp, state_name, year, treated, treated_wz3, treated_intensity,
-           high_intensity, placements_base,
+    dt[, .(statefp, state_name, year, treated, treated_wz3, placements_base,
            single = avg_sales_price_single,
            double = avg_sales_price_double)],
     id.vars = c("statefp", "state_name", "year", "treated", "treated_wz3",
-                "treated_intensity", "high_intensity", "placements_base"),
+                "placements_base"),
     measure.vars  = c("single", "double"),
     variable.name = "section_type",
     value.name    = "price"
