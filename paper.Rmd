@@ -568,17 +568,6 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \end{flushleft}
 \end{figure}
 
-\begin{table}[htbp]
-  \centering
-  \caption{Wind-Zone Dose-Response: Binary vs.\ Continuous Treatment Intensity}\label{tab:mhs-dose-response}
-  \begin{threeparttable}
-    \input{output/event-study/mhs-dose-response-static.tex}
-    \begin{tablenotes}
-      \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-cost}, replacing the year-by-year interactions with a single post-1994 $\times$ treatment indicator, estimated on the same state-year sample, outcome (the fixed-weight price index of Equation \eqref{eq:price-index}, in dollars), state and year fixed effects, weighting, and clustering as Figure \ref{fig:es-price}. Column (1) uses the binary treatment indicator (any Zone II/III county in the state). Column (2) replaces it with the MH-stock-weighted share of the state's 1980--2000 MH stock sitting in a Zone II/III county (Appendix Table \ref{tab:windzone-intensity}). Source: Census Bureau Manufactured Housing Survey; eCFR wind zone classification; Census 2000 manufactured-housing counts.
-    \end{tablenotes}
-  \end{threeparttable}
-\end{table}
-
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Standards on Building Damage per Claim}\label{fig:es-building-damage}
@@ -731,7 +720,7 @@ Column (1) pools the two sizes and recovers the index estimate. Column (2) inter
 
 # Wind-Zone Treatment Intensity by State {#appendix-windzone-intensity}
 
-The binary treatment indicator used in the main cost-side specification (Table \ref{tab:mhs-dose-response}, column 1) codes a state as treated if it contains any Zone II or III county, regardless of how much of the state's manufactured housing stock actually sits in one. This is a coarse proxy: a state can be classified treated on the strength of a single high-wind county while the bulk of its MH stock sits in Zone I. Table \ref{tab:windzone-intensity} reports, for every state with at least one Zone II/III county, the share of its 1980--2000 manufactured-housing stock located in a Zone II/III county, constructed by weighting each county's wind-zone status (24 CFR \S 3280.305, as classified in the eCFR crosswalk) by its manufactured-housing stock from the 2000 Census. Only 3 of the 11 treated states---Florida, Louisiana, and Massachusetts---have more than half of their MH stock in a Zone II/III county; pooling across all treated states, only about 30\% of the 1980--2000 MH stock sits in a Zone II/III county. This intensity measure underlies the continuous-treatment column of Table \ref{tab:mhs-dose-response}.
+The binary treatment indicator used in the cost-side specification codes a state as treated if it contains any Zone II or III county, regardless of how much of the state's manufactured housing stock actually sits in one. This is a coarse proxy: a state can be classified treated on the strength of a single high-wind county while the bulk of its MH stock sits in Zone I. Table \ref{tab:windzone-intensity} reports, for every state with at least one Zone II/III county, the share of its 1980--2000 manufactured-housing stock located in a Zone II/III county, constructed by weighting each county's wind-zone status (24 CFR \S 3280.305, as classified in the eCFR crosswalk) by its manufactured-housing stock from the 2000 Census. Only 3 of the 11 treated states---Florida, Louisiana, and Massachusetts---have more than half of their MH stock in a Zone II/III county; pooling across all treated states, only about 30\% of the 1980--2000 MH stock sits in a Zone II/III county.
 
 \begin{table}[htbp]
   \centering
