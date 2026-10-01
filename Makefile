@@ -1,7 +1,7 @@
 # Citations seem good enough for now, but can change formatting with CSL
 # CSL = chicago-author-date
 
-paper.pdf: paper.Rmd manufactured-code.bib
+paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib
 	Rscript -e "rmarkdown::render('$<')"
 
 # slides.pdf refreshes the quoted numbers first: every estimate on a slide is a
