@@ -10,7 +10,7 @@ source(here("program", "import", "rd-client.R"))
 source(here("program", "import", "geo-coverage-checks.R"))
 
 year_min <- 1985L
-year_max <- 2003L
+year_max <- 2004L
 
 # import ----
 

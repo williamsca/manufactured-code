@@ -56,7 +56,7 @@ Selection into insurance or claims may change composition. I assess this with vi
 
 # 4. Results
 
-**Home prices and quantities.** Prices rise by `r price_eff`, approximately `r price_pct` of the pre-reform treated-state mean (Figure \ref{fig:price-effect}). The premium emerges mainly in 1995 and persists through 2000; fixed size weights isolate within-size prices. Quantity effects are positive but imprecise, consistent with improved resilience raising demand for manufactured homes; point estimates suggest placements may have increased by about `r round(100 * (exp(get_mhs("placements_effect_static")) - 1))`%.
+**Home prices and quantities.** Prices rise by `r price_eff`, approximately `r price_pct` of the pre-reform treated-state mean (Figure \ref{fig:price-effect}). The premium emerges mainly in 1995, rises through the late-1990s expansion of chattel lending, and remains elevated through 2004, after that lending contracted; the headline figure is the 2000--2004 average. Fixed size weights isolate within-size prices. Quantity effects are close to zero and imprecise.
 
 **Flood damage and insurance payments.** The static estimate in Equation \eqref{eq:static-vintage} implies `r bldg_dmg_pct` lower expected building damage per manufactured-home claim (coefficient `r bldg_dmg_lp`, SE `r bldg_dmg_se`), relative to the corresponding vintage change for site-built homes. At the pre-reform mean of `r mh_pre_bldg`, this equals `r bldg_dmg_eff` less per claim. Reductions emerge and grow across post-reform cohorts (Figure \ref{fig:building-damage}). Contents damage falls by `r cont_dmg_pct`; net building and contents payments fall by `r net_bldg_pct` and `r net_cont_pct`, respectively (Table \ref{tab:claims-outcomes-static}).
 

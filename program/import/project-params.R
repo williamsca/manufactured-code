@@ -35,7 +35,12 @@ OCCUPANCY_TYPE_SF <- c(1L, 11L, 14L)
 # estimate-mhs.R state-DiD sample window (state x year panel of MH prices
 # and placements around the 1994 HUD wind standard).
 MIN_YEAR_MHS <- 1988L
-MAX_YEAR_MHS <- 2000L
+MAX_YEAR_MHS <- 2004L
+# First year of the post-period average reported as the headline price
+# effect. Chattel lending for MH expanded through 1998-99 and collapsed from
+# 2000, so averaging over 2000 onward measures the premium that persists
+# after the lending boom rather than one inflated by it.
+LASTING_START_MHS <- 2000L
 
 # research-database curated snapshot of fema_nfip_claims / fema_nfip_policies.
 # Pinned rather than resolved via rd_latest_version() so a paper's headline

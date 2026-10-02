@@ -372,13 +372,13 @@ for (out in v_out_q) {
 # Export key scalars ----
 dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
 
-# Post-1994 average of the event-study interactions, for one outcome of
-# the multi-LHS price model.
+# Post-boom (LASTING_START_MHS onward) average of the event-study
+# interactions, for one outcome of the multi-LHS price model.
 post_avg <- function(est, lhs, var = "treated", scale = 1000) {
     ct <- as.data.table(coeftable(pick_lhs(est, lhs)), keep.rownames = TRUE)
     ct[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
     ct <- ct[grepl(paste0(":", var, "$"), rn)]
-    ct[year >= 1994, mean(Estimate) / scale]
+    ct[year >= LASTING_START_MHS, mean(Estimate) / scale]
 }
 
 # Headline effect is now measured on the fixed-weight index, so it is the
@@ -391,7 +391,7 @@ ct_price <- as.data.table(
 ct_price[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
 ct_price <- ct_price[grepl(":treated$", rn)]
 
-price_effect_level <- ct_price[year >= 1994, mean(Estimate) / 1000]
+price_effect_level <- ct_price[year >= LASTING_START_MHS, mean(Estimate) / 1000]
 price_effect_1994  <- ct_price[year == 1994, Estimate / 1000]
 
 # Denominator for the percentage effect is the same object as the
@@ -416,7 +416,7 @@ price_effect_raw_level     <- post_avg(est_p, "avg_sales_price")
 ct_raw_cmn <- as.data.table(coeftable(est_raw_cmn), keep.rownames = TRUE)
 ct_raw_cmn[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
 price_effect_raw_cmn_level <- ct_raw_cmn[
-    grepl(":treated$", rn) & year >= 1994, mean(Estimate) / 1000]
+    grepl(":treated$", rn) & year >= LASTING_START_MHS, mean(Estimate) / 1000]
 price_effect_comp_level    <- post_avg(est_p, "avg_sales_price_comp")
 price_effect_raw_static    <- coef(est_dec_raw)[["post_treated"]] / 1000
 price_effect_raw_cmn_static <- coef(est_dec_raw_cmn)[["post_treated"]] / 1000
@@ -450,7 +450,7 @@ ct_placements <- as.data.table(
     coeftable(pick_lhs(est_q, "placements_ln")), keep.rownames = TRUE)
 ct_placements[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
 ct_placements <- ct_placements[grepl(":treated$", rn)]
-placements_effect_level <- ct_placements[year >= 1994, mean(Estimate)]
+placements_effect_level <- ct_placements[year >= LASTING_START_MHS, mean(Estimate)]
 
 placements_effect_static    <- coef(est_q_static)[["post_treated"]]
 placements_effect_static_se <- se(est_q_static)[["post_treated"]]
