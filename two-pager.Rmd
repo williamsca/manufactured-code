@@ -1,0 +1,118 @@
+---
+title: "The Returns to Climate Adaptation in Manufactured Housing"
+author: "Colin Williams | University of Virginia"
+date: ""
+fontsize: 10pt
+geometry: margin=0.7in
+output:
+  pdf_document:
+    keep_tex: false
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{float}
+  - \usepackage{titlesec}
+  - \titlespacing*{\section}{0pt}{8pt}{4pt}
+  - \setlength{\parskip}{4pt}
+  - \setlength{\parindent}{0pt}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+source(here::here("program", "load-results.R"))
+```
+
+# 1. Executive summary
+
+Does mandated climate adaptation pay for itself? The 1994 HUD wind standard required stronger manufactured homes in hurricane-prone areas. It raised home prices by `r price_eff` (`r price_pct`); post-1994 manufactured homes experienced `r bldg_dmg_pct` less building damage per flood claim than the site-built vintage comparison within the same county and loss year.
+
+Measured flood benefits recover approximately `r bcr_pct` of the upfront price increase over 20 years. This calculation covers one channel of a regulation designed primarily for wind resilience; wind losses, uninsured losses, displacement, and the value of reduced risk remain unmeasured. For low-income households with limited disaster insurance, stronger construction provides protection without annual premiums.
+
+# 2. Data and institutions
+
+Manufactured homes make up about 6% of U.S. housing, with larger shares in rural areas and the Southeast. HUD's federal code preempts local rules. After Hurricane Andrew, HUD strengthened wind requirements effective July 1994, applying structural, sheathing, and fastening upgrades in zones II and III (Figure \ref{fig:map-treated-states}).
+
+The Census Manufactured Housing Survey supplies state-year prices and placements (1988--2000); fixed pre-reform size weights hold the single/multi-section mix constant. OpenFEMA NFIP claims cover single-family homes built 1984--1999, with losses in 1994--2023, including `r n_mh_claims` manufactured-home claims. Policy terms (2009--2023) support composition checks. Dollar values are in 2000 dollars; damage estimates describe insured claimants, not the full housing stock.
+
+# 3. Empirical strategy
+
+**Prices.** A state and year fixed effects difference-in-differences compares states containing wind zones II or III with zone I states around 1994. Event-study coefficients are relative to 1993. Regressions use pre-reform shipment weights and state-clustered standard errors. Treatment is measured at the state level even though requirements vary within treated states.
+
+**Flood damage: construction vintage within counties.** The central design compares the change across construction vintages for manufactured homes with the corresponding change for site-built homes exposed to floods in the same county and loss year. Comparing older and newer manufactured homes alone would confound the reform with general changes in quality and exposure. Site-built homes supply the comparison vintage profile. County $\times$ loss-year effects absorb shared flood conditions; housing-type effects absorb persistent differences.
+
+The dynamic model interacts two-year vintage bins with manufactured status, relative to 1992--1993. The pooled static model uses one post-1994 interaction and a separate post-1994 effect:
+
+\begin{equation}
+\mathbb{E}[Y_{ict}\mid X]=\exp\!\left(\alpha_{c\times t}+\delta\,\mathrm{MH}_i+\lambda\,\mathrm{Post94}_i+\beta\,(\mathrm{MH}_i\times\mathrm{Post94}_i)\right).
+\label{eq:static-vintage}
+\end{equation}
+
+Here $Y_{ict}$ is claim damage or payment for claim $i$ in county $c$ and loss year $t$; $\mathrm{MH}_i$ marks a manufactured home and $\mathrm{Post94}_i$ marks a home built after 1994. County $\times$ loss-year effects $\alpha_{c\times t}$ absorb shared flood conditions; $\beta$ is the proportional difference-in-differences effect, reported as $100(e^\beta-1)$ percent. The model is estimated by Poisson pseudo-maximum likelihood. These are comparisons across construction cohorts, rather than repeated observations of a home before and after a flood.
+
+**Identification and interpretation.** A causal interpretation requires parallel vintage profiles absent the reform: general improvements in newer homes must have affected the two housing types proportionally, and no coincident change specific to manufactured homes can explain the break. Pre-reform coefficients diagnose this assumption, though some fluctuate. Vintage proxies for exposure, and production-to-installation lags may dilute the earliest treated cohort; the estimate is a reduced-form cohort effect, not a zone-specific engineering effect.
+
+Poisson pseudo-maximum likelihood estimates proportional changes and retains zero outcomes; standard errors cluster by county. A coefficient $b$ implies $100(e^b-1)$ percent change in expected damage or payment. Dollar effects apply this ratio to the manufactured-home baseline mean.
+
+Selection into insurance or claims may change composition. I assess this with vintage comparisons of policy characteristics; the static claim model is in Equation \eqref{eq:static-vintage}.
+
+# 4. Results
+
+**Home prices and quantities.** Prices rise by `r price_eff`, approximately `r price_pct` of the pre-reform treated-state mean (Figure \ref{fig:price-effect}). The premium emerges mainly in 1995 and persists through 2000; fixed size weights isolate within-size prices. Quantity effects are positive but imprecise, consistent with improved resilience raising demand for manufactured homes; point estimates suggest placements may have increased by about `r round(100 * (exp(get_mhs("placements_effect_static")) - 1))`%.
+
+**Flood damage and insurance payments.** The static estimate in Equation \eqref{eq:static-vintage} implies `r bldg_dmg_pct` lower expected building damage per manufactured-home claim (coefficient `r bldg_dmg_lp`, SE `r bldg_dmg_se`), relative to the corresponding vintage change for site-built homes. At the pre-reform mean of `r mh_pre_bldg`, this equals `r bldg_dmg_eff` less per claim. Reductions emerge and grow across post-reform cohorts (Figure \ref{fig:building-damage}). Contents damage falls by `r cont_dmg_pct`; net building and contents payments fall by `r net_bldg_pct` and `r net_cont_pct`, respectively (Table \ref{tab:claims-outcomes-static}).
+
+**Composition and other margins.** Post-reform manufactured-home policies have higher building coverage and replacement costs and are more likely to be in Special Flood Hazard Areas (Table \ref{tab:policy-composition}). These shifts imply greater potential losses; elevation rises weakly only in the latest cohort.
+
+**Returns and fiscal spillovers.** Expected flood savings are moderate. The pre-reform insured-home claim rate is approximately `r claim_rate_fmt`; given the estimated building and contents damage reductions, the expected annual flood savings are about `r ann_benefit`. Discounted at 3% over 20 years, the present value is `r npv_baseline`, about `r bcr_pct` of the price increase. Unmeasured benefits would need to supply approximately `r wind_be` per home to close the gap. Payment reductions imply roughly `r nfip_sav_m` in NFIP savings across observed claims on homes built in 1994--1999. Thus, measured flood resilience and fiscal gains are clear, while total returns remain unknown.
+
+\clearpage
+
+# Appendix: Key figures and tables
+
+\begin{figure}[H]
+\centering
+\caption{States exposed to the 1994 HUD wind standard}
+\label{fig:map-treated-states}
+\includegraphics[width=0.85\textwidth,height=2.65in,keepaspectratio]{output/descriptives/map-mhs-treated-states.pdf}
+\end{figure}
+
+\noindent\footnotesize Treated states contain counties in HUD wind zones II or III; control states are in zone I. State classification does not imply that every county in a treated state faced stronger requirements. Source: HUD wind-zone classification.\normalsize
+
+\begin{figure}[H]
+\centering
+\caption{Effect on manufactured-home prices}
+\label{fig:price-effect}
+\includegraphics[width=0.85\textwidth,height=2.8in,keepaspectratio]{output/event-study/es-mhs-avg_sales_price_fw_idx.pdf}
+\end{figure}
+
+\noindent\footnotesize State and year fixed effects event study, relative to 1993. The outcome is the fixed-weight price index, with the national 1993 value normalized to 100. Weights are each state's mean 1988--1993 shipments; standard errors are clustered by state. Source: Census Manufactured Housing Survey.\normalsize
+
+\clearpage
+
+\begin{figure}[H]
+\centering
+\caption{Building damage by construction vintage}
+\label{fig:building-damage}
+\includegraphics[width=0.85\textwidth,height=3in,keepaspectratio]{output/event-study/countyfp/es-building-damage.pdf}
+\end{figure}
+
+\noindent\footnotesize Poisson event-study coefficients for manufactured homes relative to site-built homes, normalized to the 1992--1993 construction bin. Includes common construction-vintage, housing-type, and county $\times$ loss-year fixed effects. Standard errors are clustered by county. Coefficients are log rate ratios. Source: OpenFEMA claims.\normalsize
+
+\begin{table}[H]
+\centering
+\caption{Static estimates: building damage and supplementary claims outcomes}
+\label{tab:claims-outcomes-static}
+\resizebox{\textwidth}{!}{\input{output/event-study/countyfp/claims-outcomes-static.tex}}
+\end{table}
+
+\noindent\footnotesize Poisson regressions with a post-1994 $\times$ manufactured-home interaction, a separate post-1994 main effect, housing-type effects, and county $\times$ loss-year effects. A coefficient $b$ corresponds to $100(e^b-1)$ percent. Dollar outcomes and dependent-variable means are in thousands of 2000 dollars. Outcomes are winsorized at `r winsor_cap`; the cap affects no manufactured-home claims or payment records. Observation counts differ because of outcome availability and removal of all-zero fixed-effect groups. Standard errors are clustered by county. Source: OpenFEMA claims.\normalsize
+
+\clearpage
+
+\begin{table}[H]
+\centering
+\caption{Policy characteristics by construction vintage}
+\label{tab:policy-composition}
+\resizebox{\textwidth}{!}{\input{output/event-study/countyfp/policy-composition.tex}}
+\end{table}
+
+\noindent\footnotesize Poisson regressions on individual policy terms, 2009--2023. Two-year construction-vintage interactions with manufactured-home status are relative to 1992--1993; bin labels give the first construction year. Includes housing-type, common construction-vintage, and county $\times$ five-year calendar-period fixed effects. Standard errors are clustered by county. All coefficients are log rate ratios: $100(e^b-1)$ is a proportional percentage change, including for the binary elevated-building and Special Flood Hazard Area (SFHA) indicators. Replacement cost and coverage means are in thousands of 2000 dollars. Zero recorded replacement costs are excluded; contents coverage includes policies with no contents coverage as zero. Source: OpenFEMA policies.\normalsize
