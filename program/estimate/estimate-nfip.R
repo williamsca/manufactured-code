@@ -43,7 +43,8 @@ agg_geo <- if (!is.na(geo_arg)) geo_arg else "countyfp"
 # (-5.56 uncapped vs -5.75 capped); contents damage moves more (-3.75 to
 # -3.20) because its contaminated records are a larger share of a smaller
 # sample.
-MAX_CLAIM_LOSS <- 1000
+# MAX_CLAIM_LOSS is defined in project-params.R so that
+# estimate-hud-comparison.R winsorizes at the same cap.
 
 # Calendar years per period_loss bin. The cell panel's five-year bins are
 # 2009-2013, 2014-2018, 2019-2023 (policy records begin 2009; MAX_YEAR_LOSS is
@@ -81,6 +82,10 @@ v_dict <- c(
     "policies_n" = "Policies (#)",
     "building_damage" = "Building damage",
     "log_building_damage" = "Log building damage",
+    "log_building_damage_share" = "Log bldg. dmg. share",
+    "log_net_building_pmt" = "Log net building pmt.",
+    "log_contents_damage" = "Log contents damage",
+    "log_net_contents_pmt" = "Log net contents pmt.",
     "net_building_pmt" = "Net building pmt.",
     "contents_damage" = "Contents damage",
     "net_contents_pmt" = "Net contents pmt.",
@@ -374,10 +379,24 @@ dt_claims[, (v_loss) := lapply(
 dt_claims[, log_building_damage := fifelse(
     building_damage > 0, log(building_damage), NA_real_)]
 
+# Log counterparts of the other three baseline claim outcomes. Zeros are
+# dropped as above; the net payments and contents damage have far more exact
+# zeros than building damage (see `dt_zero_share`), so each log fit has its own
+# sample and N is reported by column.
+v_log <- c("net_building_pmt", "contents_damage", "net_contents_pmt")
+dt_claims[, (paste0("log_", v_log)) := lapply(
+    .SD, function(x) fifelse(x > 0, log(x), NA_real_)), .SDcols = v_log]
+
 v_shares <- c("building_damage", "net_building_pmt")
 v_shares_names <- paste0(v_shares, "_share")
 dt_claims[, (v_shares_names) := lapply(
     .SD, function(x) 100 * x / building_value), .SDcols = v_shares]
+
+# Log of the damage share. Zero damage and non-positive or missing
+# building_value give a non-finite share and are dropped.
+dt_claims[, log_building_damage_share := fifelse(
+    is.finite(building_damage_share) & building_damage_share > 0,
+    log(building_damage_share), NA_real_)]
 
 # covariate prep for robustness specs
 dt_claims[, log_repl_cost := fifelse(
@@ -468,6 +487,30 @@ est_static_log <- feols(
     log_building_damage ~ post_mh | geo^year_loss + mh + post1994,
     data = dt_claims_est, cluster = ~countyfp)
 etable(est_static_log, fitstat = c("n", "r2", "my"))
+
+# All four baseline outcomes in logs, dynamic OLS. Same right-hand side,
+# fixed effects, and clustering as `est_claim_es`; each column drops its own
+# zero-valued claims.
+s_log <- paste0("c(log_building_damage, ",
+                paste0("log_", v_log, collapse = ", "), ")")
+est_claim_es_log_all <- feols(
+    as.formula(paste0(
+        s_log, " ~ i(period_constr, mh, ref = ref_period)",
+        " | geo^year_loss + mh + period_constr")),
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_claim_es_log_all, fitstat = c("n", "r2", "my"))
+
+# Log damage share (damage / building_value). Same specification as
+# `est_claim_es_log`; the sample also drops claims with unusable building_value.
+est_claim_es_log_share <- feols(
+    log_building_damage_share ~ i(period_constr, mh, ref = ref_period) |
+        geo^year_loss + mh + period_constr,
+    data = dt_claims_est, cluster = ~countyfp)
+est_static_log_share <- feols(
+    log_building_damage_share ~ post_mh | geo^year_loss + mh + post1994,
+    data = dt_claims_est, cluster = ~countyfp)
+etable(est_claim_es_log_share, est_static_log_share,
+       fitstat = c("n", "r2", "my"))
 
 # ---------------------------------------------------------------------------
 # Claim-level PPML: the paper's headline scale (Chunk O) ----
@@ -1355,6 +1398,10 @@ plot_es(est_claim_es, "building_damage",
 plot_es(est_claim_es_log, outcome = NULL, var = "mh",
         ylab = "Log building damage",
         path = file.path(out_dir, "es-log-building-damage.pdf"))
+
+plot_es(est_claim_es_log_share, outcome = NULL, var = "mh",
+        ylab = "Log building damage share",
+        path = file.path(out_dir, "es-log-building-damage-share.pdf"))
 
 plot_es(est_claim_es, "net_contents_pmt",
         path = file.path(out_dir, "es-net-contents-pmt.pdf"))

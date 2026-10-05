@@ -3,6 +3,17 @@ DISCOUNT_YEAR <- 2000L
 MIN_YEAR_LOSS <- 1994
 MAX_YEAR_LOSS <- 2023
 
+# Discount rate and home lifespan for every present-value calculation in the
+# paper (estimate-welfare.R, estimate-hud-comparison.R). These are HUD's own
+# assumptions in its ex ante analysis of the 1994 wind standard: benefits
+# discounted at 7% over a 33-year manufactured-home life.
+HUD_DISCOUNT_RATE <- 0.07
+HUD_LIFESPAN      <- 33L
+
+# Winsorization cap for claim-level loss and payment outcomes, in $000 of 2000
+# dollars. Rationale in estimate-nfip.R.
+MAX_CLAIM_LOSS <- 1000
+
 # Construction-vintage window for the NFIP claim and policy designs. 1984-2004
 # (extended from 1984-1999; 1983-1999 before Chunk I). The 1984 start makes every
 # two-year bin full with 1992-1993 as the last pre-treatment bin (a 1983 start

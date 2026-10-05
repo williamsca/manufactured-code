@@ -281,8 +281,9 @@ produced), rerun `Rscript program/estimate/estimate-nfip.R statefp` /
   `DATA_PATH` needed for this step).
 - **Counterfactual claim rate:** pre-1994 pooled (1980-1989 + 1990-1994),
   with 1990-1994-only reported as an alternative
-- **Discount rates:** 0%, 3%, 7%; **lifespans:** 20/30/40 years; baseline
-  cell used in the paper text is r=3%, T=20yr
+- **Discount rates:** 0%, 3%, 7%; **lifespans:** 20/30/33/40 years; baseline
+  cell used in the paper text is HUD's own assumption, r=7%, T=33yr
+  (`HUD_DISCOUNT_RATE`, `HUD_LIFESPAN` in `project-params.R`)
 - **Outputs:** `output/results/welfare-scalars.csv`
 
 ## 7. Rebuild verification (this chunk)

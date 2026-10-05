@@ -23,9 +23,10 @@ source(here::here("program", "load-results.R"))
 
 # 1. Executive summary
 
-Does mandated climate adaptation pay for itself? The 1994 HUD wind standard required stronger manufactured homes in hurricane-prone areas. It raised home prices by `r price_eff` (`r price_pct`); post-1994 manufactured homes experienced `r bldg_dmg_pct` less building damage per flood claim than the site-built vintage comparison within the same county and loss year.
+Does mandated climate adaptation pay for itself? The 1994 HUD wind standard required stronger manufactured homes in hurricane-prone areas. It raised home prices by `r price_eff` (`r price_pct`) and reduced damage reported in insurance flood claims by 
 
-Measured flood benefits recover approximately `r bcr_pct` of the upfront price increase over 20 years. This calculation covers one channel of a regulation designed primarily for wind resilience; wind losses, uninsured losses, displacement, and the value of reduced risk remain unmeasured. For low-income households with limited disaster insurance, stronger construction provides protection without annual premiums.
+
+The private benefits from reduced flood damage recover approximately `r bcr_pct` of the upfront price increase. This calculation covers one channel of a regulation designed primarily for wind resilience; wind losses, uninsured losses, displacement, and the value of reduced risk remain unmeasured. For low-income households with limited disaster insurance, stronger construction provides protection without annual premiums.
 
 # 2. Data and institutions
 
@@ -62,7 +63,11 @@ Selection into insurance or claims may change composition. I assess this with vi
 
 **Composition and other margins.** Post-reform manufactured-home policies have higher building coverage and replacement costs and are more likely to be in Special Flood Hazard Areas (Table \ref{tab:policy-composition}). These shifts imply greater potential losses; elevation rises weakly only in the latest cohort.
 
-**Returns and fiscal spillovers.** Expected flood savings are moderate. The pre-reform insured-home claim rate is approximately `r claim_rate_fmt`; given the estimated building and contents damage reductions, the expected annual flood savings are about `r ann_benefit`. Discounted at 3% over 20 years, the present value is `r npv_baseline`, about `r bcr_pct` of the price increase. Unmeasured benefits would need to supply approximately `r wind_be` per home to close the gap. Payment reductions imply roughly `r nfip_sav_m` in NFIP savings across observed claims on homes built in 1994--1999. Thus, measured flood resilience and fiscal gains are clear, while total returns remain unknown.
+**Returns and fiscal spillovers.** Expected flood savings are moderate. The pre-reform insured-home claim rate is approximately `r claim_rate_fmt`; given the estimated building and contents damage reductions, the expected annual flood savings are about `r ann_benefit`. Discounted at `r hud_rate` over `r hud_life` years, as in HUD's own analysis, the present value is `r npv_baseline`, about `r bcr_pct` of the price increase. Unmeasured benefits would need to supply approximately `r wind_be` per home to close the gap. Payment reductions imply roughly `r nfip_sav_m` in NFIP savings across observed claims on homes built in 1994--1999. Thus, measured flood resilience and fiscal gains are clear, while total returns remain unknown.
+
+# 5. Next Steps
+
+- Benchmark estimates against HUD's *ex ante* forecasts for cost increases and private benefits (Table \ref{tab:hud-comparison}).
 
 \clearpage
 
@@ -116,3 +121,13 @@ Selection into insurance or claims may change composition. I assess this with vi
 \end{table}
 
 \noindent\footnotesize Poisson regressions on individual policy terms, 2009--2023. Two-year construction-vintage interactions with manufactured-home status are relative to 1992--1993; bin labels give the first construction year. Includes housing-type, common construction-vintage, and county $\times$ five-year calendar-period fixed effects. Standard errors are clustered by county. All coefficients are log rate ratios: $100(e^b-1)$ is a proportional percentage change, including for the binary elevated-building and Special Flood Hazard Area (SFHA) indicators. Replacement cost and coverage means are in thousands of 2000 dollars. Zero recorded replacement costs are excluded; contents coverage includes policies with no contents coverage as zero. Source: OpenFEMA policies.\normalsize
+
+\clearpage
+
+\begin{table}[H]
+  \centering
+  \caption{HUD's Forecasts and the Estimates for the 1994 Wind Standard}\label{tab:hud-comparison}
+    \resizebox{\textwidth}{!}{\input{output/results/hud-comparison.tex}}
+    \par\smallskip\begin{minipage}{\textwidth}\footnotesize Notes: All monetary values are 2000 dollars per unit. HUD forecasts are from Dacquisto and Rodda (2006), Table 4-17 (consumer prices at 56\% pass-through) and Section 4.2.2 (benefits), converted from 1992 dollars using CPI-U. Ranges span Zones II and III; they are not confidence intervals. Estimates pool Zones II and III. Benefits are discounted at `r hud_rate_tex` over `r hud_life` years. Price effects compare treated states with Zone I states, for 2000 onward relative to 1993 and earlier, omitting 1994--1999; state-clustered standard errors are in parentheses. Flood benefits apply Poisson estimates of reductions in building and contents damage or net payments to the pre-1994 manufactured-home mean loss and insured claim rate in Zones II and III. HUD's private total sums avoided wind losses and mortality and injury benefits; its public total is reduced FEMA relief. This paper's totals cover estimated flood losses and NFIP payouts, respectively; unestimated channels are excluded. NFIP savings overlap avoided property losses, so private and public totals are not added. HUD's benefit-cost ratio uses aggregate annual property, mortality, and FEMA benefits divided by aggregate costs; this paper's uses private flood benefits divided by the price effect, weighted by national 1988--1993 home-size shares. Source: HUD; OpenFEMA; Census Bureau Manufactured Housing Survey.
+    \end{minipage}
+\end{table}

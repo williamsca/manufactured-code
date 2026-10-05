@@ -64,6 +64,7 @@ estimates:
 	Rscript program/estimate/estimate-mhs.R
 	Rscript program/estimate/estimate-nfip.R
 	Rscript program/estimate/estimate-welfare.R
+	Rscript program/estimate/estimate-hud-comparison.R
 	Rscript program/descriptives/estimate-sumstats-mhs.R
 	Rscript program/descriptives/estimate-sumstats-nfip.R
 	Rscript program/descriptives/plot-mhs.R

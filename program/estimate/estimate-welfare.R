@@ -100,9 +100,16 @@ cat(sprintf(
     100 * (exp(get_nfip_sc("pois_net_contents_pmt_static")) - 1),
     DELTA_CONTENTS_PAYMENT * 1e3, get_nfip_sc("mh_post_net_contents_pmt") * 1e3))
 
-# Discount rates and home lifespan for NPV calculation
-DISCOUNT_RATES <- c(0, 0.03, 0.07)
-LIFESPANS      <- c(20, 30, 40)
+# Discount rates and home lifespan for NPV calculation. The baseline is HUD's
+# own assumption (7% over 33 years, project-params.R), so the paper's
+# calculation is on the same footing as HUD's forecasts; the rest of the grid
+# is sensitivity.
+DISCOUNT_RATES <- sort(unique(c(0, 0.03, HUD_DISCOUNT_RATE)))
+LIFESPANS      <- sort(unique(c(20, 30, HUD_LIFESPAN, 40)))
+is_baseline <- function(dt) {
+    dt[, discount_rate == HUD_DISCOUNT_RATE & lifespan == HUD_LIFESPAN &
+         counterfactual == "pooled_pre"]
+}
 
 # Census 2000 is used as MH stock denominator for unconditional rates.
 # Policy panel spans roughly 1994-2014 (20 years) for pre-1994 vintages,
@@ -197,7 +204,8 @@ scenarios[, npv_benefit    := mapply(npv_annuity, annual_benefit,
                                      discount_rate, lifespan)]
 scenarios[, bcr := npv_benefit / COST]
 
-cat("\n=== Per-unit NPV and benefit-cost ratio (r=0.03, T=30) ===\n")
+cat(sprintf("\n=== Per-unit NPV and benefit-cost ratio (r=%.2f, T=%d) ===\n",
+            HUD_DISCOUNT_RATE, HUD_LIFESPAN))
 # All monetary scalars are in $000 of 2000 dollars, so * 1e3 puts them in
 # dollars -- the "k" suffix these two lines used to carry double-counted it.
 cat(sprintf("Compliance cost: $%.0f (real 2000)\n", COST * 1e3))
@@ -205,7 +213,7 @@ cat(sprintf(
     "Per-claim damage reduction: $%.0f building, $%.0f contents\n",
     DELTA_BUILDING * 1e3, DELTA_CONTENTS * 1e3
 ))
-print(scenarios[discount_rate == 0.03 & lifespan == 20, .(
+print(scenarios[discount_rate == HUD_DISCOUNT_RATE & lifespan == HUD_LIFESPAN, .(
     counterfactual,
     claim_rate     = round(claim_rate,     4),
     annual_benefit = round(annual_benefit, 4),
@@ -295,28 +303,21 @@ cat(sprintf(
 # This says how much present-value wind benefit would be needed to close the
 # gap, and expresses it as a multiple of the measured flood benefit, so the
 # paper can quote a falsifiable threshold instead of gesturing at the omission.
-npv_flood_baseline <- scenarios[
-    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
-    npv_benefit]
+npv_flood_baseline <- scenarios[is_baseline(scenarios), npv_benefit]
 wind_breakeven_npv <- COST - npv_flood_baseline
 wind_breakeven_mult <- wind_breakeven_npv / npv_flood_baseline
 cat(sprintf(
-    paste0("\nBreak-even for the omitted wind channel (r=0.03, T=20):\n",
+    paste0("\nBreak-even for the omitted wind channel (r=%.2f, T=%d):\n",
            "  measured flood benefit  $%.0f\n",
            "  cost                    $%.0f\n",
            "  wind benefit needed     $%.0f  (%.1fx the flood benefit)\n"),
+    HUD_DISCOUNT_RATE, HUD_LIFESPAN,
     npv_flood_baseline * 1e3, COST * 1e3,
     wind_breakeven_npv * 1e3, wind_breakeven_mult))
 
-npv_baseline <- scenarios[
-    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
-    npv_benefit]
-bcr_baseline <- scenarios[
-    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
-    bcr]
-annual_benefit_baseline <- scenarios[
-    discount_rate == 0.03 & lifespan == 20 & counterfactual == "pooled_pre",
-    annual_benefit]
+npv_baseline <- scenarios[is_baseline(scenarios), npv_benefit]
+bcr_baseline <- scenarios[is_baseline(scenarios), bcr]
+annual_benefit_baseline <- scenarios[is_baseline(scenarios), annual_benefit]
 nfip_savings_total <- post_claims_bldg *
     (DELTA_BUILDING_PAYMENT + DELTA_CONTENTS_PAYMENT)
 
@@ -328,7 +329,8 @@ fwrite(
             "delta_building", "delta_contents", "delta_total",
             "delta_building_pmt", "delta_contents_pmt",
             "claim_rate_pooled_pre", "claim_rate_9094",
-            "annual_benefit", "npv_3pct_20yr", "bcr_3pct_20yr",
+            "annual_benefit", "npv_baseline", "bcr_baseline",
+            "discount_rate_baseline", "lifespan_baseline",
             "post_claims_n", "nfip_savings_total",
             "wind_breakeven_npv", "wind_breakeven_mult",
             "delta_building_lvl", "delta_contents_lvl"
@@ -339,6 +341,7 @@ fwrite(
             DELTA_BUILDING_PAYMENT, DELTA_CONTENTS_PAYMENT,
             rate_pre_pooled, rate_pre_9094,
             annual_benefit_baseline, npv_baseline, bcr_baseline,
+            HUD_DISCOUNT_RATE, HUD_LIFESPAN,
             post_claims_bldg, nfip_savings_total,
             wind_breakeven_npv, wind_breakeven_mult,
             DELTA_BUILDING_LVL, DELTA_CONTENTS_LVL

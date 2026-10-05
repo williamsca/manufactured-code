@@ -134,8 +134,8 @@ zero_pmt_bldg  <- fmt_pct(get_nfip("zero_share_net_building_pmt") * 100, 0)
 zero_pmt_cont  <- fmt_pct(get_nfip("zero_share_net_contents_pmt") * 100, 0)
 claim_rate_fmt <- fmt_pct(get_welf("claim_rate_pooled_pre") * 100, 1)
 ann_benefit    <- fmt_d(get_welf("annual_benefit"))
-npv_baseline   <- fmt_d(get_welf("npv_3pct_20yr"))
-bcr_pct        <- fmt_pct(get_welf("bcr_3pct_20yr") * 100)
+npv_baseline   <- fmt_d(get_welf("npv_baseline"))
+bcr_pct        <- fmt_pct(get_welf("bcr_baseline") * 100)
 # The `\begin{abstract}` block in paper.Rmd is raw LaTeX, which pandoc passes
 # through without escaping. An unescaped "%" there starts a LaTeX comment and
 # truncates the rest of the paragraph, so wrap any value containing "%" in
@@ -272,3 +272,33 @@ wd_n_bins        <- as.integer(get_nfip("water_depth_n_bins"))
 wd_bins_cell     <- formatC(get_nfip("water_depth_bins_per_cell"),
                             format = "f", digits = 1)
 wd_one_bin       <- fmt_pct(get_nfip("water_depth_single_bin_share") * 100, 1)
+
+# HUD comparison (Table \ref{tab:hud-comparison}): HUD's ex ante forecasts for
+# the 1994 standard beside the estimates, at HUD's 7% discount rate and 33-year
+# home life. Money is in $000 of 2000 dollars, as above.
+hud_sc  <- fread(here("output", "results", "hud-comparison-scalars.csv"))
+get_hud <- function(nm) hud_sc[statistic == nm, value]
+
+hud_rate       <- fmt_pct(get_hud("hud_discount_rate") * 100)
+hud_life       <- as.integer(get_hud("hud_lifespan"))
+hud_cpi        <- formatC(get_hud("hud_cpi_factor"), format = "f", digits = 2)
+hud_bcr        <- formatC(get_hud("hud_bcr"), format = "f", digits = 1)
+hud_pv_z2      <- fmt_d(get_hud("hud_private_pv_z2"))
+hud_pv_z3      <- fmt_d(get_hud("hud_private_pv_z3"))
+fl_pv_z2       <- fmt_d(get_hud("flood_private_pv_z2"))
+fl_pv_z3       <- fmt_d(get_hud("flood_private_pv_z3"))
+fl_pv_z2_share <- fmt_pct(100 * get_hud("flood_private_pv_z2") /
+                              get_hud("hud_private_pv_z2"))
+fl_pv_z3_share <- fmt_pct(100 * get_hud("flood_private_pv_z3") /
+                              get_hud("hud_private_pv_z3"))
+fl_red_z1      <- fmt_pct(get_hud("bldg_red_z1"), 1)
+fl_red_z2      <- fmt_pct(abs(get_hud("bldg_red_z2")), 1)
+fl_red_z3      <- fmt_pct(abs(get_hud("bldg_red_z3")), 1)
+fl_bcr_z2      <- formatC(get_hud("bcr_z2"), format = "f", digits = 2)
+fl_bcr_z3      <- formatC(get_hud("bcr_z3"), format = "f", digits = 2)
+fl_bcr_z23     <- formatC(get_hud("bcr_z23"), format = "f", digits = 2)
+hud_rate_tex   <- sub("%", "\\%", hud_rate, fixed = TRUE)
+
+# Pooled Zones II/III present values for the compact HUD comparison.
+fl_pv_z23 <- fmt_d(get_hud("flood_private_pv_z23"))
+fl_pub_z23 <- fmt_d(get_hud("flood_public_pv_z23"))
