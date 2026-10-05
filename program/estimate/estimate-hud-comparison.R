@@ -224,62 +224,84 @@ cat("\nFlood-only benefit-cost ratios:\n"); print(round(bcr, 2))
 
 fd <- function(x) paste0("\\$", formatC(round(x), format = "f", digits = 0,
                                        big.mark = ","))
-fse <- function(x) paste0("(", formatC(round(x), format = "f", digits = 0,
-                                       big.mark = ","), ")")
-fpct <- function(x, se = NULL) {
-    out <- paste0(sub("^-", "$-$", formatC(x, format = "f", digits = 1)), "\\%")
-    if (is.null(se)) out else paste0(out, " (", formatC(se, format = "f", digits = 1), ")")
-}
 fx <- function(x) formatC(x, format = "f", digits = 2)
-fcost <- function(v) paste(fd(v["est"]), fse(v["se"]))
-fhud_range <- function(it, z) {
-    lo <- get_hud(it, z); hi <- get_hud(it, z, col = "hi")
-    if (isTRUE(all.equal(lo, hi))) fd(lo) else paste0(fd(lo), "--", fd(hi))
-}
 usd <- function(x_000) fd(x_000 * 1000)
 
-# Preserve the range across zones instead of imposing arbitrary zone weights.
-hud_range <- function(item, section = "all") {
-    c(lo = min(vapply(c("2", "3"), function(z) get_hud(item, z, section), numeric(1))),
-      hi = max(vapply(c("2", "3"), function(z) get_hud(item, z, section, "hi"), numeric(1))))
+# Quantity weights: post-reform MH stock, assigned by county wind zone.
+# The same zone weights apply to each size-specific price forecast because
+# the Census stock does not distinguish single- and multi-section homes.
+stock <- readRDS(here("derived", "stock-county-vintage.Rds"))
+stopifnot(uniqueN(stock, by = c("countyfp", "year_constr", "mh")) == nrow(stock))
+stock <- merge(stock[mh == 1L & year_constr %in% 1995:1999], dt_wz,
+               by = "countyfp", all.x = TRUE)
+assert_geo_coverage(stock, "wind_zone", "countyfp",
+                    "estimate-hud-comparison.R: post-reform stock x wind zones")
+zone_quantities <- stock[wind_zone %in% 2:3,
+                         .(homes_n = sum(homes_n)), by = wind_zone]
+zone_quantities[, weight := homes_n / sum(homes_n)]
+zone_weights <- setNames(zone_quantities$weight, as.character(zone_quantities$wind_zone))
+stopifnot(setequal(names(zone_weights), c("2", "3")),
+          all(is.finite(zone_weights)), abs(sum(zone_weights) - 1) < 1e-12)
+hud_weighted <- function(item, section = "all") {
+    sum(vapply(c("2", "3"), function(z) {
+        # Use each within-zone interval's midpoint for a single FEMA estimate.
+        midpoint <- (get_hud(item, z, section, "lo") +
+                     get_hud(item, z, section, "hi")) / 2
+        zone_weights[[z]] * midpoint
+    }, numeric(1)))
 }
-format_range <- function(x) paste0(fd(x[["lo"]]), "--", fd(x[["hi"]]))
-hud_private <- hud_range("private_benefit_pv")
-hud_mortality <- hud_range("mortality_benefit_pv")
-hud_public <- hud_range("public_benefit_pv")
-# Zone II is the lower endpoint of both private components, Zone III the upper.
+# Apply one home-size basket to production cost, consumer price, and benefits.
+hud_size_weighted <- function(item) {
+    sum(wt[c("single", "double")] * c(hud_weighted(item, "single"),
+                                          hud_weighted(item, "multi")))
+}
+hud_private <- hud_size_weighted("private_benefit_pv")
+hud_mortality <- hud_weighted("mortality_benefit_pv")
+hud_public <- hud_size_weighted("public_benefit_pv")
 hud_private_total <- hud_private + hud_mortality
+hud_all_total <- hud_private_total + hud_public
+hud_cost <- hud_size_weighted("consumer_price")
+hud_resource_cost <- hud_size_weighted("production_cost")
+flood_cost <- cost$z23[["est"]] / 1000
+# Constant marginal cost and full pass-through equate observed price and
+# resource cost. The fiscal payment component must not be added to gross damage.
+flood_all_total <- ben$z23$pv_priv
+flood_private_total <- flood_all_total - ben$z23$pv_pub
+hud_bcr_private <- hud_private_total / hud_cost
+hud_bcr_public <- hud_public / hud_resource_cost
+hud_bcr_all <- hud_all_total / hud_resource_cost
+flood_bcr_private <- flood_private_total / flood_cost
+flood_bcr_public <- ben$z23$pv_pub / flood_cost
+flood_bcr_all <- flood_all_total / flood_cost
+stopifnot(hud_cost > 0, hud_resource_cost > 0, flood_cost > 0,
+          is.finite(flood_private_total))
 
 dt_tab <- data.table(
-    label = c("Consumer price, single-section", "Consumer price, multi-section",
-              "Reduced losses (wind)", "Reduced losses (flood)",
-              "Mortality and injury", "Reduced FEMA relief",
-              "Reduced NFIP payouts", "Total", "Benefit-cost ratio"),
-    hud_private = c(format_range(hud_range("consumer_price", "single")),
-                    format_range(hud_range("consumer_price", "multi")),
-                    format_range(hud_private), "---", format_range(hud_mortality),
-                    "---", "---", format_range(hud_private_total), fx(hud_bcr)),
-    hud_public = c(rep("---", 5), format_range(hud_public), "---",
-                   format_range(hud_public), ""),
-    est_private = c(fcost(cost$z23_single), fcost(cost$z23_double),
-                    "---", usd(ben$z23$pv_priv), "Not estimated", "---", "---",
-                    usd(ben$z23$pv_priv), fx(bcr["z23"])),
-    est_public = c(rep("---", 5), "Not estimated", usd(ben$z23$pv_pub),
-                   usd(ben$z23$pv_pub), ""))
+    label = c("Consumer price increase", "Full production cost increase",
+              "Reduced losses (wind)", "Reduced losses (flood, net of payouts)",
+              "Mortality and injury", "Reduced FEMA relief", "Reduced NFIP payouts",
+              "Private benefits", "All benefits", "Private benefit-cost ratio",
+              "All-benefit cost ratio"),
+    hud = c(fd(hud_cost), fd(hud_resource_cost), fd(hud_private), "---",
+            fd(hud_mortality), fd(hud_public), "---", fd(hud_private_total),
+            fd(hud_all_total), fx(hud_bcr_private), fx(hud_bcr_all)),
+    estimate = c(usd(flood_cost), usd(flood_cost), "---", usd(flood_private_total),
+                 "---", "---", usd(ben$z23$pv_pub), usd(flood_private_total),
+                 usd(flood_all_total), fx(flood_bcr_private), fx(flood_bcr_all)))
 
 dir.create(here("output", "results"), showWarnings = FALSE, recursive = TRUE)
 tab <- kbl(dt_tab, format = "latex", booktabs = TRUE, escape = FALSE,
-    col.names = c("", "Private", "Public", "Private", "Public"),
-    align = c("l", rep("r", 4))) |>
-    add_header_above(c(" " = 1, "HUD forecast" = 2, "Estimate" = 2)) |>
+    col.names = c("", "HUD forecast", "Estimate"), align = c("l", "r", "r")) |>
     pack_rows("Costs (2000 dollars per unit)", 1, 2) |>
-    pack_rows("Benefits (present value per unit)", 3, 7) |>
-    pack_rows("Totals", 8, 9)
-# Each source has one BCR; the notes identify their different numerators.
-tab <- sub(paste0(fx(hud_bcr), " &  & ", fx(bcr["z23"]), " & "),
-           paste0("\\multicolumn{2}{c}{", fx(hud_bcr), "} & ",
-                  "\\multicolumn{2}{c}{", fx(bcr["z23"]), "}"),
+    pack_rows("Private Benefits (present value per unit)", 3, 5) |>
+    pack_rows("Public Benefits (present value per unit)", 6, 7) |>
+    pack_rows("Totals", 8, 11)
+# Give the notes the full text width in threeparttable, and avoid enlarging
+# the three-column table when the two-pager wraps it in resizebox.
+tab <- sub("\\begin{tabular}[t]{lrr}",
+           "\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}}lrr}",
            as.character(tab), fixed = TRUE)
+tab <- sub("\\end{tabular}", "\\end{tabular*}", tab, fixed = TRUE)
 writeLines(tab, here("output", "results", "hud-comparison.tex"))
 
 # ---------------------------------------------------------------------------
@@ -292,10 +314,22 @@ sc <- c(
     hud_lifespan = HUD_LIFESPAN,
     hud_cpi_factor = CPI_FACTOR,
     hud_bcr = hud_bcr,
-    hud_private_total_lo = hud_private_total[["lo"]] / 1000,
-    hud_private_total_hi = hud_private_total[["hi"]] / 1000,
-    hud_public_total_lo = hud_public[["lo"]] / 1000,
-    hud_public_total_hi = hud_public[["hi"]] / 1000,
+    hud_cost_weighted = hud_cost / 1000,
+    hud_resource_cost = hud_resource_cost / 1000,
+    hud_all_total = hud_all_total / 1000,
+    hud_bcr_all = hud_bcr_all,
+    flood_private_retained_pv = flood_private_total,
+    flood_bcr_private = flood_bcr_private,
+    flood_bcr_all = flood_bcr_all,
+    hud_bcr_private = hud_bcr_private,
+    hud_bcr_public = hud_bcr_public,
+    flood_bcr_public = flood_bcr_public,
+    hud_quantity_weight_z2 = zone_weights[["2"]],
+    hud_quantity_weight_z3 = zone_weights[["3"]],
+    hud_private_pv_weighted = hud_private / 1000,
+    hud_mortality_pv_weighted = hud_mortality / 1000,
+    hud_private_total = hud_private_total / 1000,
+    hud_public_total = hud_public / 1000,
     hud_private_pv_z2 = get_hud("private_benefit_pv", "2") / 1000,
     hud_private_pv_z3 = get_hud("private_benefit_pv", "3") / 1000,
     cost_z2_single = cost$z2_single[["est"]] / 1000,

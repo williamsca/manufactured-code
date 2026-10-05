@@ -18,7 +18,8 @@ library(here)
 
 # Load scalars produced by estimation scripts.
 mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
-nfip_sc <- fread(here("output", "results", "nfip-scalars.csv"))
+source(here("program", "lib", "nfip-scalars.R"))
+nfip_sc <- read_nfip_scalars()
 welf_sc <- fread(here("output", "results", "welfare-scalars.csv"))
 ss_sc   <- fread(here("output", "results", "sumstats-nfip-scalars.csv"))
 

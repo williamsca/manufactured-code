@@ -4,8 +4,10 @@ author: "Colin Williams | University of Virginia"
 date: ""
 fontsize: 10pt
 geometry: margin=0.7in
+bibliography: manufactured-code.bib
 output:
   pdf_document:
+    citation_package: natbib
     keep_tex: false
 header-includes:
   - \usepackage{booktabs}
@@ -21,53 +23,53 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 source(here::here("program", "load-results.R"))
 ```
 
-# 1. Executive summary
+\begin{abstract}
+Does mandated climate adaptation pay for itself? I study the 1994 HUD wind standard reform, which required structural upgrades to manufactured homes in hurricane-prone areas. Using claim and policy data from the National Flood Insurance Program (NFIP), I compare flood damage to manufactured and site-built homes of different construction vintages exposed to floods in the same county and over the same period. Manufactured homes built after 1994 experience `r tex(bldg_dmg_pct)` lower building damage per claim relative to site-built homes of the same vintage, which is `r bldg_dmg_eff` against the pre-1994 manufactured-home mean. On the cost side, the reform raised manufactured home prices by `r price_eff` in treated states. A back-of-envelope calculation suggests the insured flood channel alone recovers roughly `r tex(bcr_pct)` of the upfront cost. The total return---including reduced wind damage, uninsured losses, and reduced risk---is likely higher. My cost estimates are modestly larger than HUD's \emph{ex ante} forecast and are consistent with complete pass-through. For the 22 million Americans living in manufactured homes, many of whom are low-income and lack disaster insurance, the HUD standard functions as built-in catastrophe insurance; given increasing climate risks and insurance costs, this protection is likely to become even more valuable over time.
+\end{abstract}
 
-Does mandated climate adaptation pay for itself? The 1994 HUD wind standard required stronger manufactured homes in hurricane-prone areas. It raised home prices by `r price_eff` (`r price_pct`) and reduced damage reported in insurance flood claims by 
+# 1. Data and institutions
 
+Manufactured homes make up about 6% of U.S. housing, with larger shares in rural areas and the Southeast. HUD's federal code preempts local rules. After Hurricane Andrew, HUD strengthened wind requirements effective July 1994, applying structural, sheathing, and fastening upgrades for homes placed in wind zones II and III (Figure \ref{fig:map-treated-states}).
 
-The private benefits from reduced flood damage recover approximately `r bcr_pct` of the upfront price increase. This calculation covers one channel of a regulation designed primarily for wind resilience; wind losses, uninsured losses, displacement, and the value of reduced risk remain unmeasured. For low-income households with limited disaster insurance, stronger construction provides protection without annual premiums.
+I use price and placement data from the Census Manufactured Housing Survey. The Census reports average prices for single- and double-wide units. I combine these prices into a single price index using pre-reform shares to hold the composition fixed. On the benefits side, I use OpenFEMA national flood insurance program (NFIP) claims, which cover single-family homes built 1984--1999, with losses in 1994--2023. I also estimate effects on policy characteristics. There are two downsides to these data: first, they reflect flood damage, not wind damage, although there may be some overlap; and, they cover only insured homeowners, not the full population.
 
-# 2. Data and institutions
+# 2. Empirical strategy
 
-Manufactured homes make up about 6% of U.S. housing, with larger shares in rural areas and the Southeast. HUD's federal code preempts local rules. After Hurricane Andrew, HUD strengthened wind requirements effective July 1994, applying structural, sheathing, and fastening upgrades in zones II and III (Figure \ref{fig:map-treated-states}).
+**Prices.** I use a difference-in-differences design thatcompares states containing counties in wind zones II or III with other states around 1994. I weight observations by pre-reform shipment weights and cluster standard errors by state. Treatment is measured at the state level even though requirements vary within treated states, so my estimates will be biased downwards if some units within treated states are not manufactured according to the higher standards.
 
-The Census Manufactured Housing Survey supplies state-year prices and placements (1988--2000); fixed pre-reform size weights hold the single/multi-section mix constant. OpenFEMA NFIP claims cover single-family homes built 1984--1999, with losses in 1994--2023, including `r n_mh_claims` manufactured-home claims. Policy terms (2009--2023) support composition checks. Dollar values are in 2000 dollars; damage estimates describe insured claimants, not the full housing stock.
+**Flood damage: construction vintage within counties.** The central design compares the change across construction vintages for manufactured homes with the corresponding change for site-built homes exposed to floods in the same county and loss year. This avoids confounding the reform with general changes in quality and exposure.
 
-# 3. Empirical strategy
-
-**Prices.** A state and year fixed effects difference-in-differences compares states containing wind zones II or III with zone I states around 1994. Event-study coefficients are relative to 1993. Regressions use pre-reform shipment weights and state-clustered standard errors. Treatment is measured at the state level even though requirements vary within treated states.
-
-**Flood damage: construction vintage within counties.** The central design compares the change across construction vintages for manufactured homes with the corresponding change for site-built homes exposed to floods in the same county and loss year. Comparing older and newer manufactured homes alone would confound the reform with general changes in quality and exposure. Site-built homes supply the comparison vintage profile. County $\times$ loss-year effects absorb shared flood conditions; housing-type effects absorb persistent differences.
-
-The dynamic model interacts two-year vintage bins with manufactured status, relative to 1992--1993. The pooled static model uses one post-1994 interaction and a separate post-1994 effect:
+The dynamic model interacts construction vintage bins with manufactured status, relative to 1992--1993:
 
 \begin{equation}
-\mathbb{E}[Y_{ict}\mid X]=\exp\!\left(\alpha_{c\times t}+\delta\,\mathrm{MH}_i+\lambda\,\mathrm{Post94}_i+\beta\,(\mathrm{MH}_i\times\mathrm{Post94}_i)\right).
+\mathbb{E}[Y_{ict}\mid X]=\exp\!\left(\alpha_{c t}+\delta\,\mathrm{MH}_i+\lambda\,\mathrm{Post94}_i+\beta\,(\mathrm{MH}_i\times\mathrm{Post94}_i)\right),
 \label{eq:static-vintage}
 \end{equation}
 
-Here $Y_{ict}$ is claim damage or payment for claim $i$ in county $c$ and loss year $t$; $\mathrm{MH}_i$ marks a manufactured home and $\mathrm{Post94}_i$ marks a home built after 1994. County $\times$ loss-year effects $\alpha_{c\times t}$ absorb shared flood conditions; $\beta$ is the proportional difference-in-differences effect, reported as $100(e^\beta-1)$ percent. The model is estimated by Poisson pseudo-maximum likelihood. These are comparisons across construction cohorts, rather than repeated observations of a home before and after a flood.
+where $Y_{ict}$ is claim damage or payment for claim $i$ in county $c$ and loss year $t$; $\mathrm{MH}_i$ indicates a manufactured home and $\mathrm{Post94}_i$ indicates a home built after 1994. County $\times$ loss-year effects $\alpha_{c t}$ absorb common flood conditions; $\beta$ is the proportional difference-in-differences effect. The model is estimated by Poisson pseudo-maximum likelihood to accomodate zeros.
 
-**Identification and interpretation.** A causal interpretation requires parallel vintage profiles absent the reform: general improvements in newer homes must have affected the two housing types proportionally, and no coincident change specific to manufactured homes can explain the break. Pre-reform coefficients diagnose this assumption, though some fluctuate. Vintage proxies for exposure, and production-to-installation lags may dilute the earliest treated cohort; the estimate is a reduced-form cohort effect, not a zone-specific engineering effect.
+**Identification and interpretation.** A causal interpretation requires parallel vintage profiles absent the reform: general improvements in newer homes must have affected the two housing types proportionally, and no coincident change specific to manufactured homes can explain the break. The pre-reform coefficients test this assumption. The post-treatment effects may emerge gradually because of production-to-installation lags.
 
-Poisson pseudo-maximum likelihood estimates proportional changes and retains zero outcomes; standard errors cluster by county. A coefficient $b$ implies $100(e^b-1)$ percent change in expected damage or payment. Dollar effects apply this ratio to the manufactured-home baseline mean.
+Poisson pseudo-maximum likelihood estimates proportional changes and retains zero outcomes. A coefficient $b$ implies $100(e^b-1)$ percent change in expected damage or payment. Dollar effects apply this ratio to the manufactured-home baseline mean.
 
-Selection into insurance or claims may change composition. I assess this with vintage comparisons of policy characteristics; the static claim model is in Equation \eqref{eq:static-vintage}.
+Selection into insurance or claims may change composition of households filing claims. I assess this threat by re-estimating \eqref{eq:static-vintage} on a sample of NFIP policies, so that $i$ indexes a flood insurance policy rather than a specific claim, and the outcome $Y_{ict}$ measures policy characteristics, including replacement cost, coverage limits, and whether the property is in a Special Flood Hazard Area.
 
-# 4. Results
+# 3. Results
 
-**Home prices and quantities.** Prices rise by `r price_eff`, approximately `r price_pct` of the pre-reform treated-state mean (Figure \ref{fig:price-effect}). The premium emerges mainly in 1995, rises through the late-1990s expansion of chattel lending, and remains elevated through 2004, after that lending contracted; the headline figure is the 2000--2004 average. Fixed size weights isolate within-size prices. Quantity effects are close to zero and imprecise.
+**Home prices and quantities.** Prices rise by `r price_eff`, approximately `r price_pct` of the pre-reform treated-state mean (Figure \ref{fig:price-effect}). The premium emerges mainly in 1995, rises through the late-1990s, and remains elevated through 2004. There was an enormous expansion in manufactured home placements over the 1990s that may confound my estimates because it was concentrated in the South and because credit-fueled demand may have raised prices. To mitigate this concern, I use 2000--2004 average effect as my preferred estimate. Quantity effects are imprecise, but suggest a modest relative increase in placements before 1999 and a decline thereafter.
 
-**Flood damage and insurance payments.** The static estimate in Equation \eqref{eq:static-vintage} implies `r bldg_dmg_pct` lower expected building damage per manufactured-home claim (coefficient `r bldg_dmg_lp`, SE `r bldg_dmg_se`), relative to the corresponding vintage change for site-built homes. At the pre-reform mean of `r mh_pre_bldg`, this equals `r bldg_dmg_eff` less per claim. Reductions emerge and grow across post-reform cohorts (Figure \ref{fig:building-damage}). Contents damage falls by `r cont_dmg_pct`; net building and contents payments fall by `r net_bldg_pct` and `r net_cont_pct`, respectively (Table \ref{tab:claims-outcomes-static}).
+**Flood damage and insurance payments.** I estimate `r bldg_dmg_pct` lower expected building damage per manufactured-home claim (coefficient `r bldg_dmg_lp`, SE `r bldg_dmg_se`), relative to the corresponding vintage change for site-built homes (Figure \ref{fig:building-damage}). At the pre-reform mean of `r mh_pre_bldg`, this equals `r bldg_dmg_eff` less per claim. Reductions emerge immediately and are roughly constant across post-reform vintages. Similarly, contents damage falls by `r cont_dmg_pct`. Net building and contents payments fall by `r net_bldg_pct` and `r net_cont_pct`, respectively (Table \ref{tab:claims-outcomes-static}).
 
-**Composition and other margins.** Post-reform manufactured-home policies have higher building coverage and replacement costs and are more likely to be in Special Flood Hazard Areas (Table \ref{tab:policy-composition}). These shifts imply greater potential losses; elevation rises weakly only in the latest cohort.
+The damage effect is driven by claims made from Zone III counties. I show this with a triple-diff that compares the relative vintage profile of flood damages across counties in different wind zones. This design accomodates differential changes over time in MH and site-built homes so long as those patterns are consistent across counties. 
 
-**Returns and fiscal spillovers.** Expected flood savings are moderate. The pre-reform insured-home claim rate is approximately `r claim_rate_fmt`; given the estimated building and contents damage reductions, the expected annual flood savings are about `r ann_benefit`. Discounted at `r hud_rate` over `r hud_life` years, as in HUD's own analysis, the present value is `r npv_baseline`, about `r bcr_pct` of the price increase. Unmeasured benefits would need to supply approximately `r wind_be` per home to close the gap. Payment reductions imply roughly `r nfip_sav_m` in NFIP savings across observed claims on homes built in 1994--1999. Thus, measured flood resilience and fiscal gains are clear, while total returns remain unknown.
+**Composition and other margins.** Post-reform manufactured-home policies have higher building coverage and replacement costs and are more likely to be in Special Flood Hazard Areas (Table \ref{tab:policy-composition}). These shifts may imply greater potential losses. If so, the observed reductions are conservative estimates of the true effect.
 
-# 5. Next Steps
+**Returns and fiscal spillovers.** Expected flood savings are moderate. The pre-reform insured-home claim rate is approximately `r claim_rate_fmt`; given the estimated building and contents damage reductions, the expected annual flood savings are about `r ann_benefit`. Discounted at `r hud_rate` over `r hud_life` years, as in HUD's cost-benefit forecast \citep{dacquisto_housing_2006}, the present value is `r npv_baseline`, about `r bcr_pct` of the price increase. Unmeasured benefits would need to supply approximately `r wind_be` per home to close the gap.
 
-- Benchmark estimates against HUD's *ex ante* forecasts for cost increases and private benefits (Table \ref{tab:hud-comparison}).
+# 4. Next Steps
+
+- Benchmark estimates against HUD's *ex ante* forecasts for cost increases and private benefits (Table \ref{tab:hud-comparison}) and other research on the returns to climate adaptation.
+- Look for data so I can test for effects on wind resistence and damage and other structural characteristics (CoreLogic???)
 
 \clearpage
 
@@ -128,6 +130,6 @@ Selection into insurance or claims may change composition. I assess this with vi
   \centering
   \caption{HUD's Forecasts and the Estimates for the 1994 Wind Standard}\label{tab:hud-comparison}
     \resizebox{\textwidth}{!}{\input{output/results/hud-comparison.tex}}
-    \par\smallskip\begin{minipage}{\textwidth}\footnotesize Notes: All monetary values are 2000 dollars per unit. HUD forecasts are from Dacquisto and Rodda (2006), Table 4-17 (consumer prices at 56\% pass-through) and Section 4.2.2 (benefits), converted from 1992 dollars using CPI-U. Ranges span Zones II and III; they are not confidence intervals. Estimates pool Zones II and III. Benefits are discounted at `r hud_rate_tex` over `r hud_life` years. Price effects compare treated states with Zone I states, for 2000 onward relative to 1993 and earlier, omitting 1994--1999; state-clustered standard errors are in parentheses. Flood benefits apply Poisson estimates of reductions in building and contents damage or net payments to the pre-1994 manufactured-home mean loss and insured claim rate in Zones II and III. HUD's private total sums avoided wind losses and mortality and injury benefits; its public total is reduced FEMA relief. This paper's totals cover estimated flood losses and NFIP payouts, respectively; unestimated channels are excluded. NFIP savings overlap avoided property losses, so private and public totals are not added. HUD's benefit-cost ratio uses aggregate annual property, mortality, and FEMA benefits divided by aggregate costs; this paper's uses private flood benefits divided by the price effect, weighted by national 1988--1993 home-size shares. Source: HUD; OpenFEMA; Census Bureau Manufactured Housing Survey.
+    \par\smallskip\begin{minipage}{\textwidth}\footnotesize Notes: All monetary values are 2000 dollars per unit. HUD forecasts are from \citet{dacquisto_housing_2006}, Tables 4-13 (private losses), 4-15 (FEMA relief), 4-16 (production costs), and 4-17 (consumer prices), with mortality and injury benefits from Section 4.2.2; values are converted from 1992 dollars using CPI-U. Zone weights are `r hud_weight_z2_tex` for Zone II and `r hud_weight_z3_tex` for Zone III, based on the Census-imputed stock of manufactured homes built in 1995--1999. Costs and size-specific benefits use national 1988--1993 home-size shares. HUD's consumer price forecast assumes 56\% pass-through, using supply elasticity 3.0 and demand elasticity $-2.4$; full production costs include materials, labor, design, and overhead. For this paper, constant marginal cost and full pass-through are assumed, so the estimated price increase also measures resource cost. Estimates pool Zones II and III. Price effects compare treated states with Zone I states, for 2000 onward relative to 1993 and earlier, omitting 1994--1999. Benefits are discounted at `r hud_rate_tex` over `r hud_life` years. Flood benefits apply Poisson estimates to the pre-1994 manufactured-home mean loss and insured claim rate. Private flood benefits equal avoided building and contents damage less reduced net NFIP payments; adding the public payment savings therefore recovers avoided damage without double counting. HUD's private benefits include wind losses and mortality and injury; all benefits add FEMA relief. Private benefit-cost ratios divide private benefits by the consumer price increase; all-benefit ratios divide all benefits by full production cost. These per-unit ratios exclude the deadweight loss from reduced sales included in HUD's original aggregate analysis. Unestimated channels are excluded. Only point estimates are shown; totals and ratios use unrounded values. Source: HUD; OpenFEMA; Census Bureau Manufactured Housing Survey.
     \end{minipage}
 \end{table}

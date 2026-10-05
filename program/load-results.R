@@ -3,14 +3,15 @@
 # formatting helper and pre-formatted value quoted in paper.Rmd, so the
 # Rmd holds only prose.  Sourced from paper.Rmd's setup chunk.
 #
-# Run order: estimate-sumstats-nfip.R, estimate-mhs.R, estimate-nfip.R,
+# Run order: estimate-sumstats-nfip.R, estimate-mhs.R, estimate-nfip-*.R,
 #            then estimate-welfare.R (depends on the other two).
 
 library(data.table)
 library(here)
 
 mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
-nfip_sc <- fread(here("output", "results", "nfip-scalars.csv"))
+source(here("program", "lib", "nfip-scalars.R"))
+nfip_sc <- read_nfip_scalars()
 welf_sc <- fread(here("output", "results", "welfare-scalars.csv"))
 ss_sc   <- fread(here("output", "results", "sumstats-nfip-scalars.csv"))
 
@@ -265,6 +266,21 @@ wd_miss_mh_pre   <- fmt_pct(get_nfip("water_depth_missing_mh_pre") * 100, 1)
 wd_miss_mh_post  <- fmt_pct(get_nfip("water_depth_missing_mh_post") * 100, 1)
 wd_miss_sb_pre   <- fmt_pct(get_nfip("water_depth_missing_sb_pre") * 100, 1)
 wd_miss_sb_post  <- fmt_pct(get_nfip("water_depth_missing_sb_post") * 100, 1)
+
+# Wind-zone triple difference, building damage (Table
+# \ref{tab:windzone-ddd-building}), in log points.
+wz_lp <- function(nm) lp_fmt(get_nfip(paste0("wz_building_damage_", nm)))
+wz_se <- function(nm) se_fmt(get_nfip(paste0("wz_building_damage_", nm, "_se")))
+wz_did_z1 <- wz_lp("did_z1"); wz_did_z1_se <- wz_se("did_z1")
+wz_did_z2 <- wz_lp("did_z2"); wz_did_z2_se <- wz_se("did_z2")
+wz_did_z3 <- wz_lp("did_z3"); wz_did_z3_se <- wz_se("did_z3")
+wz_ddd_tr <- wz_lp("ddd_tr"); wz_ddd_tr_se <- wz_se("ddd_tr")
+wz_ddd_z2 <- wz_lp("ddd_z2"); wz_ddd_z2_se <- wz_se("ddd_z2")
+wz_ddd_z3 <- wz_lp("ddd_z3"); wz_ddd_z3_se <- wz_se("ddd_z3")
+wz_mh_z1_shr <- fmt_pct(100 * get_nfip("wz_n_mh_claims_z1") /
+    sum(sapply(1:3, function(z) get_nfip(paste0("wz_n_mh_claims_z", z)))), 0)
+wz_n_cty_z3   <- as.integer(get_nfip("wz_n_counties_z3"))
+wz_n_state_z3 <- as.integer(get_nfip("wz_n_states_z3"))
 # Within-cell variation in the depth control, so the appendix can establish that
 # the small change in fit reflects what drives damage rather than a control with
 # nothing to vary on.
@@ -302,3 +318,18 @@ hud_rate_tex   <- sub("%", "\\%", hud_rate, fixed = TRUE)
 # Pooled Zones II/III present values for the compact HUD comparison.
 fl_pv_z23 <- fmt_d(get_hud("flood_private_pv_z23"))
 fl_pub_z23 <- fmt_d(get_hud("flood_public_pv_z23"))
+
+# Stock quantity weights displayed in the HUD table notes.
+hud_weight_z2_tex <- tex(fmt_pct(100 * get_hud("hud_quantity_weight_z2"), 1))
+hud_weight_z3_tex <- tex(fmt_pct(100 * get_hud("hud_quantity_weight_z3"), 1))
+
+# Separate private and public ratios in the HUD comparison.
+hud_bcr_private <- formatC(get_hud("hud_bcr_private"), format = "f", digits = 2)
+hud_bcr_public <- formatC(get_hud("hud_bcr_public"), format = "f", digits = 2)
+fl_bcr_public <- formatC(get_hud("flood_bcr_public"), format = "f", digits = 2)
+
+# Retained private losses exclude the fiscal NFIP payment component.
+fl_retained_pv <- fmt_d(get_hud("flood_private_retained_pv"))
+fl_retained_bcr <- formatC(get_hud("flood_bcr_private"), format = "f", digits = 2)
+hud_all_bcr <- formatC(get_hud("hud_bcr_all"), format = "f", digits = 2)
+fl_all_bcr <- formatC(get_hud("flood_bcr_all"), format = "f", digits = 2)

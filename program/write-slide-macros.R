@@ -1,7 +1,7 @@
 # write-slide-macros.R: generate LaTeX macros for slides.tex
 #
 # Reads the same results layer that paper.Rmd reads (output/results/*.csv,
-# written by estimate-mhs.R, estimate-nfip.R, estimate-welfare.R, and
+# written by estimate-mhs.R, estimate-nfip-*.R, estimate-welfare.R, and
 # estimate-sumstats-nfip.R) and emits one \newcommand per quoted number to
 # output/results/slide-numbers.tex.
 #
@@ -19,7 +19,8 @@ library(data.table)
 library(here)
 
 mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
-nfip_sc <- fread(here("output", "results", "nfip-scalars.csv"))
+source(here("program", "lib", "nfip-scalars.R"))
+nfip_sc <- read_nfip_scalars()
 welf_sc <- fread(here("output", "results", "welfare-scalars.csv"))
 ss_sc   <- fread(here("output", "results", "sumstats-nfip-scalars.csv"))
 
@@ -39,7 +40,7 @@ get_ss   <- function(nm) get_one(ss_sc,   nm)
 
 # Formatting helpers ----
 #
-# Monetary scalars in mhs-scalars, nfip-scalars, and welfare-scalars are
+# Monetary scalars in mhs-scalars, nfip-*-scalars, and welfare-scalars are
 # stored in $000 (2000 dollars); sumstats-nfip-scalars stores raw dollars.
 # fmt_d converts the former, fmt_draw the latter.  Both take absolute values:
 # the sign of a damage reduction is carried by the sentence on the slide, not

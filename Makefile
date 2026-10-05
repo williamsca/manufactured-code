@@ -62,7 +62,10 @@ data:
 
 estimates:
 	Rscript program/estimate/estimate-mhs.R
-	Rscript program/estimate/estimate-nfip.R
+	Rscript program/estimate/estimate-nfip-claims.R
+	Rscript program/estimate/estimate-nfip-composition.R
+	Rscript program/estimate/estimate-nfip-takeup.R
+	Rscript program/estimate/estimate-nfip-windzone.R
 	Rscript program/estimate/estimate-welfare.R
 	Rscript program/estimate/estimate-hud-comparison.R
 	Rscript program/descriptives/estimate-sumstats-mhs.R

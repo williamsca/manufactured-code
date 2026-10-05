@@ -11,7 +11,7 @@
 #   4. Sensitivity grid over discount rate, lifespan, claim rate assumption
 #
 # Main input:   derived/welfare-county-vintage.Rds
-# Point estimates from estimate-nfip.R (Table claims-outcomes). These are
+# Point estimates from estimate-nfip-claims.R (Table claims-outcomes). These are
 # PROPORTIONAL (Poisson) coefficients as of Chunk O, converted to dollars per
 # claim here against an MH baseline mean -- see the conversion block below for
 # why the private and fiscal calculations use different baselines.
@@ -27,9 +27,10 @@ source(here("program", "estimate", "welfare-lib.R"))
 # Parameters ----
 # ---------------------------------------------------------------------------
 
-# Per-claim damage/payment reductions from nfip-scalars.csv (estimate-nfip.R)
+# Per-claim damage/payment reductions from nfip-claims-scalars.csv (estimate-nfip-claims.R)
 # Compliance cost from mhs-scalars.csv (estimate-mhs.R)
-nfip_sc <- fread(here("output", "results", "nfip-scalars.csv"))
+source(here("program", "lib", "nfip-scalars.R"))
+nfip_sc <- read_nfip_scalars()
 mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
 get_nfip_sc <- function(nm) nfip_sc[statistic == nm, value]
 get_mhs_sc  <- function(nm) mhs_sc[statistic == nm, value]
@@ -58,7 +59,7 @@ get_mhs_sc  <- function(nm) mhs_sc[statistic == nm, value]
 # so it is not a rounding matter.
 #
 # Both means are computed on the estimation sample after winsorization, in
-# estimate-nfip.R, so they are means of exactly the variable the coefficient
+# estimate-nfip-claims.R, so they are means of exactly the variable the coefficient
 # describes. The conversion assumes the proportional effect is homogeneous
 # across claims, which is the same assumption the Poisson specification makes.
 delta_private <- function(outcome) {

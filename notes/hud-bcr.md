@@ -75,3 +75,46 @@
 - **NIBS BCRs are for site-built I-Code buildings and FORTIFIED retrofits, not manufactured homes specifically**, and are themselves ex ante HAZUS-based model estimates; use as order-of-magnitude benchmarks only. NIBS also cautions that its FEMA-grant BCR was later "incorrectly used to justify all types of mitigation," so match the BCR to the specific mitigation type (adopt-code vs. exceed-code vs. grant).
 - **Industry vs. HUD cost estimates diverge ~2×**; report both bounds rather than adopting either uncritically.
 - **Many secondary/industry web sources** (dealer blogs) repeat the "not one post-1994 home destroyed in 2004" claim; treat these as derivative of the HUD/DHSMV/Grosskopf/IBHS assessments rather than independent evidence.
+
+# References
+
+> Wind Standards for Manufactured Homes. The second case study, reviewed in Section 4.2.2,
+involves the Wind Standards for Manufactured Homes. This was proposed by HUD in 1993
+soon after Hurricane Andrew caused extensive damage in South Florida. The rule was
+implemented in 1994.The revised standards increased required wind resistance in high-wind Zones II and III, and were
+designed to substantially reduce the percentage likelihood of significant loss from a future
+Hurricane Andrew-level storm. The revisions were justified because they were targeted to
+specific zones with high winds, and because they help prevent negative externalities resulting
+from weather-related destruction of manufactured homes located near other units. Standards
+were ultimately set to increase marginal production costs by amounts close to expected private
+benefits ($1,500 for single-section in Zone II and $2,000 for single-section in Zone III). The
+requirements included higher design loads and uplift forces, shutters or instructions for installingxviiHOUSING IMPACT ANALYSISshutters to protect windows and doors, foundation systems for homes near the coastline designed
+to satisfy the highest windload exposure, and higher standards for fastening roof, wall and floor
+framing assemblies to one another.The projected benefit of the revised wind standards was to eliminate 75 percent of wind damage
+in Zone II and 83 percent in Zone III, as well as reducing dislocation, injuries, deaths and various
+social costs. Private benefits for single-family units computed over their service lives and
+discounted at 7 percent per year were $1,516 in Zone II and $2,022 in Zone III based on the
+change in the probability of wind damage. Public benefits based on reduced FEMA spending
+and similarly calculated ranged from $782 to $1,063 in Zone II and $1,043 to $1,418 in Zone III.
+Benefits from reduced cost of death and injury were also calculated, with lifetime values of $39
+in Zone II and $43 in Zone III. Various other benefits were considered likely to increase the
+benefits of the more stringent wind standard by small amounts, but could not be quantified.Economic costs of complying with the new HUD standard were also estimated. Increased
+material costs were multiplied by an industry standard multiplier of 2.22 to incorporate other
+production and management costs. Production cost increases ranged from $1,492 (singlesection, Zone II) to $2,722 (multiple section, Zone III). Pass-through of these cost increases to
+consumers was estimated at 56 percent, although this rate would be much closer to 1.00 to the
+degree that the zones represent submarkets and manufacturers were able to shift production
+across zones. Total annual costs of $51.7 million were calculated as the sum of costs to
+consumers, costs to producers and deadweight loss, compared to total annual benefits of
+approximately $83.8 million, for net benefits of $32.1 million.Affordability and distributional impacts of the new standard were estimated based on the cost
+impacts, along with the assumption that owners would buy the land to which the unit is attached.
+The net effect of changing down payment, purchase arrangements and tax rate is to increase
+monthly payments by less than two percent. More complete measures of affordability would be
+appropriate in a HIA. These include estimating how many buyers would have to spend more
+than 28 percent of their income to purchase a new manufactured home under the more stringent
+wind standards, estimating how many households would have enough income to purchase a new
+unit meeting the new wind standards, or comparing monthly housing cost increases to median
+household income. Further analysis would consider the lengthy time periods required before
+market effects appear, and the impacts on submarkets including low-income, elderly households
+located outside metropolitan areas. Finally, possible approaches to extending the housing impact
+analysis for manufactured housing wind standards were described, including effects on existing
+manufactured homes, site-built homes, rental units, coastal housing and flood insurance. *(HUD, Housing Impact Analysis (huduser.gov, Jan. 2006))*
