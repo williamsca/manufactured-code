@@ -50,6 +50,26 @@ paper.html: paper.md
 
 .PHONY: data estimates test all
 
+# Hosted licensed data; run only on its host/compute node, independently of
+# the local public-data rebuild. Override CORELOGIC_ARGS for a state pilot.
+.PHONY: data-corelogic
+data-corelogic:
+	Rscript program/import/databuild-corelogic.R $(CORELOGIC_ARGS)
+
+.PHONY: test-corelogic
+test-corelogic:
+	Rscript program/tests/check-corelogic-databuild.R
+	Rscript program/tests/check-corelogic-prices.R
+	Rscript program/tests/check-corelogic-ddd.R
+
+.PHONY: estimates-corelogic
+estimates-corelogic:
+	Rscript program/estimate/estimate-corelogic-prices.R
+
+.PHONY: estimates-corelogic-windzone
+estimates-corelogic-windzone:
+	Rscript program/estimate/estimate-corelogic-windzone.R
+
 data:
 	Rscript program/import/import-cpi.R
 	Rscript program/import/import-census.R

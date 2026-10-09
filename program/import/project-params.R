@@ -67,3 +67,10 @@ NFIP_VERSION <- "v2-2026-09-02"
 # NFIP_VERSION: this crosswalk defines treatment for both the MHS and NFIP
 # designs, so an eCFR amendment must not silently move it.
 ECFR_WIND_ZONE_VERSION <- "v2026-09-03"
+
+# Hosted CoreLogic full builds of the August 2023 delivery. Partial-state
+# source versions must never be selected through rd_latest_version().
+CORELOGIC_PB_VERSION <- "v2026-10-07"
+CORELOGIC_OT_VERSION <- "v2026-10-07"
+CORELOGIC_MIN_SALE_YEAR <- 1990L
+CORELOGIC_MAX_SALE_YEAR <- 2023L
