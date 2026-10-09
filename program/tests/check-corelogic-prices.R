@@ -1,7 +1,7 @@
 # Synthetic records only: exercise the production price formulas against known truth.
 library(data.table)
 library(fixest)
-source("program/estimate/estimate-corelogic-prices.R")
+source("program/lib/corelogic-prices.R")
 set.seed(1994)
 x <- CJ(countyfp = sprintf("%05d", 1:12), mh = 0:1,
         year_constr = 1984:1999, year_sale = 2000:2005)

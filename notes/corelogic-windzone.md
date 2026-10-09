@@ -217,3 +217,17 @@ Implementation: `program/estimate/estimate-corelogic-windzone.R`, submitted with
 `CORELOGIC_RESULTS`, and `CORELOGIC_REFERENCE`. `make test-corelogic` includes
 synthetic tests that recover known binary, separate-zone, and annual DDD effects
 in the presence of both MH-vintage and zone-vintage changes.
+
+The estimator includes its figures in a plotting section, as in
+`estimate-nfip-claims.R`. It shares verified-input setup and coefficient exports
+with the baseline price estimator through `program/lib/corelogic-setup.R`.
+The wind-zone formula and crosswalk helpers remain in `program/lib/` for
+independent checks. Each run archives the estimator and these shared sources.
+
+Cleanup validation (2026-10-09): Rivanna job 21119449 reran all static and annual
+specifications, writing privately to
+`/scratch/chv7bg/manufactured-code/corelogic-results/windzone-refactor-v1-20261009`.
+Comparison job 21119463 matched all eleven aggregate CSVs to the 1994-retaining
+run within numerical tolerance (`1e-8`), including support and unidentified
+contrasts; all three PNG figures were byte-identical. The synthetic DDD
+checks also passed.

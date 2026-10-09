@@ -151,8 +151,11 @@ manifest, and a passed persisted-artifact verification. The job accepts
 `CORELOGIC_BUILD` and a new `CORELOGIC_RESULTS` directory; see
 `program/estimate/corelogic-prices.slurm`. The initial result manifest preserves
 the exact estimation code hash; that job's source is archived privately under
-`source-v1/` in its results directory. A subsequent refactor shares the tested formula
-and aggregate figure renderer without changing estimating equations. Fitted
+`source-v1/` in its results directory. The current script uses the project's
+linear estimation-script style, with figures in its own plotting section and
+shared setup in `program/lib/corelogic-setup.R`. The tested price formulas live
+in `program/lib/corelogic-prices.R`. Each run archives these source files and
+their hashes. Fitted
 models remain private. Aggregate CSVs include all annual coefficients, post
 coefficients, vintage/sale-year support, and snapshot size balance.
 
@@ -161,3 +164,10 @@ test of both the static and annual price formulas. The estimation job identified
 every intended non-reference cohort in every specification. Confidence intervals
 are county-clustered; no multiple-testing correction was applied to this initial
 descriptive price profile.
+
+Cleanup validation (2026-10-09): Rivanna job 21119448 reran every specification
+against the same verified build, writing privately to
+`/scratch/chv7bg/manufactured-code/corelogic-results/prices-refactor-v1-20261009`.
+Comparison job 21119463 matched all five aggregate CSVs to the 1994-retaining
+run within numerical tolerance (`1e-8`); both PNG figures were byte-identical.
+The synthetic formula checks also passed.

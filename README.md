@@ -15,3 +15,12 @@ The [wind-zone triple differences](notes/corelogic-windzone.md) use an audited
 county reference and retain zone-specific construction-vintage effects.
 The current profiles retain 1994 as its own partially treated cohort; static
 summaries also retain 1994 with separate transition-cohort terms.
+
+`estimate-corelogic-prices.R` estimates MH-versus-site-built vintage price
+differences; `estimate-corelogic-windzone.R` estimates how those differences
+vary between HUD wind zones II/III and I. Each script includes its estimation,
+robustness, and plotting sections, following `estimate-nfip-claims.R`.
+They share `program/lib/corelogic-setup.R` for verified inputs, private output
+directories, database reads, and coefficient exports. Both produce aggregate
+CSVs and figures in `CORELOGIC_RESULTS`; the wind-zone script also requires
+`CORELOGIC_REFERENCE` and exports the county crosswalk and support audits.
