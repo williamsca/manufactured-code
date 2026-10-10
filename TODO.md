@@ -6,6 +6,12 @@ Verification is built in rather than ad hoc. `program/tests/` holds fake-data te
 
 # TODO
 
+## Leora (Oct. 9, 2026)
+
+
+
+## 
+
 Timeline anchors: JMP-heavy through August (Chunk A only, low effort); September for B–D, with C1 early in that block since D–G all inherit its numbers; late September to mid-October for E–F; welfare table (G) once C and E land; slides and dry run by late October for APPAM (early November).
 
 ## Chunk C — Cost side: wind-zone dose-response [agent; Colin reviews interpretation]

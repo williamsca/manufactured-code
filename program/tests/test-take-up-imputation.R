@@ -277,7 +277,7 @@ test_that("the equal split is positive wherever the imputed stock is, so the sam
 
 # Exercise the production constructor, including missing policy cells and
 # claims in tracts without policies. The stock frame determines exposure.
-source(file.path("program", "lib", "takeup-panel.R"))
+source(here::here("program", "lib", "takeup-panel.R"))
 test_that("stock frame preserves zero-policy cells and all matched claims", {
     stock <- CJ(countyfp = c("01001", "01003"),
                 year_constr = c(1992L, 1993L, 1994L, 1995L), mh = 0:1)
