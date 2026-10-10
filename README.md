@@ -1,26 +1,32 @@
 # manufactured-code
 
-The CoreLogic workstream builds and analyzes licensed data on Rivanna. See
-[the implementation and build results](notes/corelogic-databuild.md) and
-[the research plan](PLAN_CORELOGIC.md). `make test-corelogic` checks synthetic
-SQL fixtures; `make data-corelogic` requires a Rivanna Slurm allocation.
+CoreLogic licensed records are built and estimated on Rivanna. See
+[build documentation](notes/corelogic-databuild.md) and the
+[research plan](PLAN_CORELOGIC.md). `make test-corelogic` runs synthetic sample,
+price, wind-zone, share, and tract-sorting checks.
 
-Vintage prices run through `program/estimate/corelogic-prices.slurm` with
-`CORELOGIC_BUILD` pointing to a verified build and `CORELOGIC_RESULTS` to a new
-private results directory. `make estimates-corelogic` also requires Slurm.
-See [the amenity and location robustness plan](PLAN_CORELOGIC_ROBUSTNESS.md).
-The [initial vintage price results](notes/corelogic-prices.md) include the figures,
-specification comparisons, and snapshot size balance.
-The [wind-zone triple differences](notes/corelogic-windzone.md) use an audited
-county reference and retain zone-specific construction-vintage effects.
-The current profiles retain 1994 as its own partially treated cohort; static
-summaries also retain 1994 with separate transition-cohort terms.
+The current price analysis uses sales in 2000–2023, construction vintages
+1989–1999, 1993 as the annual reference, and 1994–1999 as static treatment.
+There are no measured covariates. National vintage profiles and wind-zone
+triple differences compare county effects with added census-tract effects
+on the same tract-covered sample. County clustering is primary.
 
-`estimate-corelogic-prices.R` estimates MH-versus-site-built vintage price
-differences; `estimate-corelogic-windzone.R` estimates how those differences
-vary between HUD wind zones II/III and I. Each script includes its estimation,
-robustness, and plotting sections, following `estimate-nfip-claims.R`.
-They share `program/lib/corelogic-setup.R` for verified inputs, private output
-directories, database reads, and coefficient exports. Both produce aggregate
-CSVs and figures in `CORELOGIC_RESULTS`; the wind-zone script also requires
-`CORELOGIC_REFERENCE` and exports the county crosswalk and support audits.
+Submit `program/estimate/corelogic-tracts.slurm` to prepare the private snapshot
+tract lookup. Set `CORELOGIC_BUILD`, a new `CORELOGIC_RESULTS` directory, and
+`CORELOGIC_PB_SOURCE` to the pinned Property Basic source directory. Then submit
+`corelogic-prices.slurm` and `corelogic-windzone.slurm`, setting `CORELOGIC_TRACTS`
+to the completed lookup directory; the wind-zone job also needs
+`CORELOGIC_REFERENCE`. All jobs require Slurm and a complete verified build.
+
+Only current aggregate tables and figures are kept locally under
+`output/corelogic/prices/`, `output/corelogic/windzone/`, and
+`output/corelogic/share/`. Licensed lookup files and fitted models stay private.
+The analysis scripts produce one national vintage-price figure and pooled and
+separate-zone triple-difference figures, in PDF and PNG.
+
+The parallel MH-share analysis uses surviving 2023 dwelling parcels with one
+observation per home, not the sale sample. Submit `corelogic-share.slurm` with
+the build, results, and reference inputs. Its effects are percentage points.
+
+Current specifications and results: [prices](notes/corelogic-prices.md),
+[wind zones](notes/corelogic-windzone.md), and [MH shares](notes/corelogic-share.md).

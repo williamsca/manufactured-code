@@ -15,4 +15,5 @@ cd "$SLURM_SUBMIT_DIR"
 export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
 : "${CORELOGIC_BUILD:?Set CORELOGIC_BUILD to a verified private build}"
 : "${CORELOGIC_RESULTS:?Set CORELOGIC_RESULTS to a new private results directory}"
+: "${CORELOGIC_TRACTS:?Set verified private parcel-tract lookup directory}"
 Rscript program/estimate/estimate-corelogic-prices.R

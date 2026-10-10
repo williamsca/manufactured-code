@@ -1,7 +1,7 @@
 # Triple differences in MH vintage sale-price profiles across HUD wind zones.
 # Zones II/III minus Zone I remove MH vintage changes common to all zones;
 # zone x vintage and county x type FEs retain the lower-order interactions.
-# Includes static contrasts, annual profiles, robustness, and figures.
+# Includes static contrasts and annual profiles, county and census-tract effects.
 #
 # Usage: set CORELOGIC_BUILD, CORELOGIC_RESULTS, and CORELOGIC_REFERENCE;
 # submit corelogic-windzone.slurm.
@@ -24,36 +24,16 @@ audit <- merge(wz, legacy, by = "countyfp", all = TRUE, suffixes = c("_reconstru
 fwrite(audit[is.na(wind_zone_legacy) | is.na(wind_zone_reconstructed) |
     wind_zone_legacy != wind_zone_reconstructed], file.path(out_dir, "windzone_reconciliation.csv"))
 # estimation sample ----
-glob <- quote_path(file.path(input, "sales", "*.parquet"))
-dt <- read_corelogic(paste("SELECT countyfp, mh, year_constr, year_sale,
-    sale_price_2000, eligible_sale, consideration_documented, pb_sqft, pb_lot_sqft,
-    wind_zone AS wind_zone_build FROM read_parquet(", glob, ") WHERE eligible_sale AND countyfp IS NOT NULL
-    AND date_sale >= MAKE_DATE(year_constr,1,1)"))
-dt <- merge(dt, wz[, .(countyfp, wind_zone, statefp)], by = "countyfp", all.x = TRUE, sort = FALSE)
+source(here("program", "lib", "corelogic-price-sample.R"))
+dt <- cl_price_sample()
+dt <- merge(dt, wz[, .(countyfp, wind_zone)], by = "countyfp", all.x = TRUE, sort = FALSE)
 fwrite(dt[is.na(wind_zone), .(sales = .N), by = .(countyfp, mh)], file.path(out_dir, "unmatched_counties.csv"))
-fwrite(dt[, .(sales = .N), by = .(wind_zone_build, wind_zone, mh)], file.path(out_dir, "zone_join_audit.csv"))
 dt <- dt[!is.na(wind_zone)]
-stopifnot(all(dt$sale_price_2000 > 0), !anyNA(dt$sale_price_2000))
-dt[, `:=`(
-    log_price = log(sale_price_2000), post_mh = mh * as.integer(year_constr >= 1995),
-    mh_tr = mh * (wind_zone >= 2), mh_z2 = mh * (wind_zone == 2), mh_z3 = mh * (wind_zone == 3),
-    mh_1994 = mh * (year_constr == 1994),
-    sizes_ok = pb_sqft >= 200 & pb_sqft <= 10000 & pb_lot_sqft >= 100 & pb_lot_sqft <= 4356000
-)]
-dt[is.na(sizes_ok), sizes_ok := FALSE]
-dt[, `:=`(
-    post_mh_tr = post_mh * (wind_zone >= 2), post_mh_z2 = post_mh * (wind_zone == 2),
-    post_mh_z3 = post_mh * (wind_zone == 3), mh_1994_tr = mh_1994 * (wind_zone >= 2),
-    mh_1994_z2 = mh_1994 * (wind_zone == 2), mh_1994_z3 = mh_1994 * (wind_zone == 3),
-    cohort_group = fifelse(year_constr == 1994, "transition_1994", fifelse(year_constr >= 1995, "post", "pre")),
-    log_sqft = log(pmax(pb_sqft, 1)), log_lot = log(pmax(pb_lot_sqft, 1))
-)]
+dt[, `:=`(mh_tr = mh * (wind_zone >= 2), mh_z2 = mh * (wind_zone == 2), mh_z3 = mh * (wind_zone == 3))]
+dt[, `:=`(post_mh_tr = post_mh * (wind_zone >= 2), post_mh_z2 = post_mh * (wind_zone == 2),
+    post_mh_z3 = post_mh * (wind_zone == 3), cohort_group = fifelse(year_constr >= 1994, "post", "pre"))]
 fwrite(dt[, .(sales = .N, counties = uniqueN(countyfp), states = uniqueN(statefp)),
-    by = .(wind_zone, mh, year_constr)
-], file.path(out_dir, "support_by_vintage.csv"))
-fwrite(dt[year_sale >= 2000, .(sales = .N, counties = uniqueN(countyfp), states = uniqueN(statefp)),
-    by = .(wind_zone, mh, cohort_group)
-], file.path(out_dir, "support_post_2000.csv"))
+    by = .(wind_zone, mh, year_constr)], file.path(out_dir, "support_by_vintage.csv"))
 
 # estimation helpers ----
 collect <- function(m, id, param, cluster) {
@@ -61,7 +41,7 @@ collect <- function(m, id, param, cluster) {
     tab[, `:=`(parameterization = param, cluster = cluster)]
     tab
 }
-fit <- function(id, rows, controls = "", county_type = TRUE, dynamic = FALSE) {
+fit <- function(id, rows, tract = FALSE, dynamic = FALSE) {
     coefs <- list()
     profiles <- list()
     dids <- list()
@@ -77,7 +57,7 @@ fit <- function(id, rows, controls = "", county_type = TRUE, dynamic = FALSE) {
     }
     for (by_zone in c(FALSE, TRUE)) {
         param <- if (by_zone) "separate_zones" else "pooled_treated"
-        f <- cl_ddd_formula(by_zone, dynamic, controls, county_type)
+        f <- cl_ddd_formula(by_zone, dynamic, tract = tract)
         m <- feols(f, x, vcov = ~countyfp, mem.clean = TRUE)
         if (dynamic) {
             profiles[[paste(id, param, "county")]] <- collect(m, id, param, "county")
@@ -86,7 +66,7 @@ fit <- function(id, rows, controls = "", county_type = TRUE, dynamic = FALSE) {
         }
         if (dynamic) {
             modifiers <- if (by_zone) c("mh", "mh_z2", "mh_z3") else c("mh", "mh_tr")
-            expected <- setdiff(sort(unique(x$year_constr)), c(1992L, 1993L))
+            expected <- setdiff(sort(unique(x$year_constr)), 1993L)
             for (key in modifiers) {
                 terms <- names(coef(m))[grepl(paste0(":", key, "$"), names(coef(m)))]
                 observed <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", terms))
@@ -139,21 +119,11 @@ fit <- function(id, rows, controls = "", county_type = TRUE, dynamic = FALSE) {
     )
 }
 
-# static contrasts and robustness ----
-# Each specification fits both II/III versus I and separate II/III contrasts.
-
-later <- dt$year_sale >= 2000
-size <- later & dt$sizes_ok
-controls <- "+ log_sqft + I(log_sqft^2) + log_lot + I(log_lot^2)"
+# Static contrasts: no measured covariates; census-tract comparison on a common sample.
 specs <- list(
-    all_sales = list(rows = rep(TRUE, nrow(dt))),
-    sales_2000 = list(rows = later),
-    size_sample_2000 = list(rows = size),
-    size_controls_2000 = list(rows = size, controls = controls),
-    no_florida_2000 = list(rows = later & dt$statefp != "12"),
-    strict_2000 = list(rows = later & dt$consideration_documented),
-    common_type_intercept_2000 = list(rows = later, county_type = FALSE),
-    narrow_2000 = list(rows = later & dt$year_constr >= 1990 & dt$year_constr <= 1997)
+    county = list(rows = rep(TRUE, nrow(dt))),
+    county_common = list(rows = dt$tract_ok),
+    tract = list(rows = dt$tract_ok, tract = TRUE)
 )
 coefs <- list()
 profiles <- list()
@@ -177,8 +147,8 @@ for (id in names(specs)) {
 }
 
 # event studies ----
-# Joint 1992-1993 reference; 1994 has its own partially treated coefficient.
-for (id in c("sales_2000", "size_sample_2000", "size_controls_2000")) {
+# 1993 reference; static treatment includes the partially treated 1994 cohort.
+for (id in names(specs)) {
     est <- do.call(fit, c(list(id = id, dynamic = TRUE), specs[[id]]))
     profiles <- c(profiles, est$profiles)
     models <- c(models, est$models)
@@ -197,7 +167,7 @@ draw <- function(sample_ids, labels, by_zone, filename) {
     x <- dt_es[specification %in% sample_ids & parameterization ==
         if (by_zone) "separate_zones" else "pooled_treated"]
     refs <- CJ(
-        specification = sample_ids, vintage = c(1992L, 1993L),
+        specification = sample_ids, vintage = 1993L,
         contrast = if (by_zone) c("mh_z2", "mh_z3") else "mh_tr"
     )
     refs[, `:=`(pct = 0, pct_low = 0, pct_high = 0)]
@@ -215,10 +185,10 @@ draw <- function(sample_ids, labels, by_zone, filename) {
         geom_point(size = 2, position = position_dodge(.25)) +
         scale_color_manual(values = c("#0072B2", "#D55E00")) +
         scale_shape_manual(values = c(16, 17)) +
-        scale_x_continuous(breaks = 1984:1999) +
+        scale_x_continuous(breaks = 1989:1999) +
         labs(
             x = "Original construction year", y = "Triple difference in MH prices (%)",
-            color = NULL, shape = NULL, caption = "Sales 2000-2023; joint 1992-1993 reference. Shaded 1994 cohort partially treated; 95% intervals clustered by county."
+            color = NULL, shape = NULL, caption = "Sales 2000-2023; 1993 reference. Shaded 1994 cohort partially treated; 95% intervals clustered by county."
         ) +
         theme_classic(base_size = 14) +
         theme(
@@ -230,33 +200,32 @@ draw <- function(sample_ids, labels, by_zone, filename) {
     ggsave(file.path(out_dir, paste0(filename, ".pdf")), p, width = 9, height = if (by_zone) 7 else 5)
     ggsave(file.path(out_dir, paste0(filename, ".png")), p, width = 9, height = if (by_zone) 7 else 5, dpi = 150)
 }
-draw(c("sales_2000"), "All qualifying sales", FALSE, "vintage_ddd")
-draw(
-    c("size_sample_2000", "size_controls_2000"),
-    c("Common sample, no size controls", "Floor area and lot size controls"), FALSE, "vintage_ddd_size"
-)
-draw(
-    c("size_sample_2000", "size_controls_2000"),
-    c("Common sample, no size controls", "Floor area and lot size controls"), TRUE, "vintage_ddd_byzone"
-)
+draw(c("county_common", "tract"),
+    c("County effects, tract-covered sample", "Also census tract effects"), FALSE, "vintage_ddd")
+draw(c("county_common", "tract"),
+    c("County effects, tract-covered sample", "Also census tract effects"), TRUE, "vintage_ddd_byzone")
 
 # provenance ----
 files <- c(
     here("program", "lib", "corelogic-windzone.R"),
     here("program", "lib", "corelogic-ddd.R"),
     here("program", "lib", "corelogic-setup.R"),
-    here("program", "estimate", "estimate-corelogic-windzone.R"), geo_file
+    here("program", "estimate", "estimate-corelogic-windzone.R"),
+    here("program", "lib", "corelogic-price-sample.R"), geo_file
 )
 dir.create(file.path(out_dir, "source"))
-file.copy(files[1:4], file.path(out_dir, "source"))
+file.copy(files[1:5], file.path(out_dir, "source"))
 write_json(
     list(
         status = "complete", build = input, job = Sys.getenv("SLURM_JOB_ID"),
         matched_preferred_sales = nrow(dt), crosswalk_counties = nrow(wz),
-        vintage_1994 = "Retained as own annual coefficient; static DDD has separate 1994 x MH x zone terms",
+        sale_window = c(2000L, 2023L), construction_window = c(1989L, 1999L), reference_vintage = 1993L,
+        vintage_1994 = "Own annual coefficient; included in static post (1994-1999)",
         wind_zone_source = "24 CFR 3280.305(c)(2), official 2020 list, matched to geo_county v2026-09-02 incl. historical counties",
         zone_II_counties = 144, zone_III_counties = 25, zone_III_fips_codes = sum(wz$wind_zone == 3),
-        lower_order_terms = "county x sale year; county x type (or type x zone sensitivity); zone x annual vintage",
+        lower_order_terms = "county x sale year; county x type; zone x annual vintage",
+        tract_effect = "Additive snapshot tract FE; county controls retained",
+        tract_lookup_manifest_md5 = unname(tools::md5sum(file.path(Sys.getenv("CORELOGIC_TRACTS"), "manifest.json"))),
         code_reference_md5 = as.list(tools::md5sum(files)), session = capture.output(sessionInfo())
     ),
     file.path(out_dir, "manifest.json"),

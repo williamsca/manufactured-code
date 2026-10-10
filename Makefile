@@ -61,6 +61,8 @@ test-corelogic:
 	Rscript program/tests/check-corelogic-databuild.R
 	Rscript program/tests/check-corelogic-prices.R
 	Rscript program/tests/check-corelogic-ddd.R
+	Rscript program/tests/check-corelogic-share.R
+	Rscript program/tests/check-corelogic-tracts.R
 
 .PHONY: estimates-corelogic
 estimates-corelogic:
@@ -69,6 +71,10 @@ estimates-corelogic:
 .PHONY: estimates-corelogic-windzone
 estimates-corelogic-windzone:
 	Rscript program/estimate/estimate-corelogic-windzone.R
+
+.PHONY: estimates-corelogic-share
+estimates-corelogic-share:
+	Rscript program/estimate/estimate-corelogic-share.R
 
 data:
 	Rscript program/import/import-cpi.R

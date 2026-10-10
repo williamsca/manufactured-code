@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=mh-cl-ddd
-#SBATCH --output=corelogic-ddd_%j.out
-#SBATCH --error=corelogic-ddd_%j.err
+#SBATCH --job-name=mh-cl-share
+#SBATCH --output=corelogic-share_%j.out
+#SBATCH --error=corelogic-share_%j.err
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -16,6 +16,4 @@ export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
 : "${CORELOGIC_BUILD:?Set verified build directory}"
 : "${CORELOGIC_RESULTS:?Set new private results directory}"
 : "${CORELOGIC_REFERENCE:?Set public reference directory}"
-Rscript program/tests/check-corelogic-ddd.R
-: "${CORELOGIC_TRACTS:?Set verified private parcel-tract lookup directory}"
-Rscript program/estimate/estimate-corelogic-windzone.R
+Rscript program/estimate/estimate-corelogic-share.R
