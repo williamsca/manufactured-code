@@ -1,7 +1,7 @@
 # Exercise the production share formulas without loading licensed records.
 library(data.table)
 library(fixest)
-expressions <- parse("program/estimate/estimate-corelogic-share.R")
+expressions <- parse("program/corelogic/estimate-corelogic-share.R")
 for (e in expressions) {
     if (is.call(e) && identical(e[[1]], as.name("<-")) && identical(e[[2]], as.name("forms"))) eval(e)
 }

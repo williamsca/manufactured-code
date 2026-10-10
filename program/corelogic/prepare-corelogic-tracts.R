@@ -33,7 +33,7 @@ audit <- dbGetQuery(con, paste("SELECT COUNT(*) AS parcels, COUNT(tractfp) AS tr
     COUNT(DISTINCT tractfp) AS tracts FROM read_parquet(", quote_path(file.path(out_dir, "parcel_tracts.parquet")), ")"))
 fwrite(audit, file.path(out_dir, "tract_lookup_support.csv"))
 dbDisconnect(con, shutdown = TRUE)
-files <- c(here("program", "estimate", "prepare-corelogic-tracts.R"), here("program", "lib", "corelogic-setup.R"))
+files <- c(here("program", "corelogic", "prepare-corelogic-tracts.R"), here("program", "lib", "corelogic-setup.R"))
 dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "source"))
 write_json(list(status = "complete", build = input, source = pb_source, job = Sys.getenv("SLURM_JOB_ID"),
     census_id_rule = "County FIPS + first six digits of numeric ten-character snapshot census_id, same county only",

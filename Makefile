@@ -4,6 +4,11 @@
 paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib
 	Rscript -e "rmarkdown::render('$<')"
 
+two-pager.pdf: two-pager.Rmd program/load-results.R program/lib/nfip-scalars.R manufactured-code.bib \
+	$(wildcard output/results/*.csv output/results/*.tex output/event-study/*.pdf \
+	output/event-study/countyfp/*.pdf output/event-study/countyfp/*.tex output/descriptives/*.pdf)
+	Rscript -e "rmarkdown::render('$<')"
+
 # slides.pdf refreshes the quoted numbers first: every estimate on a slide is a
 # macro from output/results/slide-numbers.tex, never typed in by hand.
 slides.pdf: slides.tex manufactured-code.bib output/results/slide-numbers.tex
@@ -64,17 +69,9 @@ test-corelogic:
 	Rscript program/tests/check-corelogic-share.R
 	Rscript program/tests/check-corelogic-tracts.R
 
-.PHONY: estimates-corelogic
-estimates-corelogic:
-	Rscript program/estimate/estimate-corelogic-prices.R
-
-.PHONY: estimates-corelogic-windzone
-estimates-corelogic-windzone:
-	Rscript program/estimate/estimate-corelogic-windzone.R
-
-.PHONY: estimates-corelogic-share
-estimates-corelogic-share:
-	Rscript program/estimate/estimate-corelogic-share.R
+# CoreLogic estimates run on Rivanna via Slurm, not locally:
+#   ./run_remote.sh corelogic [SCRIPT]
+# See program/corelogic/corelogic.slurm.
 
 data:
 	Rscript program/import/import-cpi.R

@@ -73,7 +73,7 @@ p <- ggplot(plotdata, aes(vintage, pp)) + geom_hline(yintercept = 0, linetype = 
     labs(x = "Original construction year in snapshot", y = "MH share contrast (percentage points)",
         caption = "1993 reference; county-clustered 95% intervals. Parcel-count weights.") + theme_share
 for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0("share_vintage_coefficients.", ext)), p, width = 9, height = 5, dpi = 150)
-files <- c(here("program", "estimate", "estimate-corelogic-share.R"), here("program", "lib", "corelogic-setup.R"), here("program", "lib", "corelogic-windzone.R"))
+files <- c(here("program", "corelogic", "estimate-corelogic-share.R"), here("program", "lib", "corelogic-setup.R"), here("program", "lib", "corelogic-windzone.R"))
 dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "source"))
 write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"), homes = sum(cells$homes),
     construction_window = c(1989L,1999L), reference_vintage = 1993L, post_from = 1994L,

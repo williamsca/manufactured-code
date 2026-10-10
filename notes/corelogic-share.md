@@ -2,7 +2,7 @@
 
 The October 9, 2026 specification uses construction vintages 1989–1999,
 1993 as the annual reference, and 1994–1999 as the static post period.
-`program/estimate/estimate-corelogic-share.R` reads the verified build's
+`program/corelogic/estimate-corelogic-share.R` reads the verified build's
 `properties/` inventory, not its sales. Each eligible dwelling parcel counts
 once, whether or not it sold. The denominator is classified MH plus site-built
 single-dwelling parcels, not all housing units or park residents. Snapshot
@@ -47,5 +47,4 @@ them. No record-level licensed files are downloaded. The private run archives
 source code and model objects and records input paths and source hashes.
 
 `make test-corelogic` includes known-truth tests of all six share equations.
-Submit `program/estimate/corelogic-share.slurm` with `CORELOGIC_BUILD`,
-`CORELOGIC_REFERENCE`, and a new `CORELOGIC_RESULTS` directory.
+Run with `./run_remote.sh corelogic estimate-corelogic-share.R`.

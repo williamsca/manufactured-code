@@ -2,7 +2,7 @@
 # annual profiles and static contrasts, county and census-tract effects.
 # Unlike estimate-corelogic-windzone.R, this does not compare wind zones.
 #
-# Usage: set CORELOGIC_BUILD and CORELOGIC_RESULTS; submit corelogic-prices.slurm.
+# Usage: ./run_remote.sh corelogic estimate-corelogic-prices.R
 
 rm(list = ls())
 library(here)
@@ -96,7 +96,7 @@ draw(c("county_common", "tract"),
 # provenance ----
 dir.create(file.path(out_dir, "source"))
 files <- c(
-    here("program", "estimate", "estimate-corelogic-prices.R"),
+    here("program", "corelogic", "estimate-corelogic-prices.R"),
     here("program", "lib", "corelogic-setup.R"),
     here("program", "lib", "corelogic-prices.R"),
     here("program", "lib", "corelogic-price-sample.R")

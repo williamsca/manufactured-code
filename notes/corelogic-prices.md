@@ -31,9 +31,9 @@ PNG copy, static and annual coefficient CSVs, sample counts, tract coverage,
 and the run manifest. Only current results are retained. Fitted models and
 licensed records remain on Rivanna.
 
-Submit `corelogic-tracts.slurm` first to prepare the verified private lookup,
-then `corelogic-prices.slurm` with `CORELOGIC_BUILD`, `CORELOGIC_RESULTS`, and
-`CORELOGIC_TRACTS`. The build must be complete and pass persisted-artifact
+Run `./run_remote.sh corelogic prepare-corelogic-tracts.R` to refresh the
+private lookup, then `./run_remote.sh corelogic estimate-corelogic-prices.R`,
+which reads the latest lookup (`tracts/current`). The build must be complete and pass persisted-artifact
 verification. The run archives its source code and input-reference hashes.
 `make test-corelogic` includes known-truth tests of the vintage formulas and
 tract sorting.

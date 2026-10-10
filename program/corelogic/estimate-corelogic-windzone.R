@@ -3,8 +3,7 @@
 # zone x vintage and county x type FEs retain the lower-order interactions.
 # Includes static contrasts and annual profiles, county and census-tract effects.
 #
-# Usage: set CORELOGIC_BUILD, CORELOGIC_RESULTS, and CORELOGIC_REFERENCE;
-# submit corelogic-windzone.slurm.
+# Usage: ./run_remote.sh corelogic estimate-corelogic-windzone.R
 
 rm(list = ls())
 library(here)
@@ -210,7 +209,7 @@ files <- c(
     here("program", "lib", "corelogic-windzone.R"),
     here("program", "lib", "corelogic-ddd.R"),
     here("program", "lib", "corelogic-setup.R"),
-    here("program", "estimate", "estimate-corelogic-windzone.R"),
+    here("program", "corelogic", "estimate-corelogic-windzone.R"),
     here("program", "lib", "corelogic-price-sample.R"), geo_file
 )
 dir.create(file.path(out_dir, "source"))

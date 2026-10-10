@@ -1,6 +1,9 @@
 data/
 derived/
 output/
+# Rivanna-only aggregate exports and Slurm logs (run_remote.sh)
+results/
+*.err
 literature/
 notes/apps/*.txt
 notes/apps/*.md

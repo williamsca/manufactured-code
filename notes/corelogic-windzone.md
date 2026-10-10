@@ -35,8 +35,7 @@ and annual coefficient tables, support audits, and a run manifest accompany
 them. Only current results are retained. Fitted models and licensed records
 remain private on Rivanna.
 
-Submit `corelogic-windzone.slurm` with `CORELOGIC_BUILD`, `CORELOGIC_RESULTS`,
-`CORELOGIC_REFERENCE`, and `CORELOGIC_TRACTS`. `make test-corelogic` recovers
+Run with `./run_remote.sh corelogic estimate-corelogic-windzone.R`. `make test-corelogic` recovers
 known static/annual wind-zone effects and tests tract sorting. Price profiles
 remain descriptive: a causal interpretation requires comparable untreated
 MH/site-built vintage patterns across zones.
