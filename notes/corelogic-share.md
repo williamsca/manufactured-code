@@ -42,7 +42,12 @@ from the adjusted static regressions, which use every pre/post cohort.
 
 Figures: `share_by_vintage.pdf` displays raw national and zone shares;
 `share_vintage_coefficients.pdf` displays national county-adjusted and zone
-comparison profiles relative to 1993. PNG copies and aggregate CSVs accompany
+comparison profiles relative to 1993. The “National: county-adjusted” panel
+plots the annual vintage indicators from `share ~ i(year_constr, ref = 1993) |
+countyfp`, weighted by homes. Each coefficient is an adjusted within-county
+difference in MH share from the 1993 vintage, in percentage points. It pools
+all matched wind zones and does not use a treated/untreated comparison.
+PNG copies and aggregate CSVs accompany
 them. No record-level licensed files are downloaded. The private run archives
 source code and model objects and records input paths and source hashes.
 

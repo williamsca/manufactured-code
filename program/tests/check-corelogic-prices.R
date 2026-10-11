@@ -27,3 +27,16 @@ m <- feols(cl_price_formula(fe), x, notes = FALSE)
 stopifnot(abs(coef(m)[["year_constr::1994:mh"]] - .06) < 1e-8,
     abs(coef(m)[["year_constr::1995:mh"]] - .12) < 1e-8)
 cat("Partial 1994 treatment attenuates the static contrast while remaining annual.\n")
+
+# The price entry point now also uses the shared DDD formulas.
+source("program/tests/check-corelogic-ddd.R")
+m <- feols(cl_ddd_formula(dynamic = TRUE, controls = "+ area"), x, notes = FALSE)
+b <- coef(m)[grepl(":mh_tr$", names(coef(m)))]
+v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
+stopifnot(length(b) == 10, max(abs(b - .11 * (v >= 1994))) < 1e-8)
+# A partially treated 1994 cohort remains separate in each DDD profile.
+x[, log_price := log_price - .055 * mh_tr * (year_constr == 1994)]
+m <- feols(cl_ddd_formula(dynamic = TRUE, controls = "+ area"), x, notes = FALSE)
+stopifnot(abs(coef(m)[["year_constr::1994:mh_tr"]] - .055) < 1e-8,
+    abs(coef(m)[["year_constr::1995:mh_tr"]] - .11) < 1e-8)
+cat("Price DDD profiles recover pooled annual effects and partial 1994 treatment.\n")

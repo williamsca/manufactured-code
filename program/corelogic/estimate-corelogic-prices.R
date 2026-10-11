@@ -1,119 +1,104 @@
-# MH versus site-built sale prices by original construction vintage:
-# annual profiles and static contrasts, county and census-tract effects.
-# Unlike estimate-corelogic-windzone.R, this does not compare wind zones.
-#
+# National MH vintage price contrasts and triple differences across HUD wind zones.
+# County effects only; no tract lookup or tract fixed effects.
 # Usage: ./run_remote.sh corelogic estimate-corelogic-prices.R
-
 rm(list = ls())
 library(here)
 source(here("program", "lib", "corelogic-setup.R"))
 source(here("program", "lib", "corelogic-prices.R"))
-
+source(here("program", "lib", "corelogic-ddd.R"))
+source(here("program", "lib", "corelogic-windzone.R"))
 source(here("program", "lib", "corelogic-price-sample.R"))
-# estimation sample ----
-dt <- cl_price_sample()
+ref <- Sys.getenv("CORELOGIC_REFERENCE")
+if (!nzchar(ref)) stop("Set CORELOGIC_REFERENCE")
+geo_file <- file.path(ref, "geo_county.parquet")
+wz <- cl_windzone_counties(read_corelogic(paste("SELECT countyfp,statefp,name FROM read_parquet(", quote_path(geo_file), ")")))
+fwrite(wz, file.path(out_dir, "windzone_crosswalk.csv"))
+dt <- cl_price_sample(with_tracts = FALSE)
+dt <- merge(dt, wz[, .(countyfp, wind_zone)], by = "countyfp", all.x = TRUE, sort = FALSE)
+fwrite(dt[is.na(wind_zone), .(sales = .N), by = .(countyfp, mh)], file.path(out_dir, "unmatched_counties.csv"))
+dt <- dt[!is.na(wind_zone)]
+dt[, `:=`(mh_tr = mh * (wind_zone >= 2), mh_z2 = mh * (wind_zone == 2), mh_z3 = mh * (wind_zone == 3))]
+dt[, `:=`(post_mh_tr = post_mh * (wind_zone >= 2), post_mh_z2 = post_mh * (wind_zone == 2),
+    post_mh_z3 = post_mh * (wind_zone == 3))]
 fwrite(dt[, .(sales = .N, parcels = uniqueN(clip), counties = uniqueN(countyfp)),
     by = .(mh, year_constr)], file.path(out_dir, "sample_by_vintage.csv"))
 fwrite(dt[, .(sales = .N), by = .(mh, year_sale)], file.path(out_dir, "sample_by_sale_year.csv"))
+fwrite(dt[, .(sales = .N, counties = uniqueN(countyfp), states = uniqueN(statefp)),
+    by = .(wind_zone, mh, year_constr)], file.path(out_dir, "support_by_vintage.csv"))
 
-# estimation helpers ----
-fit <- function(id, rows, fe, controls = "", dynamic_fit = TRUE) {
-    x <- dt[which(rows)]
-    cat("Estimating", id, "N=", nrow(x), "\n")
-    f <- cl_price_formula(fe, controls, dynamic_fit)
-    m <- feols(f, data = x, vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
-    tab <- cl_coeftable(m, id)
-    tab[, `:=`(mh_input = sum(x$mh), counties_input = uniqueN(x$countyfp))]
-    # Check that every non-reference cohort is identified (never silently plot dropped cohorts).
-    if (dynamic_fit) {
-        expected <- setdiff(sort(unique(x$year_constr)), 1993L)
-        found <- as.integer(sub("year_constr::([0-9]+):mh", "\\1", tab[grepl("^year_constr::", term), term]))
-        stopifnot(setequal(expected, found))
-    }
-    list(model = m, coefficients = if (dynamic_fit) tab else tab[term %in% "post_mh"])
-}
-
-# County baseline, same-sample comparison, and added census-tract fixed effects.
-fe_county_type <- "countyfp^year_sale + countyfp^mh + year_constr"
-specs <- list(
-    county = list(rep(TRUE, nrow(dt)), fe_county_type),
-    county_common = list(dt$tract_ok, fe_county_type),
-    tract = list(dt$tract_ok, paste(fe_county_type, "+ tractfp"))
+# The DDD helper retains MH x vintage and zone x vintage lower-order terms.
+# The national model remains a vintage x type comparison, as in the share figure.
+fe_national <- "countyfp^year_sale + countyfp^mh + year_constr"
+forms <- list(
+    national_dynamic = cl_price_formula(fe_national),
+    national_static = cl_price_formula(fe_national, dynamic_fit = FALSE),
+    pooled_dynamic = cl_ddd_formula(dynamic = TRUE),
+    pooled_static = cl_ddd_formula(),
+    separate_dynamic = cl_ddd_formula(by_zone = TRUE, dynamic = TRUE),
+    separate_static = cl_ddd_formula(by_zone = TRUE)
 )
-dynamic <- list()
-static <- list()
-models <- list()
-for (id in names(specs)) {
-    s <- specs[[id]]
-    controls <- if (length(s) == 3) s[[3]] else ""
-    est_es <- fit(id, s[[1]], s[[2]], controls)
-    est_static <- fit(id, s[[1]], s[[2]], controls, dynamic_fit = FALSE)
-    dynamic[[id]] <- est_es$coefficients
-    static[[id]] <- est_static$coefficients
-    models[[paste0(id, "_dynamic")]] <- est_es$model
-    models[[paste0(id, "_static")]] <- est_static$model
-    fwrite(rbindlist(dynamic), file.path(out_dir, "vintage_coefficients.csv"))
-    fwrite(rbindlist(static), file.path(out_dir, "post_coefficients.csv"))
+models <- list(); tabs <- list()
+for (id in names(forms)) {
+    cat("Estimating", id, "N=", nrow(dt), "\n")
+    m <- feols(forms[[id]], data = dt, vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
+    tab <- cl_coeftable(m, id)
+    tab[, `:=`(mh_input = sum(dt$mh), counties_input = uniqueN(dt$countyfp))]
+    modifiers <- if (grepl("^national", id)) "mh" else if (grepl("^pooled", id)) c("mh", "mh_tr") else c("mh", "mh_z2", "mh_z3")
+    if (grepl("dynamic$", id)) {
+        expected <- setdiff(sort(unique(dt$year_constr)), 1993L)
+        for (key in modifiers) {
+            terms <- tab[grepl(paste0(":", key, "$"), term), term]
+            observed <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", terms))
+            stopifnot(setequal(expected, observed))
+        }
+    } else {
+        stopifnot(all(paste0("post_", modifiers) %in% tab$term))
+    }
+    tabs[[id]] <- tab
+    models[[id]] <- m
 }
-
+coefficients <- rbindlist(tabs)
+fwrite(coefficients[grepl("dynamic$", specification)], file.path(out_dir, "vintage_coefficients.csv"))
+fwrite(coefficients[grepl("static$", specification)], file.path(out_dir, "post_coefficients.csv"))
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
-# plots ----
-dt_es <- fread(file.path(out_dir, "vintage_coefficients.csv"))[grepl("^year_constr::", term)]
-dt_es[, vintage := as.integer(sub("year_constr::([0-9]+):mh", "\\1", term))]
-draw <- function(selected, labels, filename) {
-    plotdata <- dt_es[specification %in% selected]
-    plotdata <- rbind(plotdata, CJ(specification = selected, vintage = 1993L)[
-        , `:=`(pct = 0, pct_low = 0, pct_high = 0)
-    ], fill = TRUE)
-    plotdata[, series := factor(specification, levels = selected, labels = labels)]
-    p <- ggplot(plotdata, aes(vintage, pct, color = series, shape = series)) +
-        annotate("rect", xmin = 1993.5, xmax = 1994.5, ymin = -Inf, ymax = Inf, fill = "gray80", alpha = .4) +
-        geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
-        geom_vline(xintercept = 1993.5, linetype = "dotted") +
-        geom_errorbar(aes(ymin = pct_low, ymax = pct_high), width = .15, position = position_dodge(.25)) +
-        geom_point(size = 2, position = position_dodge(.25)) +
-        scale_color_manual(values = c("#0072B2", "#D55E00")) +
-        scale_shape_manual(values = c(16, 17)) +
-        scale_x_continuous(breaks = 1989:1999) +
-        labs(
-            x = "Original construction year", y = "Relative MH vintage price (%)",
-            color = NULL, shape = NULL,
-            caption = "Sales 2000-2023; 1993 reference; shaded 1994 cohort partially treated. County-clustered 95% intervals."
-        ) +
-        theme_classic(base_size = 14) +
-        theme(
-            text = element_text(family = "serif"),
-            legend.position = "bottom", legend.text = element_text(size = 12),
-            plot.caption = element_text(size = 11)
-        )
-    ggsave(file.path(out_dir, paste0(filename, ".pdf")), p, width = 9, height = 5)
-    ggsave(file.path(out_dir, paste0(filename, ".png")), p, width = 9, height = 5, dpi = 150)
-}
-draw(c("county_common", "tract"),
-    c("County effects, tract-covered sample", "Also census tract effects"), "vintage_prices")
+# Four panels: national DiD, pooled DDD, and the two separate zone DDDs.
+plotdata <- coefficients[grepl("dynamic$", specification) &
+    (specification == "national_dynamic" | !grepl(":mh$", term))]
+plotdata[, vintage := as.integer(sub("year_constr::([0-9]+).*", "\\1", term))]
+comparisons <- c("National: county-adjusted", "II/III minus I", "II minus I", "III minus I")
+plotdata[, comparison := fifelse(specification == "national_dynamic", comparisons[1],
+    fifelse(specification == "pooled_dynamic", comparisons[2], fifelse(grepl(":mh_z2$", term), comparisons[3], comparisons[4])))]
+plotdata <- rbind(plotdata, data.table(comparison = comparisons, vintage = 1993L,
+    pct = 0, pct_low = 0, pct_high = 0), fill = TRUE)
+plotdata[, comparison := factor(comparison, levels = comparisons)]
+p <- ggplot(plotdata, aes(vintage, pct)) +
+    annotate("rect", xmin = 1993.5, xmax = 1994.5, ymin = -Inf, ymax = Inf, fill = "gray80", alpha = .4) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+    geom_vline(xintercept = 1993.5, linetype = "dotted", color = "black") +
+    geom_errorbar(aes(ymin = pct_low, ymax = pct_high), width = .15) +
+    geom_point(color = "#0072B2", size = 2) + facet_wrap(~comparison, ncol = 2) +
+    scale_x_continuous(breaks = seq(1989, 1999, 2)) +
+    labs(x = "Original construction year", y = "MH relative price contrast (%)",
+        caption = "Sales 2000-2023; 1993 reference; shaded 1994 partially treated. County-clustered 95% intervals.") +
+    theme_classic(base_size = 14) + theme(text = element_text(family = "serif"), plot.caption = element_text(size = 10))
+for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0("vintage_prices.", ext)), p, width = 9, height = 5, dpi = 150)
 
-# provenance ----
-dir.create(file.path(out_dir, "source"))
-files <- c(
-    here("program", "corelogic", "estimate-corelogic-prices.R"),
-    here("program", "lib", "corelogic-setup.R"),
-    here("program", "lib", "corelogic-prices.R"),
-    here("program", "lib", "corelogic-price-sample.R")
-)
-file.copy(files, file.path(out_dir, "source"))
-write_json(list(
-    status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"),
-    sale_rows = nrow(dt), tract_rows = sum(dt$tract_ok), specification_ids = names(specs),
+files <- c(here("program", "corelogic", "estimate-corelogic-prices.R"),
+    here("program", "lib", "corelogic-setup.R"), here("program", "lib", "corelogic-prices.R"),
+    here("program", "lib", "corelogic-price-sample.R"), here("program", "lib", "corelogic-ddd.R"),
+    here("program", "lib", "corelogic-windzone.R"))
+dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "source"))
+write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"),
+    sale_rows = nrow(dt), specification_ids = names(forms),
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
     sale_window = c(2000L, 2023L), construction_window = c(1989L, 1999L), reference_vintage = 1993L,
     vintage_1994 = "Own annual coefficient; included in static post (1994-1999)",
+    treatment = "HUD zones II/III; untreated zone I; pooled and separate zone contrasts",
+    lower_order_terms = "DDD: county x sale year; county x type; zone x annual vintage; MH x vintage",
+    national = "Vintage x type DiD with county x sale year, county x type, and vintage effects",
+    tract_effect = "None; no tract lookup required", weights = "Equal per transaction",
     source_build_manifest_md5 = unname(tools::md5sum(file.path(input, "manifest.json"))),
-    code_md5 = unname(tools::md5sum(files[1])),
-    code_reference_md5 = as.list(tools::md5sum(files)),
-    wind_zone = "Not used in the baseline vintage price analysis",
-    tract_lookup_manifest_md5 = unname(tools::md5sum(file.path(Sys.getenv("CORELOGIC_TRACTS"), "manifest.json"))),
-    tract_effect = "Additive snapshot tract FE; retain county x sale year and county x type",
-    session = capture.output(sessionInfo())
-), file.path(out_dir, "manifest.json"), pretty = TRUE, auto_unbox = TRUE)
+    code_reference_md5 = as.list(tools::md5sum(c(files, geo_file))),
+    session = capture.output(sessionInfo())), file.path(out_dir, "manifest.json"), pretty = TRUE, auto_unbox = TRUE)
 cat("COMPLETE", out_dir, "\n")
