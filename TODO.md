@@ -14,7 +14,7 @@ Verification is built in rather than ad hoc. `program/tests/` holds fake-data te
 
 Timeline anchors: JMP-heavy through August (Chunk A only, low effort); September for B–D, with C1 early in that block since D–G all inherit its numbers; late September to mid-October for E–F; welfare table (G) once C and E land; slides and dry run by late October for APPAM (early November).
 
-## Chunk P — Cost side moved to county x vintage CoreLogic designs [agent] — branch `chunk-p-county-vintage-cost-side`
+## Chunk P — Cost side moved to county x vintage CoreLogic designs [agent] — merged to `main` `5e780ec` (2026-10-12)
 Memo in `notes/LOG.md`; spec in `notes/specs.md` §20.
 - [X] Static ladder for prices and surviving counts (4 columns), overlay event-study figures, main-text table `tab:cost-static`.
 - [X] MHS state TWFE moved to Appendix `appendix-mhs`.
