@@ -63,7 +63,7 @@ cl_mh_only_plot <- function(tab, out_dir, quantity = FALSE, state = FALSE) {
 
 # Paper figure: vintage-FE and state x vintage-FE event studies overlaid, in log points, no caption.
 cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
-    specs <- c("Vintage FE", "State x vintage FE")
+    specs <- c("Vintage FE", "State \u00d7 vintage FE")
     x <- rbind(copy(tab)[, spec := specs[1]], copy(tab_state)[, spec := specs[2]], fill = TRUE)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
@@ -136,7 +136,7 @@ cl_mh_static_fits <- function(x, quantity = FALSE) {
 cl_mh_static_table <- function(res, file, quantity = FALSE) {
     stopifnot(length(res$fits) == 4L)
     place <- if (quantity) "County" else "County $\\times$ sale year"
-    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = 3, fitstat = "n",
+    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = "r3", fitstat = "n",
         keep = "%post_", style.tex = style.tex(tablefoot = FALSE), depvar = FALSE,
         headers = list("Sample:" = list("MH" = 2, "MH and site-built" = 2)),
         dict = c(post_z2 = "Zone II $\\times$ post", post_mh_z2 = "Zone II $\\times$ post",
