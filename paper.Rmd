@@ -91,7 +91,7 @@ The price sample consists of arm's-length sales from 2000 through 2023 of homes 
 
 The quantity measure counts parcels in the 2023 snapshot by county, construction year, and housing type, whether or not they sold. These counts are surviving homes: a home built in 1990 and destroyed or removed before 2023 is not counted. A count therefore combines the number of homes built and the share of them that survived to 2023. The quantity sample contains `r cl_n_mh_homes` manufactured homes and `r cl_n_sb_homes` site-built homes built from 1989 through 1999, in the `r cl_n_cty_q` counties with at least one manufactured home built in that window.
 
-Each county is assigned its HUD wind zone under 24 CFR \S 3280.305. Zones II and III are treated; Zone I is the comparison. Every Florida county is in Zone II or Zone III. Outside Florida, the Zone III counties are in Louisiana and North Carolina. Alaska and Hawaii are excluded.
+Each county is assigned its HUD wind zone under 24 CFR \S 3280.305 (Figure \ref{map:windzone-counties}). Zones II and III are treated; Zone I is the comparison. Every Florida county is in Zone II or Zone III. Outside Florida, the Zone III counties are in Louisiana and North Carolina. Alaska and Hawaii are excluded.
 
 ## Flood Damage and Insurance Coverage
 
@@ -281,6 +281,17 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \clearpage
 
 # Tables and Figures
+
+\begin{figure}[htbp]
+  \centering
+  \caption{HUD Wind Zones by County}\label{map:windzone-counties}
+  \includegraphics{output/descriptives/map-mhs-windzone-counties.pdf}
+  \begin{flushleft}
+  \begin{footnotesize}
+  Notes: Counties are shaded by their HUD wind zone under 24 CFR \S 3280.305. Alaska and Hawaii are excluded. Source: eCFR wind zone classification; Census TIGER/Line county shapefiles.
+  \end{footnotesize}
+  \end{flushleft}
+\end{figure}
 
 \begin{figure}[htbp]
   \centering
@@ -520,7 +531,7 @@ This appendix reports a state-level design for the price and quantity effects of
 
 ## Data and Price Index
 
-This appendix estimates price and quantity effects from a state-by-year panel from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state. The sample covers 1988--2004. It extends ten years past the reform so that it spans both the expansion of chattel lending for manufactured homes in the late 1990s and the contraction of that lending after 1999. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states (see Figure \ref{map:treated-states}).
+This appendix estimates price and quantity effects from a state-by-year panel from the Census Bureau's Manufactured Housing Survey (MHS), which reports average sales prices and placement counts by state. The sample covers 1988--2004. It extends ten years past the reform so that it spans both the expansion of chattel lending for manufactured homes in the late 1990s and the contraction of that lending after 1999. The treatment group consists of states containing HUD wind zones II or III; the control group is zone I states.
 
 Manufactured homes are placed in two sizes. A single-section home arrives as one transportable unit; a multi-section home arrives as two or more units that are joined on site. Multi-section homes are larger and more expensive: over the sample period the average real sales price is `r avg_p_single` for a single-section home and `r avg_p_double` for a multi-section home, a ratio of `r price_ratio` to one. The survey reports an average sales price for each size separately and an average across all homes placed. The all-homes average is the placement-weighted mixture of the two size-specific averages, so it rises both when prices rise and when placements shift toward multi-section homes. The multi-section share differs across states and changes over the sample period, so the all-homes average conflates price changes with changes in the size mix, and a shift in the mix would enter a difference-in-differences estimate as a price effect.
 
@@ -561,17 +572,6 @@ I also find that price effects are larger for multi-section units (`r price_eff_
 HUD's prospective analysis provides a benchmark for these price effects. As reproduced in \citet[Table 4-17]{dacquisto_housing_2006}, the analysis predicted consumer price increases of \$829 and \$1,007 for single- and multi-section homes in Zone II, and \$1,177 and \$1,512 in Zone III, using a 56\% pass-through rate. These figures use the analysis's 1992 price baseline, whereas the estimates here are in 2000 dollars. An alternative with nearly full pass-through predicts increases ranging from \$1,402 to \$2,695. Comparing these forecasts with the estimated price response requires a common dollar year and weights for home size and wind-zone exposure. Such a comparison evaluates the joint predictions of accounting-based compliance costs and assumed pass-through; a discrepancy alone cannot identify which component accounts for it.
 
 Figure \ref{fig:es-placements} shows the corresponding event study for log placements, estimated on the same state-years as the price index so that the price and quantity effects describe one panel rather than two. Collapsing the post-period to a single coefficient gives `r plc_eff` log points (SE `r plc_se`), a 95% interval of `r plc_ci_lo` to `r plc_ci_hi`. The point estimate is close to zero and statistically indistinguishable from zero. The single coefficient averages over two phases: placements in treated states rise relative to control states through 1998 and fall below them after 1999, following the expansion and contraction of chattel lending described above. The interval is wide enough to contain declines of roughly `r fmt_lp(abs(get_mhs("placements_effect_static") - 1.96 * get_mhs("placements_effect_static_se")))` log points as well as increases, so a modest decline cannot be ruled out. The estimates are consistent with relatively inelastic demand, or with an outward demand shift from the improved construction offsetting the higher price.
-
-\begin{figure}[htbp]
-  \centering
-  \caption{States Treated by the 1994 HUD Wind Standard}\label{map:treated-states}
-  \includegraphics{output/descriptives/map-mhs-treated-states.pdf}
-  \begin{flushleft}
-  \begin{footnotesize}
-  Notes: Treated states are those with any overlap with HUD wind zones II or III. Control states are wind zone I states. Alaska and Hawaii are excluded. Source: Census Bureau Manufactured Housing Survey and Census TIGER/Line state shapefiles.
-  \end{footnotesize}
-  \end{flushleft}
-\end{figure}
 
 \begin{figure}[htbp]
   \centering
