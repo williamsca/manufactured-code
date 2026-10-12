@@ -231,17 +231,6 @@ Figure \ref{fig:takeup-claim-frequency} plots the two event studies together. Re
 
 These results support greater NFIP take-up among owners of newer manufactured homes without a detectable increase in claim frequency among insured homes. They provide no evidence that the reduction in damage per claim is explained by selection toward homes that file fewer claims. Unchanged claim frequency does not, however, rule out selection on the severity of losses conditional on a claim. Improved insurability is one possible explanation for greater participation, but these estimates do not distinguish changes in eligibility or access from changes in insurance demand. The take-up profile varies before the reform and does not show a discrete jump at 1994; its causal interpretation also depends on the stock-allocation and vacancy assumptions discussed in the appendix.
 
-\begin{figure}[htbp]
-  \centering
-  \caption{NFIP Take-Up and Claim Frequency by Construction Vintage}\label{fig:takeup-claim-frequency}
-  \includegraphics{output/event-study/countyfp/es-takeup-claim-frequency.pdf}
-  \begin{minipage}{\textwidth}
-  \footnotesize
-  Notes: Poisson event-study coefficients for manufactured homes relative to single-family homes, normalized to the 1992--1993 construction bin. Policies per home uses log imputed home-years as an exposure offset; claims per policy uses log observed policy-years. Both specifications include county $\times$ calendar-period, housing-type, and construction-vintage-bin fixed effects. Calendar periods cover 2009--2023 in five-year bins. Error bars are 95\% intervals using state-clustered standard errors; markers are displaced horizontally for readability. The dotted line separates pre- and post-reform vintages. The bin labeled 1994 contains construction years 1994 and 1995. The reference-bin coefficients are normalized to zero. Appendix Section \ref{appendix-take-up} describes the imputation, and Table \ref{tab:take-up} reports the coefficients. Source: OpenFEMA claims and policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
-  \end{minipage}
-\end{figure}
-
-
 <!--
 ## Robustness
 
@@ -395,6 +384,16 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \end{threeparttable}
 \end{table}
 \end{landscape}
+
+\begin{figure}[htbp]
+  \centering
+  \caption{NFIP Take-Up and Claim Frequency by Construction Vintage}\label{fig:takeup-claim-frequency}
+  \includegraphics{output/event-study/countyfp/es-takeup-claim-frequency.pdf}
+  \begin{minipage}{\textwidth}
+  \footnotesize
+  Notes: Poisson event-study coefficients for manufactured homes relative to single-family homes, normalized to the 1992--1993 construction bin. Policies per home uses log imputed home-years as an exposure offset; claims per policy uses log observed policy-years. Both specifications include county $\times$ calendar-period, housing-type, and construction-vintage-bin fixed effects. Calendar periods cover 2009--2023 in five-year bins. Error bars are 95\% intervals using state-clustered standard errors; markers are displaced horizontally for readability. The dotted line separates pre- and post-reform vintages. The bin labeled 1994 contains construction years 1994 and 1995. The reference-bin coefficients are normalized to zero. Appendix Section \ref{appendix-take-up} describes the imputation, and Table \ref{tab:take-up} reports the coefficients. Source: OpenFEMA claims and policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
+  \end{minipage}
+\end{figure}
 
 \begin{table}[htbp]
   \centering
