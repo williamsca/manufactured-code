@@ -10,7 +10,7 @@ library(kableExtra)
 source(here("program", "import", "project-params.R"))
 
 in_window <- function(year) {
-    between(year, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) & year != 1994L
+    between(year, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)
 }
 tag_groups <- function(d) {
     d[, housing_type := fifelse(mh == 1L, "Manufactured", "Site-built")]

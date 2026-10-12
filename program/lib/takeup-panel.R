@@ -9,7 +9,7 @@ build_takeup_panel <- function(policies, claims, stock, periods, binw = 2L,
     key <- c("countyfp", "year_constr", "mh")
     stopifnot(data.table::uniqueN(stock, by = key) == nrow(stock),
               !anyNA(stock$homes_n), all(stock$homes_n >= 0))
-    eligible <- data.table::copy(stock[homes_n > 0 & year_constr != 1994L])
+    eligible <- data.table::copy(stock[homes_n > 0])
     stopifnot(nrow(eligible) > 0L)
     p <- merge(policies[period_loss %in% periods], eligible[, ..key], by = key)
     c <- merge(claims[period_loss %in% periods], eligible[, ..key], by = key)

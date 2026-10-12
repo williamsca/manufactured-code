@@ -39,11 +39,11 @@ source(here("program", "import", "rd-client.R"))
 
 # Census vintage bins -> construction years retained within each bin.
 # 1980-1983 dropped (no source distinguishes them from 1984+ within the
-# 1980_1989 bin); 1994 dropped by default (July effective date +
-# production/installation lags make it a mixed pre/post year).
+# 1980_1989 bin). 1994 is retained and coded post-reform, although the July
+# effective date and production/installation lags make it a mixed year.
 bin_years <- list(
     "1980_1989" = 1984:1989,
-    "1990_1994" = 1990:1993,
+    "1990_1994" = 1990:1994,
     "1995_1998" = 1995:1998,
     "1999_2000" = 1999L
 )

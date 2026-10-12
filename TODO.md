@@ -14,6 +14,14 @@ Verification is built in rather than ad hoc. `program/tests/` holds fake-data te
 
 Timeline anchors: JMP-heavy through August (Chunk A only, low effort); September for B–D, with C1 early in that block since D–G all inherit its numbers; late September to mid-October for E–F; welfare table (G) once C and E land; slides and dry run by late October for APPAM (early November).
 
+## Chunk P — Cost side moved to county x vintage CoreLogic designs [agent] — branch `chunk-p-county-vintage-cost-side`
+Memo in `notes/LOG.md`; spec in `notes/specs.md` §20.
+- [X] Static ladder for prices and surviving counts (4 columns), overlay event-study figures, main-text table `tab:cost-static`.
+- [X] MHS state TWFE moved to Appendix `appendix-mhs`.
+- [X] Construction year 1994 retained in NFIP take-up stock and sumstats.
+- [ ] **Open: headline price figure** — abstract/intro/discussion/conclusion/HUD table/BCR still MHS-based.
+- [ ] Wild cluster bootstrap for Zone III (20 counties); county wind-zone map for the main text.
+
 ## Chunk C — Cost side: wind-zone dose-response [agent; Colin reviews interpretation]
 Addresses review target 4 and comment 7. The current binary treatment (any Zone II/III county in the state) is badly diluted: pooled across treated states only **30%** of the 1980–2000 MH stock sits in Zone II/III, ranging from FL 97% and LA 64% down to GA 6% and VA 3%. Taken literally the binary $5,000 implies something near $17,000 in a fully-treated market, which strains credulity — so this test is diagnostic either way.
 - [X] Build state-level continuous treatment intensity: MH-stock-weighted share of counties in Zone II/III, from `derived/ecfr-windzone.csv` × `derived/census2000-mh-county-vintage.Rds`. Write to `derived/` and export the state table as a paper appendix. Done: `derived/mhs-windzone-intensity.Rds`, `output/descriptives/windzone-intensity.tex`, appendix Table `tab:windzone-intensity` in `paper.Rmd`.

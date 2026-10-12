@@ -333,3 +333,43 @@ fl_retained_pv <- fmt_d(get_hud("flood_private_retained_pv"))
 fl_retained_bcr <- formatC(get_hud("flood_bcr_private"), format = "f", digits = 2)
 hud_all_bcr <- formatC(get_hud("hud_bcr_all"), format = "f", digits = 2)
 fl_all_bcr <- formatC(get_hud("flood_bcr_all"), format = "f", digits = 2)
+
+# CoreLogic cost side (Chunk P): static ladder for prices (OLS, log points) and
+# surviving counts (PPML, log points), columns 1-4 as in notes/specs.md §20,
+# plus the sample sizes quoted in the data section. Read from the aggregate
+# outputs of program/corelogic/estimate-corelogic-{prices,share}.R.
+cl_dir <- here("output", "corelogic")
+cl_lad <- rbind(
+    fread(file.path(cl_dir, "prices", "mh_static_ladder.csv"))[, outcome := "price"],
+    fread(file.path(cl_dir, "share", "mh_static_ladder.csv"))[, outcome := "count"])
+cl_lad[, `:=`(col = as.integer(sub("ladder_", "", specification)),
+              zone = fifelse(grepl("z2$", term), 2L, 3L))]
+stopifnot(nrow(cl_lad) == 16L, !anyDuplicated(cl_lad, by = c("outcome", "col", "zone")))
+get_lad <- function(o, k, z, what = "estimate") {
+    x <- cl_lad[outcome == o & col == k & zone == z, get(what)]
+    stopifnot(length(x) == 1L)
+    x
+}
+# "0.072 (SE 0.023)" and the implied percentage change.
+lad_b  <- function(o, k, z) formatC(get_lad(o, k, z), format = "f", digits = 3)
+lad_se <- function(o, k, z) se_fmt(get_lad(o, k, z, "se"))
+lad_pc <- function(o, k, z) pctc_fmt(get_lad(o, k, z))
+cl_sales <- fread(file.path(cl_dir, "prices", "sample_by_vintage.csv"))
+cl_n_mh_sales <- format(cl_sales[mh == 1, sum(sales)], big.mark = ",")
+cl_n_sb_sales <- format(cl_sales[mh == 0, sum(sales)], big.mark = ",")
+cl_support <- fread(file.path(cl_dir, "share", "mh_static_ladder_support.csv"))
+cl_n_mh_homes <- format(cl_support[mh == 1, sum(homes)], big.mark = ",")
+cl_n_sb_homes <- format(cl_support[mh == 0, sum(homes)], big.mark = ",")
+cl_n_cty_q <- format(cl_support[mh == 1, sum(counties[post == 0])], big.mark = ",")
+# Range of an outcome-zone's estimates across the four columns, as % changes.
+lad_min <- function(o, z) pctc_fmt(min(cl_lad[outcome == o & zone == z, estimate]))
+lad_max <- function(o, z) pctc_fmt(max(cl_lad[outcome == o & zone == z, estimate]))
+# Count event studies (both versions): range of the Zone III coefficients for
+# construction years 1995-1999, quoted in the quantity results paragraph.
+cl_es_q <- rbind(fread(file.path(cl_dir, "share", "mh_only_vintage_coefficients.csv")),
+                 fread(file.path(cl_dir, "share", "mh_only_vintage_coefficients_state_vintage_fe.csv")))
+cl_es_q[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
+stopifnot(nrow(cl_es_q) == 40L)
+cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
+cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
+cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)

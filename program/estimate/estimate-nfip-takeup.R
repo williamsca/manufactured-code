@@ -56,9 +56,8 @@ dt <- merge(dt, dt_stock, by = c("countyfp", "year_constr", "mh"), all.x = TRUE)
 
 dt_homes_cell <- unique(dt[, .(countyfp, year_constr, mh, homes_n)])
 dt_homes_cell[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
-# a period_constr bin whose year_constr members are ALL missing stock (e.g.
-# the ambiguous 1994 construction year, dropped in impute-stock.R) must stay
-# NA, not silently become a 0-home bin via na.rm sum over nothing
+# a period_constr bin whose year_constr members are ALL missing stock must
+# stay NA, not silently become a 0-home bin via na.rm sum over nothing
 dt_homes_cell <- dt_homes_cell[
     , .(homes_n = if (all(is.na(homes_n))) NA_real_ else sum(homes_n, na.rm = TRUE)),
     by = .(countyfp, period_constr, mh)]
@@ -291,7 +290,7 @@ iplot(est_pois_es)
 # than claiming a decomposition the estimator does not deliver.
 #
 # Construct the denominator from every eligible Census stock cell, then join
-# counts. Match numerator construction years to positive stock, excluding 1994.
+# counts. Match numerator construction years to positive stock.
 # The shared helper also builds five-year vintage bins for the diagnostic.
 source(here("program", "lib", "takeup-panel.R"))
 # Claims are aggregated directly so tracts without policies are not silently

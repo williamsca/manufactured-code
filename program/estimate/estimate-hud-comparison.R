@@ -232,7 +232,7 @@ usd <- function(x_000) fd(x_000 * 1000)
 # the Census stock does not distinguish single- and multi-section homes.
 stock <- readRDS(here("derived", "stock-county-vintage.Rds"))
 stopifnot(uniqueN(stock, by = c("countyfp", "year_constr", "mh")) == nrow(stock))
-stock <- merge(stock[mh == 1L & year_constr %in% 1995:1999], dt_wz,
+stock <- merge(stock[mh == 1L & year_constr %in% 1994:1999], dt_wz,
                by = "countyfp", all.x = TRUE)
 assert_geo_coverage(stock, "wind_zone", "countyfp",
                     "estimate-hud-comparison.R: post-reform stock x wind zones")

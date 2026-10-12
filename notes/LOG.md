@@ -4,6 +4,82 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Chunk P — Cost side moved to county x vintage CoreLogic designs; 1994 retained in take-up (2026-10-12)
+
+Branch `chunk-p-county-vintage-cost-side`. Colin's request 2026-10-12: replace
+the MHS state TWFE in the main text with the county comparisons across
+construction vintages (MH only), which align with the NFIP design; move the
+state TWFE to an appendix; add a main-text static table for prices and
+quantities with progressively stricter specifications; keep 1994 everywhere.
+Headline price figure explicitly punted. Spec detail in `notes/specs.md` §20.
+
+**Already on `main` (needed for Rivanna, which runs `origin/main` only):**
+`f4c29e1` (state x vintage FE event studies), `d5e4056` (static ladder, overlay
+figures, known-truth test), `2c9b1c2` (3-decimal table rounding, × in legends).
+Estimation code only; everything else below is on the branch.
+
+### What changed
+
+- **Static ladder** (`cl_mh_static_formula`, `cl_mh_static_fits`,
+  `cl_mh_static_table`, `cl_type_count_panel` in `corelogic-mh-only.R`):
+  (1) MH, vintage FE; (2) state x vintage FE; (3) MH vs SB with county x
+  vintage + type x vintage FE; (4) state x vintage x type FE. Colin approved the
+  four columns. Column 3 deliberately uses county x vintage FE rather than the
+  older `cl_ddd_formula`'s zone x vintage FE.
+- **Paper:** new Data subsection (CoreLogic), new Cost Estimation (Eqs.
+  `es-cost-price`, `es-cost-quantity`, `ddd-cost`), new cost Results, two
+  overlay figures and Table `tab:cost-static` (Panels A/B). MHS data, Eq.
+  `event-study-cost`, results, and three figures moved verbatim to new Appendix
+  `appendix-mhs`; the size-type and intensity appendices now point to it.
+- **1994 in NFIP take-up:** `impute-stock.R` keeps 1994 (1990-1994 Census bin
+  now allocates to 1990:1994); `takeup-panel.R`, sumstats no longer drop it;
+  HUD zone weights use 1994-1999 stock. Paper notes and one slide line updated.
+  Claim-level NFIP already included 1994; CoreLogic price samples already did.
+
+### Results
+
+| Static, log points (SE) | (1) | (2) | (3) | (4) |
+|---|---:|---:|---:|---:|
+| Price, Zone III | 0.072 (0.023) | 0.060 (0.038) | 0.023 (0.021) | 0.080 (0.041) |
+| Price, Zone II | 0.015 (0.014) | 0.002 (0.027) | -0.051 (0.022) | 0.005 (0.032) |
+| Count, Zone III | -0.921 (0.115) | -0.687 (0.117) | -0.776 (0.130) | -0.789 (0.157) |
+| Count, Zone II | -0.239 (0.058) | -0.112 (0.049) | -0.185 (0.069) | -0.248 (0.086) |
+
+Price premium in Zone III is +2.3% to +8.4%, precise only in (1) and (4).
+Zone II's −0.051 in (3) disappears in (4): it comes from state-specific
+site-built vintage profiles. Surviving MH counts fall sharply in Zone III
+(−50% to −60%) in every column.
+
+Take-up with 1994 retained: static policies-per-home 0.205 → 0.185 (SE 0.082);
+claims per home 0.354 → 0.336; claims per policy 0.062 → 0.062. Stock
+benchmark vs MHS shipments 0.95 → 0.97. Dynamic profile description in the
+appendix still holds (first post bin 0.022 → 0.004).
+
+### Verified
+
+`make test` and `make test-corelogic` pass, including the new ladder test (each
+column absorbs exactly the shocks its FE target, and only those). Paper renders
+with no undefined references. Every new number in the text is a scalar read in
+`load-results.R` from `output/corelogic/` (not `output/results/`: CoreLogic
+aggregates are downloaded there by `run_remote.sh`).
+
+### Open questions
+
+1. **Headline price figure** (punted): abstract, intro cost paragraph,
+   discussion, conclusion, HUD table and BCR still use the MHS `price_eff`,
+   and the intro still describes the MHS design. The new county estimates are
+   log points on resale prices, not dollars on new-home prices.
+2. **Quantity interpretation:** large decline in surviving Zone III MH vs.
+   ~zero MHS placement effect. Text argues survival bias works against the
+   decline; no direct evidence on placements by county.
+3. **Zone III inference** rests on 20 counties (14 FL); wild cluster bootstrap
+   not yet run. Column (2)/(4) Zone III vs. Zone I identification outside
+   Florida is only LA and NC.
+4. A county wind-zone map would replace the (now appendix) treated-states map
+   in the main text; not built.
+
+---
+
 ## Chunk O — Claim-level headline moved to PPML, and the cost-benefit conversion (2026-08-27)
 
 Merged to `main` as `113e60c`. Colin's decision, after

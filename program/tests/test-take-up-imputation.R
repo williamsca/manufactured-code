@@ -199,8 +199,8 @@ test_that("normalizing within-bin shares over retained years only inflates the r
 })
 
 # Simulate the per-home ratio at a two-construction-year vintage bin where
-# `homes_n` exists for only one of the two years (the real 1994 bin: 1994 is
-# dropped from the stock imputation, 1995 is not).
+# `homes_n` exists for only one of the two years (e.g. a construction year
+# dropped from the stock imputation while its bin partner is retained).
 simulate_mixed_bin <- function(
     rate = 0.3, homes_1995 = 500, policies_1994 = 200, policies_1995 = 150
 ) {
@@ -290,10 +290,10 @@ test_that("stock frame preserves zero-policy cells and all matched claims", {
                      period_loss = 2009L, claims_n = c(1, 2))
     d <- build_takeup_panel(p, cl, stock, c(2009L, 2014L))
     expect_equal(nrow(d), 16L)
-    expect_equal(sum(d$policies_n), 5)
+    expect_equal(sum(d$policies_n), 104)
     expect_equal(sum(d$claims_n), 3)
-    expect_equal(d[period_loss == 2009, sum(homes_n)], 120)
-    expect_equal(d[period_constr == 1994, unique(homes_n)], 10)
+    expect_equal(d[period_loss == 2009, sum(homes_n)], 160)
+    expect_equal(d[period_constr == 1994, unique(homes_n)], 20)
     expect_equal(d[countyfp == "01003", sum(policies_n)], 0)
     expect_true(all(is.na(d[policies_n == 0, log_policy_yrs])))
     expect_true(all(is.finite(d$log_home_yrs)))

@@ -1509,3 +1509,60 @@ scalars), so `\vWdDepth` rendered −0.116 as "$116". Damage outcomes now emit
 `*Pct` / `*LP` / `*Dol` and `fmt_d` is never applied to a coefficient. The
 "Why levels and not logs" backup frame is replaced by "Why proportional and not
 dollars".
+
+## 20. Cost side moved to county x vintage CoreLogic designs (Chunk P, 2026-10-12)
+
+Colin's decision 2026-10-12: replace the MHS state-year TWFE (§1, §11) in the
+main text with county comparisons across construction vintages in the CoreLogic
+records; the MHS design moves to Appendix `appendix-mhs`. The headline price
+figure (`price_eff`, abstract/intro/discussion/conclusion, HUD table, BCR) is
+**unchanged and still MHS-based** pending Colin's decision.
+
+### 20.1 Event studies (paper Eqs. `es-cost-price`, `es-cost-quantity`)
+
+- **Scripts:** `program/corelogic/estimate-corelogic-prices.R`,
+  `program/corelogic/estimate-corelogic-share.R`; helpers in
+  `program/lib/corelogic-mh-only.R`. Run on Rivanna via
+  `./run_remote.sh corelogic <script>`.
+- **Price:** `log_price ~ i(year_constr, z2, ref = 1993) + i(year_constr, z3, ref = 1993) | countyfp^year_sale + year_constr`
+  on MH sales only (`eligible_sale`, sale years 2000-2023, vintages 1989-1999,
+  sale date >= Jan 1 of vintage; 1994 included). OLS, unweighted.
+- **Quantity:** `mh_homes ~ <same interactions> | countyfp + year_constr`, PPML,
+  on surviving 2023 Property Basic MH parcels by county x vintage, balanced over
+  counties with any MH in 1989-1999, zeros retained (`cl_mh_count_panel`).
+- **Robustness:** both with `statefp^year_constr` in place of `year_constr`
+  (`cl_mh_only_formula(state = TRUE)`).
+- **Clustering:** county. **Reference:** 1993.
+- **Paper figures:** `output/corelogic/{prices,share}/mh_only_vintage_{prices,quantities}_compare.pdf`
+  overlay both versions in log points (`cl_mh_only_compare_plot`).
+
+### 20.2 Static ladder (paper Table `tab:cost-static`)
+
+`post = 1[year_constr >= 1994]` (1994 coded post). `cl_mh_static_formula(k)`:
+
+| Col | Sample | Regressors | Fixed effects (price; quantity swaps `countyfp^year_sale` -> `countyfp`) |
+|---|---|---|---|
+| 1 | MH | `post_z2 + post_z3` | `countyfp^year_sale + year_constr` |
+| 2 | MH | `post_z2 + post_z3` | `countyfp^year_sale + statefp^year_constr` |
+| 3 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + countyfp^year_constr + mh^year_constr` |
+| 4 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + countyfp^year_constr + statefp^year_constr^mh` |
+
+Price: OLS on the full matched sale sample (MH rows only in 1-2). Quantity:
+PPML on `cl_type_count_panel` (MH and SB = `homes - mh_homes` counts over the
+same MH-support counties, zeros retained). Clustering by county. Outputs:
+`mh_static_ladder.{tex,csv}` in each output folder; the paper table stacks the
+two `.tex` files as Panels A and B. Known-truth test
+(`check-corelogic-mh-only.R`): a county x vintage shock common to both types
+biases only columns 1-2; an MH-specific state x vintage shock biases only
+columns 1 and 3; column 4 absorbs both.
+
+Column 3 uses county x vintage FE, not the `year_constr^wind_zone` FE of the
+existing `cl_ddd_formula` triple difference (§ corelogic-prices.md), so the MH
+vs SB comparison is within county and vintage.
+
+### 20.3 1994 retained in NFIP take-up
+
+`impute-stock.R` now retains construction year 1994 (`bin_years$"1990_1994" =
+1990:1994`); `takeup-panel.R` and `estimate-sumstats-nfip.R` no longer drop it;
+HUD-comparison zone weights use 1994-1999 stock. The 1994-1995 take-up bin now
+holds both years. The claim-level NFIP design already included 1994.
