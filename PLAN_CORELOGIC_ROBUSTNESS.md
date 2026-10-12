@@ -36,10 +36,10 @@ own transition cohort.
 The initial geographic scope is the continental US and DC. Wind-zone contrasts
 require reconciling the legacy reference with the research-database contract;
 unmatched counties must not silently become zone I.
-The [initial wind-zone triple differences](notes/corelogic-windzone.md) now use
-an audited reconstructed reference. Their broad-cohort contrast is negative,
-but becomes approximately zero with 1990–1997 cohorts; amenity and risk balance
-should therefore be tested as triple-difference profiles as well as pooled ones.
+The [wind-zone price triple differences](notes/corelogic-prices.md) use an
+audited reconstructed reference within the price estimator. Annual pre-treatment
+profiles and the static tract/size comparisons should be assessed alongside
+amenity and risk balance before interpreting the estimates causally.
 
 For a characteristic or hazard measure X, run the same annual-vintage equation:
 

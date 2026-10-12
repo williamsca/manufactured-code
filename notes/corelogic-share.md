@@ -25,7 +25,9 @@ receive parcel-count weights, yielding the parcel-level regression coefficients.
 Inference clusters by county; effects and intervals are in percentage points.
 The exported `n` counts regression cells, while `homes_input` counts homes.
 
-Rivanna job 21140980 completed successfully. It analyzed 11,336,139 homes.
+Rivanna job 21208555 completed successfully on October 11, 2026. It analyzed
+11,336,139 homes; the full-sample annual and static coefficients match the
+previous run (21140980) to numerical precision.
 Aggregate outputs: `output/corelogic/share/`.
 
 | Static specification | Contrast (pp) | County-clustered 95% interval (pp) |
@@ -53,3 +55,79 @@ source code and model objects and records input paths and source hashes.
 
 `make test-corelogic` includes known-truth tests of all six share equations.
 Run with `./run_remote.sh corelogic estimate-corelogic-share.R`.
+
+## Static III-minus-I LaTeX table
+
+`static_III_minus_I.tex` is generated with `fixest::etable()` and compares
+baseline county effects with additive tract effects. There are no size controls.
+The outcome is MH share in **percentage points**, so coefficients and standard
+errors are already on the reported scale. This is a share DiD across zones;
+housing type is the outcome rather than a third difference.
+
+Both columns include county and pre/post fixed effects plus separate
+zone II × post and zone III × post interactions. The displayed coefficient is
+zone III × post, relative to zone I. Pre is 1989–1993; post is 1994–1999,
+including the partially treated 1994 cohort. Zone II remains in the joint model.
+The annual share models and figures continue to use all matched eligible homes.
+
+The table uses the same tract-covered surviving inventory in both columns,
+after tract-model singleton removal. Each tract-vintage share cell receives
+its home count as the regression weight. The table distinguishes the number
+of cells from the underlying number of homes. Inference clusters by county.
+
+Tracts are assigned by joining the eligible inventory's parcel IDs and counties
+to the pinned 2023 Property Basic snapshot, using the same validated numeric
+census-ID rule as the price lookup. **The sale-only tract lookup is not used**:
+homes that never sold remain eligible. The geography is snapshot geography,
+not verified at the construction date. `tract_coverage.csv` reports coverage;
+`static_support.csv` reports retained pre/post support, and
+`static_coefficients.csv` retains both zone interactions and intervals.
+
+The pinned Property Basic source is required for share estimation, in addition
+to the verified build and county reference. The source archive and run manifest
+record the snapshot manifest hash. `make test-corelogic` checks static tract
+formulas and equality of weighted-cell and parcel-level coefficients.
+
+
+The current static table uses 11,079,895 homes in 2,698 counties and 568,234
+tract-vintage cells in each column (job 21208555). The III-minus-I estimate is
+-3.483 pp (SE 0.569; 95% interval [-4.60, -2.37]) at baseline and -2.866 pp
+(SE 0.317; 95% interval [-3.49, -2.24]) with tract effects. Both columns use the
+same retained inventory; the new table differs from the earlier full-sample
+static export because it conditions on tract coverage and uses a fully collapsed
+pre/post lower-order effect.
+
+The LaTeX table uses default `etable()` significance stars and standard errors,
+with no notes in the table file. Explanations belong in the ultimate document.
+
+
+## MH-only quantity event study
+
+`mh_only_vintage_quantities.pdf` and its PNG copy show the vintage profile of
+**MH counts**, separately comparing zone II and zone III with zone I. This is
+not an MH share regression: there is no site-built outcome or denominator.
+Counts come from the eligible surviving 2023 inventory, not transactions.
+They measure the number of surviving homes by original construction year,
+not historical construction flows or units subsequently removed.
+
+Every county with at least one eligible MH home in 1989–1999 contributes all
+11 vintage cells, including zero counts. Counties with no MH over the whole
+window contain no information for a county-effect Poisson count model and
+are omitted. The model uses Poisson pseudo-maximum likelihood with county and
+vintage effects plus separate vintage × zone II and vintage × zone III
+interactions, relative to 1993. There are no tract effects, size controls,
+exposure denominator, or additional observation weights. Inference clusters
+by county. Coefficients are converted to percentage count contrasts through
+`100 * (exp(beta) - 1)`, rather than percentage points.
+
+`mh_counts_by_county_vintage.csv` exports the balanced county-vintage aggregate
+panel; `mh_counts_by_vintage.csv` reports aggregate MH counts and zero-cell
+support by zone and vintage. `mh_only_vintage_coefficients.csv` retains the
+count-model coefficients and intervals. The private model archive includes
+the fitted Poisson model. Synthetic checks cover known count ratios, the
+1993 reference, and retaining missing cohorts as zeros.
+
+The MH count run (21208555) covers 1,165,546 homes in 2,455 counties and
+27,005 county-vintage cells, including 3,082 zero-count cells. All 20
+non-reference zone-vintage count interactions are identified. The existing
+share coefficients are unchanged from the previous run.

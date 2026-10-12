@@ -4,21 +4,17 @@ rm(list = ls())
 library(here)
 source(here("program", "lib", "corelogic-setup.R"))
 source(here("program", "lib", "corelogic-windzone.R"))
+source(here("program", "lib", "corelogic-share.R"))
+source(here("program", "lib", "corelogic-mh-only.R"))
 ref <- Sys.getenv("CORELOGIC_REFERENCE")
 if (!nzchar(ref)) stop("Set CORELOGIC_REFERENCE")
 geo_file <- file.path(ref, "geo_county.parquet")
 wz <- cl_windzone_counties(read_corelogic(paste("SELECT countyfp,statefp,name FROM read_parquet(", quote_path(geo_file), ")")))
 # Match the price dwelling universe using snapshot fields; no sale eligibility screen.
 glob <- quote_path(file.path(input, "properties", "*.parquet"))
-cells <- read_corelogic(sprintf("SELECT countyfp, year_built AS year_constr,
-    COUNT(*) AS homes, SUM(mh) AS mh_homes, COUNT(DISTINCT clip) AS parcels
-    FROM read_parquet(%s) WHERE countyfp IS NOT NULL AND clip IS NOT NULL
-    AND year_built BETWEEN 1989 AND 1999 AND mh IS NOT NULL
-    AND COALESCE(land_use_code,'') NOT IN ('135','136','454','400')
-    AND COALESCE(property_indicator_code,'') IN ('','00','10')
-    AND (number_of_buildings IS NULL OR number_of_buildings=1)
-    AND (number_of_units IS NULL OR number_of_units=1)
-    GROUP BY countyfp,year_built", glob))
+tract_cells <- cl_share_tract_cells(glob)
+cells <- tract_cells[, .(homes = sum(homes), mh_homes = sum(mh_homes), parcels = sum(parcels)),
+    by = .(countyfp, year_constr)]
 stopifnot(all(cells$homes == cells$parcels))
 cells <- merge(cells, wz[, .(countyfp, wind_zone, statefp)], by = "countyfp", all.x = TRUE)
 fwrite(cells[is.na(wind_zone), .(homes = sum(homes)), by = countyfp], file.path(out_dir, "unmatched_counties.csv"))
@@ -53,6 +49,48 @@ for (id in names(forms)) {
 }
 coefficients <- rbindlist(tabs)
 fwrite(coefficients, file.path(out_dir, "share_coefficients.csv"))
+# Static III-minus-I table: baseline and tract FE on the same surviving inventory.
+tract_cells <- merge(tract_cells, wz[, .(countyfp, wind_zone)], by = "countyfp", all.x = TRUE)
+fwrite(tract_cells[, .(homes = sum(homes), mh_homes = sum(mh_homes)),
+    by = .(wind_zone, year_constr, tract_ok = !is.na(tractfp))], file.path(out_dir, "tract_coverage.csv"))
+x <- tract_cells[!is.na(wind_zone) & !is.na(tractfp)]
+x[, `:=`(share_pp = 100 * mh_homes / homes, post = as.integer(year_constr >= 1994))]
+x[, `:=`(post_z2 = post * (wind_zone == 2), post_z3 = post * (wind_zone == 3))]
+static_input_homes <- sum(x$homes)
+m <- feols(cl_share_static_formula(tract = TRUE), x, weights = ~homes,
+    vcov = ~countyfp, mem.clean = TRUE)
+x <- x[obs(m)]
+static_homes <- sum(x$homes)
+static_counties <- uniqueN(x$countyfp)
+static_models <- list(tract_static = summary(m, lean = TRUE))
+static_models[["baseline_static"]] <- feols(cl_share_static_formula(), x, weights = ~homes,
+    vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
+stopifnot(nobs(static_models$baseline_static) == nobs(static_models$tract_static))
+cl_share_static_table(static_models, out_dir, static_homes, static_counties)
+fwrite(x[, .(homes = sum(homes), mh_homes = sum(mh_homes), counties = uniqueN(countyfp)),
+    by = .(wind_zone, post)], file.path(out_dir, "static_support.csv"))
+# The static table's models use a pp outcome, so cl_coeftable estimates are already pp.
+static_tabs <- rbindlist(lapply(names(static_models), function(id) {
+    z <- cl_coeftable(static_models[[id]], id)
+    z[, c("pct", "pct_low", "pct_high") := NULL]
+    z[, `:=`(pp = estimate, pp_low = ci_low, pp_high = ci_high,
+        homes_input = static_homes, n_tract_vintage_cells = n)]
+    z
+}))
+fwrite(static_tabs, file.path(out_dir, "static_coefficients.csv"))
+models <- c(models, static_models)
+# MH-only quantities by construction vintage, with zero-count county-vintage cells.
+# No site-built denominator, parcel weighting, or sale screen enters this count model.
+quantity <- cl_mh_count_panel(cells)
+quantity_model <- fepois(cl_mh_only_formula(quantity = TRUE), quantity,
+    vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
+quantity_tab <- cl_mh_only_coefficients(quantity_model, "mh_only_quantity_dynamic")
+fwrite(quantity_tab, file.path(out_dir, "mh_only_vintage_coefficients.csv"))
+fwrite(quantity, file.path(out_dir, "mh_counts_by_county_vintage.csv"))
+fwrite(quantity[, .(mh_homes = sum(mh_homes), counties = .N, zero_cells = sum(mh_homes == 0)),
+    by = .(wind_zone, year_constr)], file.path(out_dir, "mh_counts_by_vintage.csv"))
+cl_mh_only_plot(quantity_tab, out_dir, quantity = TRUE)
+models[["mh_only_quantity_dynamic"]] <- quantity_model
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 theme_share <- theme_classic(base_size = 14) + theme(text = element_text(family = "serif"), legend.position = "bottom")
 raw[, zone := factor(wind_zone, levels = 0:3, labels = c("National", "Zone I", "Zone II", "Zone III"))]
@@ -73,9 +111,15 @@ p <- ggplot(plotdata, aes(vintage, pp)) + geom_hline(yintercept = 0, linetype = 
     labs(x = "Original construction year in snapshot", y = "MH share contrast (percentage points)",
         caption = "1993 reference; county-clustered 95% intervals. Parcel-count weights.") + theme_share
 for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0("share_vintage_coefficients.", ext)), p, width = 9, height = 5, dpi = 150)
-files <- c(here("program", "corelogic", "estimate-corelogic-share.R"), here("program", "lib", "corelogic-setup.R"), here("program", "lib", "corelogic-windzone.R"))
+files <- c(here("program", "corelogic", "estimate-corelogic-share.R"), here("program", "lib", "corelogic-setup.R"), here("program", "lib", "corelogic-windzone.R"), here("program", "lib", "corelogic-share.R"), here("program", "lib", "corelogic-mh-only.R"))
 dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "source"))
 write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"), homes = sum(cells$homes),
+    mh_only_homes = sum(quantity$mh_homes), mh_only_county_vintage_cells = nrow(quantity),
+    mh_only_quantity_specification = "County-FE PPML on MH counts with zero county-vintage cells; vintage FE; separate zone x vintage",
+    static_input_homes = static_input_homes, static_homes = static_homes, static_counties = static_counties,
+    static_tract_vintage_cells = nrow(x),
+    static_specification = "Joint II and III versus I; pre/post FE; baseline and additive tract FE; common tract-covered inventory",
+    pb_source_manifest_md5 = unname(tools::md5sum(file.path(Sys.getenv("CORELOGIC_PB_SOURCE"), "_meta.json"))),
     construction_window = c(1989L,1999L), reference_vintage = 1993L, post_from = 1994L,
     outcome = "MH indicator, surviving 2023 dwelling parcels; effects in percentage points",
     weights = "One per parcel, implemented through county-vintage counts", code_reference_md5 = as.list(tools::md5sum(c(files, geo_file))),

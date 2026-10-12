@@ -36,3 +36,25 @@ for (id in c("pooled_static", "pooled_dynamic")) {
     }
 }
 cat("CoreLogic share formulas recover national and zone contrasts in share units.\n")
+
+source("program/lib/corelogic-share.R")
+y <- CJ(county = 1:8, wind_zone = 1:3, tract = 1:3, post = 0:1)
+y[, `:=`(countyfp = sprintf("%02d%03d", wind_zone, county), homes = 1000 + county * 20)]
+y[, tractfp := paste0(countyfp, sprintf("%06d", tract))]
+y[, `:=`(post_z2 = post * (wind_zone == 2), post_z3 = post * (wind_zone == 3))]
+y[, share_pp := 20 + county/10 + wind_zone + 2 * post + tract/2 + 3 * post_z2 - post_z3]
+a <- feols(cl_share_static_formula(), y, weights = ~homes, notes = FALSE)
+b <- feols(cl_share_static_formula(tract = TRUE), y, weights = ~homes, notes = FALSE)
+stopifnot(max(abs(coef(a)[c("post_z2", "post_z3")] - c(3,-1))) < 1e-8,
+    max(abs(coef(b)[c("post_z2", "post_z3")] - c(3,-1))) < 1e-8)
+# The weighted cell model equals an unweighted home-level indicator regression.
+y[, mh_homes := as.integer(round(homes * share_pp / 100))]
+y[, share_pp := 100 * mh_homes / homes]
+homes <- y[, .(mh = c(rep(100, mh_homes), rep(0, homes - mh_homes))),
+    by = .(countyfp, tractfp, post, post_z2, post_z3)]
+m <- feols(cl_share_static_formula(tract = TRUE), y, weights = ~homes, notes = FALSE)
+individual <- feols(mh ~ post_z2 + post_z3 | countyfp + post + tractfp, homes, notes = FALSE)
+stopifnot(max(abs(coef(m) - coef(individual))) < 1e-8)
+cat("Static share tables recover known pp effects and parcel-level weighting.\n")
+
+source("program/tests/check-corelogic-mh-only.R")

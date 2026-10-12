@@ -37,15 +37,14 @@ export CORELOGIC_BUILD="${CORELOGIC_BUILD:-$CL_ROOT/corelogic/continental-v2-202
 export CORELOGIC_REFERENCE="${CORELOGIC_REFERENCE:-$CL_ROOT/public-reference}"
 export CORELOGIC_PB_SOURCE="${CORELOGIC_PB_SOURCE:-/scratch/$USER/research-database/licensed/curated/cl_property_basic/v2026-10-07}"
 CORELOGIC_RESULTS_ROOT="${CORELOGIC_RESULTS_ROOT:-$CL_ROOT/corelogic-results}"
-# Prices and wind zones read the latest completed tract lookup unless told
+# Prices read the latest completed tract lookup unless told
 # otherwise; resolved per script so a fresh lookup from this job is picked up.
 TRACTS_SPEC="${CORELOGIC_TRACTS:-$CORELOGIC_RESULTS_ROOT/tracts/current}"
 
-# Dependency order: the tract lookup feeds prices and wind zones.
+# Dependency order: the tract lookup feeds prices.
 ALL_SCRIPTS=(
     prepare-corelogic-tracts.R
     estimate-corelogic-prices.R
-    estimate-corelogic-windzone.R
     estimate-corelogic-share.R
 )
 
@@ -60,7 +59,6 @@ check_for() {
     case "$1" in
         tracts) echo program/tests/check-corelogic-tracts.R ;;
         prices) echo program/tests/check-corelogic-prices.R ;;
-        windzone) echo program/tests/check-corelogic-ddd.R ;;
         share) echo program/tests/check-corelogic-share.R ;;
     esac
 }
@@ -99,14 +97,14 @@ for script in "${SCRIPTS[@]}"; do
     export CORELOGIC_TRACTS="$(readlink -f "$TRACTS_SPEC" || echo "$TRACTS_SPEC")"
     CORELOGIC_RESULTS="$private_dir" Rscript "program/corelogic/${script}"
 
-    # Point `current` at this run; prices and wind zones read tracts/current.
+    # Point `current` at this run; prices read tracts/current.
     ln -sfn "$SLURM_JOB_ID" "${CORELOGIC_RESULTS_ROOT}/${name}/current"
 
     # Export aggregates only: no parquet, rds, archived source or DuckDB spill.
     rm -rf "$export_dir"
     mkdir -p "$export_dir"
     find "$private_dir" -maxdepth 1 -type f \
-        \( -name '*.csv' -o -name '*.pdf' -o -name '*.png' -o -name '*.json' \) \
+        \( -name '*.csv' -o -name '*.pdf' -o -name '*.png' -o -name '*.json' -o -name '*.tex' \) \
         -exec cp {} "$export_dir/" \;
     printf 'job: %s\ncommit: %s\nprivate_results: %s\n' "$SLURM_JOB_ID" \
         "$(git rev-parse HEAD 2>/dev/null || echo unknown)" "$private_dir" \

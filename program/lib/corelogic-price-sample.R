@@ -1,7 +1,17 @@
 # Shared sale sample; optionally join the verified snapshot tract lookup.
-cl_price_sample <- function(with_tracts = TRUE) {
+cl_price_sample <- function(with_tracts = TRUE, with_sizes = FALSE) {
     sales <- quote_path(file.path(input, "sales", "*.parquet"))
-    tract_select <- tract_join <- ""
+    tract_select <- tract_join <- size_select <- size_join <- ""
+    if (with_sizes) {
+        pb_source <- Sys.getenv("CORELOGIC_PB_SOURCE")
+        if (!nzchar(pb_source) || basename(pb_source) != manifest$pb_version)
+            stop("Set CORELOGIC_PB_SOURCE to the pinned Property Basic version")
+        pb_meta <- fromJSON(file.path(pb_source, "_meta.json"))
+        stopifnot(pb_meta$n_rows == manifest$pb_source_rows)
+        pb <- quote_path(file.path(pb_source, "*.parquet"))
+        size_select <- ", p.land_square_footage AS lot_sqft, p.living_square_feet_all_buildings AS living_sqft"
+        size_join <- sprintf("LEFT JOIN read_parquet(%s) p ON s.clip=p.clip AND s.countyfp=p.countyfp", pb)
+    }
     if (with_tracts) {
         tract_dir <- Sys.getenv("CORELOGIC_TRACTS")
         if (!nzchar(tract_dir)) stop("Set CORELOGIC_TRACTS to the verified private lookup")
@@ -13,10 +23,10 @@ cl_price_sample <- function(with_tracts = TRUE) {
         tract_join <- sprintf("LEFT JOIN read_parquet(%s) t ON s.clip=t.clip AND s.countyfp=t.countyfp", lookup)
     }
     dt <- read_corelogic(sprintf("SELECT s.countyfp, s.clip, s.mh, s.year_constr, s.year_sale,
-        s.sale_price_2000%s FROM read_parquet(%s) s %s
+        s.sale_price_2000%s%s FROM read_parquet(%s) s %s %s
         WHERE s.eligible_sale AND s.countyfp IS NOT NULL AND s.year_sale BETWEEN 2000 AND 2023
         AND s.year_constr BETWEEN 1989 AND 1999 AND s.date_sale >= MAKE_DATE(s.year_constr,1,1)",
-        tract_select, sales, tract_join))
+        tract_select, size_select, sales, tract_join, size_join))
     stopifnot(!anyNA(dt$mh), !anyNA(dt$sale_price_2000), all(dt$sale_price_2000 > 0))
     dt[, `:=`(log_price = log(sale_price_2000), post_mh = mh * as.integer(year_constr >= 1994),
         statefp = substr(countyfp, 1, 2))]

@@ -40,3 +40,25 @@ m <- feols(cl_ddd_formula(dynamic = TRUE, controls = "+ area"), x, notes = FALSE
 stopifnot(abs(coef(m)[["year_constr::1994:mh_tr"]] - .055) < 1e-8,
     abs(coef(m)[["year_constr::1995:mh_tr"]] - .11) < 1e-8)
 cat("Price DDD profiles recover pooled annual effects and partial 1994 treatment.\n")
+
+# Fully collapsed pre/post table recovers DDD under tract and size confounding.
+q <- CJ(wind_zone = 1:3, county = 1:4, mh = 0:1, post = 0:1,
+    year_sale = 2000:2003, tract = 1:3)
+q[, countyfp := sprintf("%02d%03d", wind_zone, county)]
+q[, tractfp := paste0(countyfp, sprintf("%06d", tract))]
+q[, `:=`(post_mh = post * mh, post_mh_z2 = post * mh * (wind_zone == 2),
+    post_mh_z3 = post * mh * (wind_zone == 3))]
+q[, `:=`(log_lot = rnorm(.N) + .4 * post_mh_z3,
+    log_living = rnorm(.N) - .2 * post_mh_z2)]
+q[, log_price := 10 + county / 20 + .03 * (year_sale - 2000) - .8 * mh +
+    .2 * wind_zone * post + .07 * post_mh + .11 * post_mh_z2 - .04 * post_mh_z3 +
+    .12 * tract + .15 * log_lot + .3 * log_living]
+f <- cl_ddd_formula(by_zone = TRUE, controls = "+ log_lot + log_living",
+    tract = TRUE, annual_vintage = FALSE)
+stopifnot(!grepl("year_constr", deparse(f), fixed = TRUE))
+m <- feols(f, q, vcov = ~countyfp, notes = FALSE)
+stopifnot(max(abs(coef(m)[c("post_mh", "post_mh_z2", "post_mh_z3", "log_lot", "log_living")] -
+    c(.07, .11, -.04, .15, .3))) < 1e-8, identical(obs(m), seq_len(nrow(q))))
+cat("Static pre/post DDD recovers tract- and size-adjusted known effects.\n")
+
+source("program/tests/check-corelogic-mh-only.R")
