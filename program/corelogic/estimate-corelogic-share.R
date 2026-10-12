@@ -99,6 +99,16 @@ quantity_state_tab <- cl_mh_only_coefficients(quantity_state_model, "mh_only_qua
 fwrite(quantity_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_mh_only_plot(quantity_state_tab, out_dir, quantity = TRUE, state = TRUE)
 models[["mh_only_quantity_dynamic_state_vintage_fe"]] <- quantity_state_model
+cl_mh_only_compare_plot(quantity_tab, quantity_state_tab, out_dir, quantity = TRUE)
+# Static ladder: (1)-(2) MH counts, (3)-(4) MH and site-built counts over the same counties.
+type_counts <- cl_type_count_panel(cells)
+ladder <- cl_mh_static_fits(type_counts, quantity = TRUE)
+cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"), quantity = TRUE)
+fwrite(rbindlist(lapply(1:4, function(k) cl_coeftable(ladder$fits[[k]], paste0("ladder_", k))[,
+    counties := ladder$counties[k]])), file.path(out_dir, "mh_static_ladder.csv"))
+fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)), by = .(wind_zone, mh, post)],
+    file.path(out_dir, "mh_static_ladder_support.csv"))
+models[paste0("mh_static_ladder_", 1:4)] <- ladder$fits
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 theme_share <- theme_classic(base_size = 14) + theme(text = element_text(family = "serif"), legend.position = "bottom")
 raw[, zone := factor(wind_zone, levels = 0:3, labels = c("National", "Zone I", "Zone II", "Zone III"))]
@@ -125,6 +135,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_only_homes = sum(quantity$mh_homes), mh_only_county_vintage_cells = nrow(quantity),
     mh_only_quantity_specification = "County-FE PPML on MH counts with zero county-vintage cells; vintage FE; separate zone x vintage",
     mh_only_quantity_robustness = "Same PPML with state x vintage FE in place of vintage FE",
+    mh_static_ladder = "Static PPML post x zone II/III: (1) MH counts, county + vintage FE; (2) state x vintage FE; (3) MH and site-built counts, county x type + county x vintage + type x vintage FE; (4) state x vintage x type FE in place of type x vintage",
     static_input_homes = static_input_homes, static_homes = static_homes, static_counties = static_counties,
     static_tract_vintage_cells = nrow(x),
     static_specification = "Joint II and III versus I; pre/post FE; baseline and additive tract FE; common tract-covered inventory",
