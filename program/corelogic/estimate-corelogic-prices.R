@@ -86,6 +86,13 @@ fwrite(mh_sales[, .(sales = .N, counties = uniqueN(countyfp)), by = .(wind_zone,
     file.path(out_dir, "mh_only_support.csv"))
 cl_mh_only_plot(mh_tab, out_dir)
 models[["mh_only_dynamic"]] <- mh_model
+# Robustness: state x vintage FE, so zone contrasts use only within-state variation.
+# Florida has no Zone I county, so it informs III minus II but not either contrast with Zone I.
+mh_state_model <- feols(cl_mh_only_formula(state = TRUE), mh_sales, vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
+mh_state_tab <- cl_mh_only_coefficients(mh_state_model, "mh_only_dynamic_state_vintage_fe")
+fwrite(mh_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
+cl_mh_only_plot(mh_state_tab, out_dir, state = TRUE)
+models[["mh_only_dynamic_state_vintage_fe"]] <- mh_state_model
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
 # Two panels from the joint zone-specific model; zone II is retained, not pooled with I.
@@ -116,6 +123,7 @@ dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "s
 write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"),
     sale_rows = nrow(dt), specification_ids = names(models),
     mh_only_sales = nrow(mh_sales), mh_only_specification = "MH sales only; county x sale year and vintage FE; separate zone x vintage DiDs",
+    mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     static_complete_sales = static_input, static_retained_sales = static_n,
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
     sale_window = c(2000L, 2023L), construction_window = c(1989L, 1999L), reference_vintage = 1993L,

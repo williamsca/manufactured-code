@@ -91,6 +91,14 @@ fwrite(quantity[, .(mh_homes = sum(mh_homes), counties = .N, zero_cells = sum(mh
     by = .(wind_zone, year_constr)], file.path(out_dir, "mh_counts_by_vintage.csv"))
 cl_mh_only_plot(quantity_tab, out_dir, quantity = TRUE)
 models[["mh_only_quantity_dynamic"]] <- quantity_model
+# Robustness: state x vintage FE, so zone contrasts use only within-state variation.
+# Florida has no Zone I county, so it informs III minus II but not either contrast with Zone I.
+quantity_state_model <- fepois(cl_mh_only_formula(quantity = TRUE, state = TRUE), quantity,
+    vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
+quantity_state_tab <- cl_mh_only_coefficients(quantity_state_model, "mh_only_quantity_dynamic_state_vintage_fe")
+fwrite(quantity_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
+cl_mh_only_plot(quantity_state_tab, out_dir, quantity = TRUE, state = TRUE)
+models[["mh_only_quantity_dynamic_state_vintage_fe"]] <- quantity_state_model
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 theme_share <- theme_classic(base_size = 14) + theme(text = element_text(family = "serif"), legend.position = "bottom")
 raw[, zone := factor(wind_zone, levels = 0:3, labels = c("National", "Zone I", "Zone II", "Zone III"))]
@@ -116,6 +124,7 @@ dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "s
 write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"), homes = sum(cells$homes),
     mh_only_homes = sum(quantity$mh_homes), mh_only_county_vintage_cells = nrow(quantity),
     mh_only_quantity_specification = "County-FE PPML on MH counts with zero county-vintage cells; vintage FE; separate zone x vintage",
+    mh_only_quantity_robustness = "Same PPML with state x vintage FE in place of vintage FE",
     static_input_homes = static_input_homes, static_homes = static_homes, static_counties = static_counties,
     static_tract_vintage_cells = nrow(x),
     static_specification = "Joint II and III versus I; pre/post FE; baseline and additive tract FE; common tract-covered inventory",
