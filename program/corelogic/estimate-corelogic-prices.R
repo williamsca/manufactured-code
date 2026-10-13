@@ -94,7 +94,7 @@ mh_state_tab <- cl_mh_only_coefficients(mh_state_model, "mh_only_dynamic_state_v
 fwrite(mh_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_mh_only_plot(mh_state_tab, out_dir, state = TRUE)
 models[["mh_only_dynamic_state_vintage_fe"]] <- mh_state_model
-cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
+cl_mh_only_paper_plot(mh_tab, out_dir)
 # Static ladder on the full matched sale sample: (1)-(2) MH only, (3)-(4) MH vs site-built.
 ladder <- cl_mh_static_fits(dt)
 cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"))

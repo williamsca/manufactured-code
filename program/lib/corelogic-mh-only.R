@@ -61,29 +61,25 @@ cl_mh_only_plot <- function(tab, out_dir, quantity = FALSE, state = FALSE) {
         p, width = 9, height = 5, dpi = 150)
 }
 
-# Paper figure: vintage-FE and state x vintage-FE event studies overlaid, in log points, no caption.
-cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
-    specs <- c("Vintage FE", "State \u00d7 vintage FE")
-    x <- rbind(copy(tab)[, spec := specs[1]], copy(tab_state)[, spec := specs[2]], fill = TRUE)
+# Paper figure: baseline vintage-FE event study, in log points, no caption.
+cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE) {
+    x <- copy(tab)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
-    stopifnot(nrow(x) == 40L, !anyDuplicated(x, by = c("spec", "comparison", "vintage")))
+    stopifnot(nrow(x) == 20L, !anyDuplicated(x, by = c("comparison", "vintage")))
     labels <- c("Zone II minus Zone I", "Zone III minus Zone I")
-    x <- rbind(x, CJ(comparison = labels, spec = specs)[, `:=`(vintage = 1993L,
-        estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
-    x[, `:=`(comparison = factor(comparison, levels = labels), spec = factor(spec, levels = specs))]
-    dodge <- position_dodge(width = .45)
-    p <- ggplot(x, aes(vintage, estimate, shape = spec, color = spec)) +
+    x <- rbind(x, data.table(comparison = labels, vintage = 1993L,
+        estimate = 0, ci_low = 0, ci_high = 0), fill = TRUE)
+    x[, comparison := factor(comparison, levels = labels)]
+    p <- ggplot(x, aes(vintage, estimate)) +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
         geom_vline(xintercept = 1993.5, linetype = "dotted", color = "black") +
-        geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = .2, position = dodge) +
-        geom_point(size = 2, position = dodge) + facet_wrap(~comparison, ncol = 2) +
-        scale_color_manual(values = c("#0072B2", "#D55E00")) + scale_shape_manual(values = c(16, 17)) +
+        geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = .2) +
+        geom_point(color = "#0072B2", size = 2) + facet_wrap(~comparison, ncol = 2) +
         scale_x_continuous(breaks = seq(1989, 1999, 2)) +
-        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1993" else "Log MH sale price, relative to 1993",
-            color = NULL, shape = NULL) +
-        theme_classic(base_size = 14) + theme(text = element_text(family = "serif"), legend.position = "bottom")
-    filename <- if (quantity) "mh_only_vintage_quantities_compare" else "mh_only_vintage_prices_compare"
+        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1993" else "Log MH sale price, relative to 1993") +
+        theme_classic(base_size = 14) + theme(text = element_text(family = "serif"))
+    filename <- if (quantity) "mh_only_vintage_quantities_paper" else "mh_only_vintage_prices_paper"
     for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0(filename, ".", ext)),
         p, width = 9, height = 5, dpi = 150)
 }

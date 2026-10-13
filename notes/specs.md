@@ -1533,7 +1533,7 @@ figure (`price_eff`, abstract/intro/discussion/conclusion, HUD table, BCR) is
 - **Robustness:** both with `statefp^year_constr` in place of `year_constr`
   (`cl_mh_only_formula(state = TRUE)`).
 - **Clustering:** county. **Reference:** 1993.
-- **Paper figures:** `output/corelogic/{prices,share}/mh_only_vintage_{prices,quantities}_compare.pdf`
+- **Paper figures:** `output/corelogic/{prices,share}/mh_only_vintage_{prices,quantities}_paper.pdf`
   overlay both versions in log points (`cl_mh_only_compare_plot`).
 
 ### 20.2 Static ladder (paper Table `tab:cost-static`)

@@ -285,10 +285,10 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Manufactured Home Prices by Construction Year and Wind Zone}\label{fig:es-cost-price}
-  \includegraphics{output/corelogic/prices/mh_only_vintage_prices_compare.pdf}
+  \includegraphics{output/corelogic/prices/mh_only_vintage_prices_paper.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-price}, in log points relative to construction year 1993. Circles use construction-year fixed effects; triangles replace them with state $\times$ construction-year fixed effects. The sample is sales of manufactured homes from 2000 through 2023 with construction years 1989--1999. Bars are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property and deed records.
+  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-price}, in log points relative to construction year 1993. The specification includes construction-year fixed effects. The sample is sales of manufactured homes from 2000 through 2023 with construction years 1989--1999. Bars are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property and deed records.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -296,10 +296,10 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Surviving Manufactured Homes by Construction Year and Wind Zone}\label{fig:es-cost-quantity}
-  \includegraphics{output/corelogic/share/mh_only_vintage_quantities_compare.pdf}
+  \includegraphics{output/corelogic/share/mh_only_vintage_quantities_paper.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-quantity}, in log points relative to construction year 1993, estimated by Poisson pseudo-maximum likelihood. The outcome is the number of manufactured-home parcels in the 2023 snapshot by county and construction year. Circles use construction-year fixed effects; triangles replace them with state $\times$ construction-year fixed effects. Bars are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property records.
+  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-quantity}, in log points relative to construction year 1993, estimated by Poisson pseudo-maximum likelihood. The outcome is the number of manufactured-home parcels in the 2023 snapshot by county and construction year. The specification includes construction-year fixed effects. Bars are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property records.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}

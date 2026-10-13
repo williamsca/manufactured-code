@@ -99,7 +99,7 @@ quantity_state_tab <- cl_mh_only_coefficients(quantity_state_model, "mh_only_qua
 fwrite(quantity_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_mh_only_plot(quantity_state_tab, out_dir, quantity = TRUE, state = TRUE)
 models[["mh_only_quantity_dynamic_state_vintage_fe"]] <- quantity_state_model
-cl_mh_only_compare_plot(quantity_tab, quantity_state_tab, out_dir, quantity = TRUE)
+cl_mh_only_paper_plot(quantity_tab, out_dir, quantity = TRUE)
 # Static ladder: (1)-(2) MH counts, (3)-(4) MH and site-built counts over the same counties.
 type_counts <- cl_type_count_panel(cells)
 ladder <- cl_mh_static_fits(type_counts, quantity = TRUE)
