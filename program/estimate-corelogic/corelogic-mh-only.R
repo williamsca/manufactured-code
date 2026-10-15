@@ -33,7 +33,10 @@ cl_mh_only_coefficients <- function(model, id) {
 }
 
 # Paper figure: baseline vintage-FE event study, in log points, no caption.
-cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE) {
+# `forecast` (optional): one row per comparison with HUD's forecast log cost
+# change, drawn as a dashed path rising from 0 at 1993.5 to the forecast in
+# 1994, with a common legend below the panels.
+cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NULL) {
     x <- copy(tab)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
@@ -42,15 +45,31 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE) {
     x <- rbind(x, data.table(comparison = labels, vintage = 1993L,
         estimate = 0, ci_low = 0, ci_high = 0), fill = TRUE)
     x[, comparison := factor(comparison, levels = labels)]
-    p <- ggplot(x, aes(vintage, estimate)) +
+    series <- c("Regression estimates", "HUD production cost forecast")
+    x[, series := factor(series[1], levels = series)]
+    p <- ggplot(x, aes(vintage, estimate, color = series, linetype = series)) +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
         geom_vline(xintercept = 1993.5, linetype = "dotted", color = "black") +
-        geom_ribbon(aes(ymin = ci_low, ymax = ci_high), fill = "#0072B2", alpha = .2) +
-        geom_line(color = "#0072B2") +
-        geom_point(color = "#0072B2", size = 2) + facet_wrap(~comparison, ncol = 2) +
+        geom_ribbon(aes(ymin = ci_low, ymax = ci_high), fill = "#0072B2", alpha = .2,
+            color = NA, show.legend = FALSE) +
+        geom_line() +
+        geom_point(size = 2) + facet_wrap(~comparison, ncol = 2) +
+        scale_color_manual(values = setNames(c("#0072B2", "#D55E00"), series), name = NULL) +
+        scale_linetype_manual(values = setNames(c("solid", "dashed"), series), name = NULL) +
+        (if (!is.null(forecast)) {
+            f <- forecast[, .(vintage = c(1993.5, 1994, 1999), estimate = c(0, forecast, forecast)),
+                by = comparison][, comparison := factor(comparison, levels = labels)]
+            stopifnot(setequal(f$comparison, labels))
+            f[, series := factor(series[2], levels = series)]
+            # Legend keys: dot and line for estimates, dashed line alone for the forecast.
+            list(geom_line(data = f, linewidth = .6),
+                 guides(color = guide_legend(override.aes = list(shape = c(16, NA)))))
+        }) +
         scale_x_continuous(breaks = seq(1989, 1999, 2)) +
         labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1993" else "Log MH sale price, relative to 1993") +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
+            legend.position = if (is.null(forecast)) "none" else "bottom",
+            legend.key.width = unit(2, "lines"),
             panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
     filename <- if (quantity) "mh_only_vintage_quantities_paper" else "mh_only_vintage_prices_paper"
     for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0(filename, ".", ext)),

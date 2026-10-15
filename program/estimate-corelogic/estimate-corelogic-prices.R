@@ -40,7 +40,10 @@ mh_state_model <- feols(cl_mh_only_formula(state = TRUE), mh_sales, vcov = ~coun
 mh_state_tab <- cl_mh_only_coefficients(mh_state_model, "mh_only_dynamic_state_vintage_fe")
 fwrite(mh_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 models[["mh_only_dynamic_state_vintage_fe"]] <- mh_state_model
-cl_mh_only_paper_plot(mh_tab, out_dir)
+# HUD forecast overlay (program/cost-benefit/hud-cost-forecast.R), if synced.
+forecast_file <- here("output", "cost-benefit", "hud-cost-forecast.csv")
+cl_mh_only_paper_plot(mh_tab, out_dir,
+    forecast = if (file.exists(forecast_file)) fread(forecast_file) else NULL)
 cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
 # Static ladder on the full matched sale sample: (1)-(2) MH only, (3)-(4) MH vs site-built.
 ladder <- cl_mh_static_fits(dt)

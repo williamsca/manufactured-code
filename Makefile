@@ -91,6 +91,8 @@ estimates:
 	Rscript program/estimate-nfip/estimate-nfip-windzone.R
 	Rscript program/cost-benefit/estimate-welfare.R
 	Rscript program/cost-benefit/estimate-hud-comparison.R
+	Rscript program/cost-benefit/hud-cost-forecast.R
+	Rscript program/estimate-corelogic/replot-corelogic.R
 
 # Work in progress, not in the paper.
 .PHONY: nfip-mh-only

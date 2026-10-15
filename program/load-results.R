@@ -306,3 +306,18 @@ stopifnot(nrow(cl_es_q) == 40L)
 cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
 cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
 cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)
+
+# HUD's production cost forecast in log points by wind zone
+# (program/cost-benefit/hud-cost-forecast.R), drawn on the price event study.
+hud_fc <- fread(here("output", "cost-benefit", "hud-cost-forecast.csv"))
+stopifnot(setequal(hud_fc$wind_zone, 2:3))
+hud_fc_z2 <- formatC(hud_fc[wind_zone == 2, forecast], format = "f", digits = 3)
+hud_fc_z3 <- formatC(hud_fc[wind_zone == 3, forecast], format = "f", digits = 3)
+cl_es_p <- fread(file.path(cl_dir, "prices", "mh_only_vintage_coefficients.csv"))
+cl_es_p[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
+stopifnot(nrow(cl_es_p) == 20L)
+# The cost-results text states that every post-1994 Zone II point estimate
+# lies below the Zone II forecast.
+stopifnot(cl_es_p[grepl(":z2$", term) & vintage >= 1994,
+                  all(estimate < hud_fc[wind_zone == 2, forecast])])
+cl_p_z3_1999 <- formatC(cl_es_p[term == "year_constr::1999:z3", estimate], format = "f", digits = 3)
