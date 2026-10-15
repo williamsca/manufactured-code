@@ -37,7 +37,7 @@ suppress <- function(x, n_col = "sales", cols) {
     x
 }
 price_stats <- function(d) d[, .(sales = .N, parcels = uniqueN(clip), counties = uniqueN(countyfp),
-    states = uniqueN(statefp),
+    states = uniqueN(substr(countyfp, 1, 2)),
     median_nominal = as.numeric(median(sale_amount)), mean_nominal = mean(sale_amount),
     mean_log_nominal = mean(log(sale_amount)),
     median_2000 = as.numeric(median(sale_price_2000)), mean_log_2000 = mean(log(sale_price_2000)),
