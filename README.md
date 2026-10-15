@@ -1,51 +1,62 @@
 # manufactured-code
 
-CoreLogic licensed records are built and estimated on Rivanna. See
-[build documentation](notes/corelogic-databuild.md) and the
-[research plan](PLAN_CORELOGIC.md). `make test-corelogic` runs synthetic sample,
-price, wind-zone, share, and tract-sorting checks.
+Effects of the 1994 HUD wind standard for manufactured homes on prices,
+quantities, and flood damage. The paper is `paper.Rmd`; every exhibit and
+quoted number it uses comes from `output/`, and every scalar is loaded through
+`program/load-results.R`.
 
-The current price analysis uses sales in 2000–2023 and construction vintages
-1989–1999. Annual II-minus-I and III-minus-I price triple differences use 1993
-as the reference. A static III-minus-I LaTeX table compares baseline, tract
-fixed effects, and tract effects plus log lot/living area on a common sample.
-Static treatment starts in 1994. Inference clusters by county.
+## Layout
 
-The estimation scripts are in `program/corelogic/` and run on Rivanna through
-one launcher, `program/corelogic/corelogic.slurm`. From the repo root, after
+| Code | Output | What |
+|---|---|---|
+| `program/import/` | `derived/` | Data builds (CPI, Census, MHS, stock imputation, NFIP, CoreLogic build) |
+| `program/descriptives/` | `output/descriptives/` | Wind-zone map, NFIP summary statistics, state wind-zone intensity |
+| `program/estimate-mhs/` | `output/mhs/` | State TWFE on the Manufactured Housing Survey: price-index and placement event studies, static table of the other price/quantity outcomes, section-type table |
+| `program/estimate-nfip/` | `output/nfip/` | Claim-level damage (event study + static), policy composition, take-up, wind-zone triple difference |
+| `program/estimate-corelogic/` | `output/corelogic/{prices,quantities}/` | MH-only price and surviving-quantity event studies and static ladders (Rivanna only) |
+| `program/cost-benefit/` | `output/cost-benefit/` | Benefit-cost ratio and the HUD forecast comparison; combine the MHS price effect with the NFIP damage effects |
+| `program/tests/` | | Fake-data checks (`make test`, `make test-corelogic`) |
+
+Each folder holds its entry scripts (`estimate-*.R`) next to the helper files
+they source. `program/lib/` holds only `corelogic-sample.R`, which the CoreLogic
+import uses.
+
+`program/estimate-nfip/estimate-nfip-mh-only.R` is work in progress and not in
+the paper (`make nfip-mh-only`, writes `output/nfip/mh-only/`; see
+`notes/nfip-mh-only.md`).
+
+## Running
+
+```bash
+make estimates   # descriptives, MHS, NFIP, cost-benefit (local)
+make test
+make paper.pdf
+make slides.pdf  # regenerates output/slide-numbers.tex first
+```
+
+## CoreLogic (Rivanna)
+
+CoreLogic licensed records are built and estimated on Rivanna. See the
+[build documentation](notes/corelogic-databuild.md). From the repo root, after
 committing and pushing:
 
 ```bash
-./run_remote.sh corelogic                              # tracts, prices, share
-./run_remote.sh corelogic estimate-corelogic-prices.R  # one script
+./run_remote.sh estimate-corelogic                                   # prices, then quantities
+./run_remote.sh estimate-corelogic estimate-corelogic-prices.R       # one script
 ```
 
 `run_remote.sh` resets the Rivanna checkout (`~/manufactured-code`) to
-`origin/main`, submits the job, waits, checks its final state, and downloads
-the exported aggregates into `output/corelogic/<name>/`. It refuses to run if
-local `program/corelogic`, `program/lib`, or `program/tests` differ from
-`origin/main`. The Slurm file pins the verified build, Property Basic source,
-and public reference directory; export `CORELOGIC_BUILD`, `CORELOGIC_PB_SOURCE`,
-`CORELOGIC_REFERENCE`, or `CORELOGIC_TRACTS` locally to override them. Each
-script first runs its synthetic check, then writes all output to a new private
-directory `/scratch/chv7bg/manufactured-code/corelogic-results/<name>/<job id>/`
-and repoints `<name>/current` to it. Prices read `tracts/current` unless `CORELOGIC_TRACTS` is set. Shares assign
-tracts to the full surviving inventory from the pinned Property Basic snapshot.
-Only CSV, PDF, PNG, JSON, and LaTeX files are exported; parquet files, fitted models, and archived source stay on
-Rivanna.
+`origin/main`, submits `program/estimate-corelogic/estimate-corelogic.slurm`,
+waits, checks its final state, and downloads the exported aggregates into
+`output/corelogic/<name>/`. It refuses to run if local
+`program/estimate-corelogic` or `program/tests` differ from `origin/main`. The
+Slurm file pins the verified build, Property Basic source, and public reference
+directory; export `CORELOGIC_BUILD`, `CORELOGIC_PB_SOURCE`, or
+`CORELOGIC_REFERENCE` locally to override them. Each script first runs its
+synthetic check, then writes all output to a new private directory
+`/scratch/chv7bg/manufactured-code/corelogic-results/<name>/<job id>/` and
+repoints `<name>/current` to it. Only CSV, PDF, PNG, JSON, and LaTeX files are
+exported; parquet files and fitted models stay on Rivanna.
 
-Only current aggregate tables and figures are kept locally under
-`output/corelogic/prices/` and `output/corelogic/share/`. Licensed lookup files and fitted models stay private.
-The price figure shows the two separate-zone triple differences in PDF and PNG.
-The redundant standalone windzone estimator has been removed.
-
-The parallel MH-share analysis uses surviving 2023 dwelling parcels with one
-observation per home, not the sale sample. Its effects are percentage points.
-Its static III-minus-I LaTeX table compares baseline and tract effects on a
-common tract-covered inventory sample, without size controls. Both regression
-tables are generated with `fixest::etable()`, with default stars and standard
-errors and no table notes. Additional MH-only event studies compare prices and
-surviving-home counts across zones, without a site-built comparison.
-
-Current specifications and results: [prices](notes/corelogic-prices.md) and
-[MH shares](notes/corelogic-share.md).
+`Rscript program/estimate-corelogic/replot-corelogic.R` redraws the CoreLogic
+figures locally from the exported coefficient files.

@@ -1,9 +1,9 @@
 # write-slide-macros.R: generate LaTeX macros for slides.tex
 #
-# Reads the same results layer that paper.Rmd reads (output/results/*.csv,
+# Reads the same results layer that paper.Rmd reads (output/*/*-scalars.csv,
 # written by estimate-mhs.R, estimate-nfip-*.R, estimate-welfare.R, and
 # estimate-sumstats-nfip.R) and emits one \newcommand per quoted number to
-# output/results/slide-numbers.tex.
+# output/slide-numbers.tex.
 #
 # The point is that no estimate is ever typed into slides.tex by hand: if a
 # number belongs on a slide, it gets a macro here.  Derived quantities
@@ -18,11 +18,11 @@
 library(data.table)
 library(here)
 
-mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
-source(here("program", "lib", "nfip-scalars.R"))
+mhs_sc  <- fread(here("output", "mhs", "mhs-scalars.csv"))
+source(here("program", "estimate-nfip", "nfip-scalars.R"))
 nfip_sc <- read_nfip_scalars()
-welf_sc <- fread(here("output", "results", "welfare-scalars.csv"))
-ss_sc   <- fread(here("output", "results", "sumstats-nfip-scalars.csv"))
+welf_sc <- fread(here("output", "cost-benefit", "welfare-scalars.csv"))
+ss_sc   <- fread(here("output", "descriptives", "sumstats-nfip-scalars.csv"))
 
 get_one <- function(dt, nm) {
     v <- dt[statistic == nm, value]
@@ -225,47 +225,14 @@ mac("vClaimRateCIHiPct", fmt_f((exp(clmrate$hi) - 1) * 100, 1))
 # Baseline rates the coefficients move, in readable units.
 mac("vClaimRateBase", fmt_f(get_nfip("claim_rate_base_mh") * 1000, 1))
 mac("vPolMhPre",  fmt_f(get_nfip("policies_per_1k_homes_yr_mh_pre"), 1))
-mac("vPolMhPost", fmt_f(get_nfip("policies_per_1k_homes_yr_mh_post"), 1))
 mac("vPolSbPre",  fmt_f(get_nfip("policies_per_1k_homes_yr_sb_pre"), 1))
-mac("vPolSbPost", fmt_f(get_nfip("policies_per_1k_homes_yr_sb_post"), 1))
 
-# Take-up robustness: without geographic FE, split by mandatory purchase, and
-# the levels analogue that the PPML specification replaced.
-mac("vTakeupNoGeo",      fmt_s(get_nfip("takeup_ppml_static_nogeo"), 3))
-mac("vTakeupNoGeoSE",    fmt_f(get_nfip("takeup_ppml_static_nogeo_se"), 3))
+# Take-up split by mandatory purchase.
 mac("vTakeupMand",       fmt_s(get_nfip("takeup_ppml_mand_static"), 3))
 mac("vTakeupMandSE",     fmt_f(get_nfip("takeup_ppml_mand_static_se"), 3))
 mac("vTakeupNonmand",    fmt_s(get_nfip("takeup_ppml_nonmand_static"), 3))
 mac("vTakeupNonmandSE",  fmt_f(get_nfip("takeup_ppml_nonmand_static_se"), 3))
 mac("vTakeupMandSharePct", fmt_f(get_nfip("takeup_mand_share_pre_mh") * 100, 1))
-
-# The pre-1994 profile, for the slide that reads take-up as descriptive: the
-# largest coefficient sits four years *before* the reform, which is why a
-# level-break design does not fit this outcome.
-mac("vTakeupPreMax",     fmt_s(get_nfip("takeup_ppml_pre_max"), 3))
-mac("vTakeupPreMaxSE",   fmt_f(get_nfip("takeup_ppml_pre_max_se"), 3))
-mac("vTakeupPreMaxBin",  fmt_n(get_nfip("takeup_ppml_pre_max_bin")))
-mac("vTakeupPreFirst",   fmt_s(get_nfip("takeup_ppml_pre_first"), 3))
-mac("vTakeupPreFirstSE", fmt_f(get_nfip("takeup_ppml_pre_first_se"), 3))
-mac("vTakeupLvlStc",     fmt_s(get_nfip("takeup_lvl_static"), 2))
-mac("vTakeupLvlStcSE",   fmt_f(get_nfip("takeup_lvl_static_se"), 2))
-
-sec("Benefit side: water depth")
-
-# These are PPML coefficients as of Chunk O, so they are log points -- NOT
-# dollars. Reported both as the raw coefficient (to read against the table) and
-# as a percentage (to read aloud).
-mac("vWdDepthLP",    fmt_f(get_nfip("building_damage_static_rob_depth"), 3))
-mac("vWdDepthSELP",  fmt_f(get_nfip("building_damage_static_rob_depth_se"), 3))
-mac("vWdDepthPct",   pct_of(get_nfip("building_damage_static_rob_depth")))
-mac("vWdDepthXLP",   fmt_f(get_nfip("building_damage_static_rob_depthx"), 3))
-mac("vWdDepthXSELP", fmt_f(get_nfip("building_damage_static_rob_depthx_se"), 3))
-mac("vWdDepthXPct",  pct_of(get_nfip("building_damage_static_rob_depthx")))
-mac("vWdNBins",     fmt_n(get_nfip("water_depth_n_bins")))
-mac("vWdBinsCell",  fmt_f(get_nfip("water_depth_bins_per_cell"), 1))
-mac("vWdOneBinPct", fmt_f(get_nfip("water_depth_single_bin_share") * 100, 1))
-mac("vWdMissMhPost", fmt_f(get_nfip("water_depth_missing_mh_post") * 100, 1))
-mac("vWdMissSbPost", fmt_f(get_nfip("water_depth_missing_sb_post") * 100, 1))
 
 # ---------------------------------------------------------------------------
 # Cost-benefit
@@ -318,11 +285,11 @@ mac("vClaimRateSbPct", fmt_f(get_ss("claim_rate_sb") * 100, 1))
 # Write
 # ---------------------------------------------------------------------------
 
-out_path <- here("output", "results", "slide-numbers.tex")
+out_path <- here("output", "slide-numbers.tex")
 
 header <- c(
     "% slide-numbers.tex -- GENERATED FILE, DO NOT EDIT.",
-    "% Written by program/write-slide-macros.R off output/results/*-scalars.csv.",
+    "% Written by program/write-slide-macros.R off output/*/*-scalars.csv.",
     "% To change a number on a slide, change the estimator, then rerun the generator.",
     ""
 )

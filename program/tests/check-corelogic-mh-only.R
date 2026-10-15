@@ -1,7 +1,7 @@
 # Known-truth checks for MH-only price DiD and count PPML, without housing-type fields.
 library(data.table)
 library(fixest)
-source("program/lib/corelogic-mh-only.R")
+source("program/estimate-corelogic/corelogic-mh-only.R")
 mh_fixture <- CJ(wind_zone = 1:3, county = 1:6, year_constr = 1989:1999)
 mh_fixture[, countyfp := sprintf("%02d%03d", wind_zone, county)]
 mh_fixture[, `:=`(z2 = as.integer(wind_zone == 2), z3 = as.integer(wind_zone == 3),

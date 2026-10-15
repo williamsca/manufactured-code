@@ -4,21 +4,20 @@
 paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib
 	Rscript -e "rmarkdown::render('$<')"
 
-two-pager.pdf: two-pager.Rmd program/load-results.R program/lib/nfip-scalars.R manufactured-code.bib \
-	$(wildcard output/results/*.csv output/results/*.tex output/event-study/*.pdf \
-	output/event-study/countyfp/*.pdf output/event-study/countyfp/*.tex output/descriptives/*.pdf)
+two-pager.pdf: two-pager.Rmd program/load-results.R program/estimate-nfip/nfip-scalars.R manufactured-code.bib \
+	$(wildcard output/*/*.csv output/*/*.tex output/*/*.pdf)
 	Rscript -e "rmarkdown::render('$<')"
 
 # slides.pdf refreshes the quoted numbers first: every estimate on a slide is a
-# macro from output/results/slide-numbers.tex, never typed in by hand.
-slides.pdf: slides.tex manufactured-code.bib output/results/slide-numbers.tex
+# macro from output/slide-numbers.tex, never typed in by hand.
+slides.pdf: slides.tex manufactured-code.bib output/slide-numbers.tex
 	pdflatex slides
 	bibtex slides
 	pdflatex slides
 	pdflatex slides
 
-.PHONY: output/results/slide-numbers.tex
-output/results/slide-numbers.tex:
+.PHONY: output/slide-numbers.tex
+output/slide-numbers.tex:
 	Rscript program/write-slide-macros.R
 
 %.pdf: %.tex manufactured-code.bib
@@ -64,14 +63,12 @@ data-corelogic:
 .PHONY: test-corelogic
 test-corelogic:
 	Rscript program/tests/check-corelogic-databuild.R
-	Rscript program/tests/check-corelogic-prices.R
-	Rscript program/tests/check-corelogic-ddd.R
-	Rscript program/tests/check-corelogic-share.R
-	Rscript program/tests/check-corelogic-tracts.R
+	Rscript program/tests/check-corelogic-mh-only.R
 
 # CoreLogic estimates run on Rivanna via Slurm, not locally:
-#   ./run_remote.sh corelogic [SCRIPT]
-# See program/corelogic/corelogic.slurm.
+#   ./run_remote.sh estimate-corelogic [SCRIPT]
+# writes output/corelogic/{prices,quantities}/.
+# See program/estimate-corelogic/estimate-corelogic.slurm.
 
 data:
 	Rscript program/import/import-cpi.R
@@ -84,19 +81,21 @@ data:
 	Rscript program/import/databuild-welfare.R
 
 estimates:
-	Rscript program/estimate/estimate-mhs.R
-	Rscript program/estimate/estimate-nfip-claims.R
-	Rscript program/estimate/estimate-nfip-composition.R
-	Rscript program/estimate/estimate-nfip-takeup.R
-	Rscript program/estimate/estimate-nfip-windzone.R
-	Rscript program/estimate/estimate-nfip-mh-only.R
-	Rscript program/estimate/estimate-welfare.R
-	Rscript program/estimate/estimate-hud-comparison.R
-	Rscript program/descriptives/estimate-sumstats-mhs.R
-	Rscript program/descriptives/estimate-sumstats-nfip.R
-	Rscript program/descriptives/plot-mhs.R
-	Rscript program/descriptives/plot-nfip.R
 	Rscript program/descriptives/map.R
+	Rscript program/descriptives/sumstats-nfip.R
+	Rscript program/descriptives/windzone-intensity.R
+	Rscript program/estimate-mhs/estimate-mhs.R
+	Rscript program/estimate-nfip/estimate-nfip-claims.R
+	Rscript program/estimate-nfip/estimate-nfip-composition.R
+	Rscript program/estimate-nfip/estimate-nfip-takeup.R
+	Rscript program/estimate-nfip/estimate-nfip-windzone.R
+	Rscript program/cost-benefit/estimate-welfare.R
+	Rscript program/cost-benefit/estimate-hud-comparison.R
+
+# Work in progress, not in the paper.
+.PHONY: nfip-mh-only
+nfip-mh-only:
+	Rscript program/estimate-nfip/estimate-nfip-mh-only.R
 
 # Fake-data verification harness (program/tests/): each estimator is applied
 # to simulated data with known parameters and must recover the truth.

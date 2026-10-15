@@ -169,13 +169,13 @@ The cell-level specifications replace the county $\times$ loss-year fixed effect
 
 ## Cost Side: Manufactured Home Prices and Quantities {#cost-results}
 
-Figure \ref{fig:es-cost-price} plots the coefficients $\beta^{II}_k$ and $\beta^{III}_k$ of Equation \eqref{eq:es-cost-price}, together with the version that replaces construction-year fixed effects with state $\times$ construction-year fixed effects. Before 1994, the 95\% interval of every coefficient in both versions contains zero. From 1994 onward, every Zone III coefficient is positive in both versions. The Zone II coefficients after 1994 are close to zero and change sign across construction years.
+Figure \ref{fig:es-cost-price} plots the coefficients $\beta^{II}_k$ and $\beta^{III}_k$ of Equation \eqref{eq:es-cost-price} with construction-year fixed effects. The specification with state $\times$ construction-year fixed effects is not plotted; its coefficients are described here. Before 1994, the 95\% interval of every coefficient in both specifications contains zero. From 1994 onward, every Zone III coefficient is positive in both specifications. The Zone II coefficients after 1994 are close to zero and change sign across construction years.
 
 Panel A of Table \ref{tab:cost-static} reports the static price estimates. In column (1), the post-1994 change in the log price of manufactured homes in Zone III counties, relative to Zone I counties, is `r lad_b("price", 1, 3)` (standard error `r lad_se("price", 1, 3)`), a difference of `r lad_pc("price", 1, 3)`. With state $\times$ construction-year fixed effects in column (2), the estimate is `r lad_b("price", 2, 3)` (standard error `r lad_se("price", 2, 3)`); the point estimate is similar, and the standard error is larger because only within-state variation remains. Column (3) compares manufactured homes with site-built homes of the same construction year in the same county and gives `r lad_b("price", 3, 3)` (standard error `r lad_se("price", 3, 3)`). Column (4), which also allows each state its own vintage profile for each housing type, gives `r lad_b("price", 4, 3)` (standard error `r lad_se("price", 4, 3)`). The Zone III estimates are positive in all four columns and range from `r lad_min("price", 3)` to `r lad_max("price", 3)`.
 
 The Zone II estimates are `r lad_b("price", 1, 2)` (standard error `r lad_se("price", 1, 2)`) in column (1) and `r lad_b("price", 2, 2)` (standard error `r lad_se("price", 2, 2)`) in column (2). Column (3) gives `r lad_b("price", 3, 2)` (standard error `r lad_se("price", 3, 2)`), which becomes `r lad_b("price", 4, 2)` (standard error `r lad_se("price", 4, 2)`) in column (4). The difference between columns (3) and (4) comes from the vintage profile of site-built homes, which column (4) allows to differ by state. Site-built homes are subject to state and local building codes (Section \ref{institutional-background}), so their vintage profile can differ across states for reasons that do not involve the manufactured-home standard.
 
-Figure \ref{fig:es-cost-quantity} plots the coefficients of Equation \eqref{eq:es-cost-quantity} for the number of surviving manufactured homes. With construction-year fixed effects, the 1989 coefficients for both zones are positive and their 95\% intervals exclude zero; the 1990--1992 coefficients are close to zero. With state $\times$ construction-year fixed effects, the 1989 coefficients are negative, and only the Zone II coefficient has an interval that excludes zero. The 1989 coefficients therefore depend on comparisons across states. From 1994 onward, every coefficient in both zones and both versions is negative, and the Zone III coefficients from 1995 onward lie between `r cl_q_z3_lo` and `r cl_q_z3_hi`.
+Figure \ref{fig:es-cost-quantity} plots the coefficients of Equation \eqref{eq:es-cost-quantity} for the number of surviving manufactured homes, with construction-year fixed effects. In that specification, the 1989 coefficients for both zones are positive and their 95\% intervals exclude zero; the 1990--1992 coefficients are close to zero. In the specification with state $\times$ construction-year fixed effects, which is not plotted, the 1989 coefficients are negative, and only the Zone II coefficient has an interval that excludes zero. The 1989 coefficients therefore depend on comparisons across states. From 1994 onward, every coefficient in both zones and both specifications is negative, and the Zone III coefficients from 1995 onward lie between `r cl_q_z3_lo` and `r cl_q_z3_hi`.
 
 Panel B of Table \ref{tab:cost-static} reports the static count estimates. In column (1), the post-1994 change in the log number of surviving manufactured homes in Zone III counties, relative to Zone I counties, is `r lad_b("count", 1, 3)` (standard error `r lad_se("count", 1, 3)`), a change of `r lad_pc("count", 1, 3)`. Across the four columns, the Zone III estimate ranges from `r lad_min("count", 3)` to `r lad_max("count", 3)`, and the Zone II estimate ranges from `r lad_min("count", 2)` to `r lad_max("count", 2)`. In columns (3) and (4), these are changes in the number of surviving manufactured homes relative to surviving site-built homes of the same construction year in the same county.
 
@@ -195,11 +195,11 @@ Table \ref{tab:claims-outcomes} presents supplementary outcomes on insurance pay
 
 ### Why the estimates are proportional
 
-All four claim-level outcomes are estimated as proportional changes rather than as dollar differences. This is not a presentational choice, and an earlier version of this paper made the opposite one, so the reason is worth stating.
+All four claim-level outcomes are estimated as proportional changes rather than as dollar differences. This choice determines the sign and size of the estimates, so this subsection states the reason.
 
 The vintage effect these outcomes share is proportional, not additive. Manufactured and site-built homes differ in replacement cost by a factor of roughly two and a half. Any common force that changes damage by a percentage---a construction-cost trend, a change in what floods do to a house of a given quality---therefore changes it by different dollar amounts for the two housing types. A specification in dollars asks a single housing-type fixed effect to absorb a gap that is proportional, which it cannot do, and the treatment coefficient absorbs the residual. The size of the problem is not hypothetical. On simulated claims built with a treatment effect of exactly zero, but with the proportional housing-type gap and vintage gradient these data display, the dollar specification returns a large and statistically significant negative coefficient while the Poisson specification returns zero. The two specifications also disagree on the real data by about the margin that exercise predicts: the dollar estimate for building damage is `r bldg_dmg_lvl` (SE `r bldg_dmg_lvl_se`), while the proportional estimate applied to the pre-1994 manufactured-home mean is `r bldg_dmg_eff`. The gap between those two figures is the misspecification, not a finding.
 
-Among proportional specifications I use Poisson regression rather than a regression on logged damage. Three properties matter. Poisson admits zeros natively, which the payment outcomes require: `r zero_pmt_bldg` of claims record a zero net building payment and `r zero_pmt_cont` a zero net contents payment, so a log specification would drop them and would estimate the damage and payment columns on different samples. It requires no retransformation, so the estimate can be stated without an assumption about the shape of the loss distribution. Most importantly for what follows, Poisson models the conditional mean directly, so the exponentiated coefficient is a ratio of expected dollar losses. Multiplying an observed mean by it therefore recovers a dollar figure, which is what the cost-benefit calculation of Section \ref{cost-benefit} needs and what a regression on logged damage would not supply---there the exponentiated coefficient is a ratio of geometric means, and converting it into a change in the mean requires exactly the distributional assumption the levels specification was originally chosen to avoid.
+Among proportional specifications I use Poisson regression rather than a regression on logged damage. Three properties matter. Poisson admits zeros natively, which the payment outcomes require: `r zero_pmt_bldg` of claims record a zero net building payment and `r zero_pmt_cont` a zero net contents payment, so a log specification would drop them and would estimate the damage and payment columns on different samples. It requires no retransformation, so the estimate can be stated without an assumption about the shape of the loss distribution. Most importantly for what follows, Poisson models the conditional mean directly, so the exponentiated coefficient is a ratio of expected dollar losses. Multiplying an observed mean by it therefore recovers a dollar figure, which is what the cost-benefit calculation of Section \ref{cost-benefit} needs and what a regression on logged damage would not supply---there the exponentiated coefficient is a ratio of geometric means, and converting it into a change in the mean requires exactly the distributional assumption that the Poisson specification avoids.
 
 The claim-level loss and payment fields are otherwise well behaved, unlike the assessed-value and replacement-cost fields discussed in Section \ref{selection-and-composition}. Net payments are bounded by the program's statutory coverage limits.
 
@@ -209,9 +209,9 @@ The two damage fields are not bounded and contain a small number of records far 
 
 A concern with the vintage-based design is that post-1994 manufactured home policyholders may differ systematically from pre-1994 policyholders, and that these compositional differences rather than construction quality drive the damage results. Table \ref{tab:composition} reports event studies for five policy characteristics, estimated on individual policy terms rather than on the cell-level panel used elsewhere in this section, restricted like the claims and policy samples throughout to single-family residential properties, and using two-year vintage bins with 1992--1993 as the reference bin, the same normalization as the damage event studies.
 
-All five outcomes are estimated by Poisson pseudo-maximum-likelihood (PPML), for the reasons given in Section \ref{results} for the claim-level damage and payment outcomes: the vintage effect a common force exerts on these outcomes is proportional rather than additive, and PPML models the conditional mean directly, so every coefficient in the table is a log rate ratio on the same scale regardless of the outcome's own units. This choice matters most for replacement cost. Recorded replacement cost is not bounded: its standard deviation across policy terms is more than ten times its mean, and its maximum exceeds one billion dollars for a single-family home. A specification in dollar levels lets those records dominate the fit, explaining almost none of the variance and producing an unstable vintage profile; an earlier version of this table instead logged the outcome, which fits better but drops every policy term with a zero recorded replacement cost. PPML weights an observation by its fitted mean rather than by its squared deviation, so the extreme records no longer dominate, and the outcome enters as a level like the other four. The `r repl_zero_pct` of policy terms recording an exact replacement cost of zero are still dropped, since a zero replacement cost on an insured single-family home is a recording convention rather than a measurement, independent of which estimator reads the column. Coverage amounts are additionally bounded above by the program's statutory limits, so their dispersion is modest. The two location and design indicators (elevated building, Special Flood Hazard Area) enter as 0/1 rather than rescaled to percentage points, since under PPML a constant rescaling of the outcome is absorbed by the fixed effects and leaves the estimated coefficients unchanged; the percentage-point rescaling used in an earlier, OLS-based version of this table only made those coefficients comparable in magnitude to the dollar columns, which PPML's common log-point scale already does.
+All five outcomes are estimated by Poisson pseudo-maximum-likelihood (PPML), for the reasons given in Section \ref{results} for the claim-level damage and payment outcomes: the vintage effect a common force exerts on these outcomes is proportional rather than additive, and PPML models the conditional mean directly, so every coefficient in the table is a log rate ratio on the same scale regardless of the outcome's own units. This choice matters most for replacement cost. Recorded replacement cost is not bounded: its standard deviation across policy terms is more than ten times its mean, and its maximum exceeds one billion dollars for a single-family home. A specification in dollar levels lets those records dominate the fit, explaining almost none of the variance and producing an unstable vintage profile. A specification in logs fits better but drops every policy term with a zero recorded replacement cost. PPML weights an observation by its fitted mean rather than by its squared deviation, so the extreme records no longer dominate, and the outcome enters as a level like the other four. The `r repl_zero_pct` of policy terms recording an exact replacement cost of zero are still dropped, since a zero replacement cost on an insured single-family home is a recording convention rather than a measurement, independent of which estimator reads the column. Coverage amounts are additionally bounded above by the program's statutory limits, so their dispersion is modest. The two location and design indicators (elevated building, Special Flood Hazard Area) enter as 0/1 rather than rescaled to percentage points, since under PPML a constant rescaling of the outcome is absorbed by the fixed effects and leaves the estimated coefficients unchanged. All columns are therefore on the same log-point scale.
 
-Contents coverage enters unconditionally, with policies carrying no contents coverage recorded as zero. An earlier version of this table separated the probability of carrying any contents coverage from the amount carried conditional on carrying some. Both margins are individually indistinguishable from zero after 1994, so the single unconditional column reports the same finding, and it avoids conditioning on a variable that itself varies across vintages.
+Contents coverage enters unconditionally, with policies carrying no contents coverage recorded as zero. Separating the probability of carrying any contents coverage from the amount carried conditional on carrying some gives two margins, each indistinguishable from zero after 1994. The single unconditional column reports the same finding and avoids conditioning on a variable that itself varies across vintages.
 
 Two patterns appear. The first concerns the pre-1994 vintages, and here the profile is a set of isolated departures rather than a single trend shared across outcomes. Building coverage is significantly lower for manufactured homes than for site-built homes of the same vintage in the earliest pre-1994 bin (1984--1985) and statistically indistinguishable from zero in the three bins that follow it. Contents coverage moves in the opposite direction and at the opposite end of the pre-1994 window: it is statistically indistinguishable from zero in the three earliest pre-1994 bins and significantly higher only in the bin immediately preceding the reference period (1990--1991). Replacement cost shows no pre-1994 gap that clears conventional significance at any bin. The elevated-building share is likewise flat throughout the pre-1994 period. The outcome moving in a different direction from all of these is location: the share of manufactured home policies in a Special Flood Hazard Area is significantly lower than site-built in two of the four pre-1994 bins (1986--1987 and 1990--1991), with a third (1988--1989) significant only at the 10% level, and it does not shrink toward zero approaching the reference bin. The persistence of the Special Flood Hazard Area gap across most of the pre-1994 period means the parallel-vintage-trends assumption is less well supported for that outcome than for the damage outcomes, where the pre-1994 coefficients are flat and near zero; the other composition outcomes, whose pre-1994 departures are each confined to a single bin, do not raise the same concern.
 
@@ -221,23 +221,16 @@ These post-1994 shifts work against the main result. Higher building coverage an
 
 I therefore read the post-1994 composition of insured manufactured homes as shifting toward higher, not lower, expected flood damage, and read the damage estimates as understating the effect of construction quality by whatever amount that shift contributes. This reading now rests on three outcomes moving together in the same direction rather than one, and I still do not treat it as a quantitative bound.
 
-A separate concern operates through flood severity itself rather than through policy characteristics: if post-1994 manufactured homes are flooded to different depths than pre-1994 manufactured homes or than site-built homes of the same vintage, the damage reduction could reflect differential exposure rather than construction quality. Section \ref{appendix-water-depth} adds water depth at the time of loss as a control, and reports both the resulting estimate and how it varies with housing type. The result is close to the baseline and does not depend on flood severity in a way that would account for the main finding.
+A separate concern operates through flood severity itself rather than through policy characteristics: if post-1994 manufactured homes are flooded to different depths than pre-1994 manufactured homes or than site-built homes of the same vintage, the damage reduction could reflect differential exposure rather than construction quality.
 
 ## Insurance Take-Up and Claim Frequency {#take-up-results}
 
 Greater resilience could affect insurance participation as well as damage conditional on a claim. Newer manufactured homes may be more insurable, while self-protection can reduce demand for costly insurance \citep{ehrlich_market_1972}. I examine these margins using policies per home and claims per policy. Both are estimated by Poisson regression with exposure offsets and the same fixed-effect structure as the claims specifications. The home-stock denominator is imputed from Census 2000 counts of manufactured and single-family homes, adjusted for vacancy and allocated across construction years. Section \ref{appendix-take-up} provides the imputation details. Positive-stock cells with no policies enter the policies-per-home regression; claims per policy requires positive policy exposure.
 
-Figure \ref{fig:takeup-claim-frequency} plots the two event studies together. Relative to single-family homes, manufactured-home insurance participation is higher for the latest post-reform vintages, while claim frequency conditional on insurance shows no sustained increase. The pooled post-1994 contrast in policies per home is `r tk_stc_pct` (coefficient `r tk_stc`, standard error `r tk_stc_se`), with a 95\% interval of `r tk_ci_lo` to `r tk_ci_hi`. Claims per home also increase (coefficient `r ch_stc`, standard error `r ch_stc_se`). Claims per policy change by `r cr_stc_pct` (coefficient `r cr_stc`, standard error `r cr_stc_se`), with a 95\% interval of `r cr_ci_lo` to `r cr_ci_hi`. Tables \ref{tab:take-up} and \ref{tab:take-up-static} in the appendix report the vintage coefficients and pooled contrasts.
+Table \ref{tab:take-up-static} reports the static estimates. The post-1994 contrast in policies per home is `r tk_stc_pct` (coefficient `r tk_stc`, standard error `r tk_stc_se`), with a 95\% interval of `r tk_ci_lo` to `r tk_ci_hi`. Claims per home also increase (coefficient `r ch_stc`, standard error `r ch_stc_se`). Claims per policy change by `r cr_stc_pct` (coefficient `r cr_stc`, standard error `r cr_stc_se`), with a 95\% interval of `r cr_ci_lo` to `r cr_ci_hi`.
 
-These results support greater NFIP take-up among owners of newer manufactured homes without a detectable increase in claim frequency among insured homes. They provide no evidence that the reduction in damage per claim is explained by selection toward homes that file fewer claims. Unchanged claim frequency does not, however, rule out selection on the severity of losses conditional on a claim. Improved insurability is one possible explanation for greater participation, but these estimates do not distinguish changes in eligibility or access from changes in insurance demand. The take-up profile varies before the reform and does not show a discrete jump at 1994; its causal interpretation also depends on the stock-allocation and vacancy assumptions discussed in the appendix.
+These results support greater NFIP take-up among owners of newer manufactured homes without a detectable increase in claim frequency among insured homes. They provide no evidence that the reduction in damage per claim is explained by selection toward homes that file fewer claims. Unchanged claim frequency does not, however, rule out selection on the severity of losses conditional on a claim. Improved insurability is one possible explanation for greater participation, but these estimates do not distinguish changes in eligibility or access from changes in insurance demand. Their causal interpretation also depends on the stock-allocation and vacancy assumptions discussed in the appendix.
 
-<!--
-## Robustness
-
-The main building damage results rely on county $\times$ loss-period fixed effects to absorb location-specific variation in storm severity. A concern is that within-county variation in flood exposure---for instance, proximity to a floodplain or drainage infrastructure---could differ systematically across construction vintages and housing types. I address this by re-estimating the primary building damage specification with census tract $\times$ loss-period fixed effects, which absorb finer-grained geographic heterogeneity.
-
-Table \ref{tab:geo-robustness} compares the two specifications. The tract-level estimates are very similar in magnitude to the county-level baseline, with modestly wider confidence intervals reflecting the smaller sample sizes within tracts. The agreement across geographic controls indicates that the estimates are not driven by exposure differences at the county-period level that tract-period averages also capture. It does not rule out residual within-tract differences in exposure by vintage and housing type---manufactured homes clustered in a single park, newer units placed on higher pads, or site-built homes occupying a different part of the same floodplain would all survive a tract $\times$ loss-period fixed effect.
--->
 
 # Discussion
 
@@ -288,7 +281,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \includegraphics{output/corelogic/prices/mh_only_vintage_prices_paper.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-price}, in log points relative to construction year 1993. The specification includes construction-year fixed effects. The sample is sales of manufactured homes from 2000 through 2023 with construction years 1989--1999. Bars are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property and deed records.
+  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-price}, in log points relative to construction year 1993. The specification includes construction-year fixed effects. The sample is sales of manufactured homes from 2000 through 2023 with construction years 1989--1999. Shaded regions are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property and deed records.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -296,10 +289,10 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Surviving Manufactured Homes by Construction Year and Wind Zone}\label{fig:es-cost-quantity}
-  \includegraphics{output/corelogic/share/mh_only_vintage_quantities_paper.pdf}
+  \includegraphics{output/corelogic/quantities/mh_only_vintage_quantities_paper.pdf}
   \begin{flushleft}
   \begin{footnotesize}
-  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-quantity}, in log points relative to construction year 1993, estimated by Poisson pseudo-maximum likelihood. The outcome is the number of manufactured-home parcels in the 2023 snapshot by county and construction year. The specification includes construction-year fixed effects. Bars are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property records.
+  Notes: Figure plots the coefficients $\beta^{II}_k$ (left) and $\beta^{III}_k$ (right) of Equation \eqref{eq:es-cost-quantity}, in log points relative to construction year 1993, estimated by Poisson pseudo-maximum likelihood. The outcome is the number of manufactured-home parcels in the 2023 snapshot by county and construction year. The specification includes construction-year fixed effects. Shaded regions are 95\% intervals with standard errors clustered by county. The dotted line separates construction years before and after 1994. Source: CoreLogic property records.
   \end{footnotesize}
   \end{flushleft}
 \end{figure}
@@ -316,7 +309,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \textit{Panel B: Surviving homes}
 
   {\footnotesize
-  \input{output/corelogic/share/mh_static_ladder.tex}
+  \input{output/corelogic/quantities/mh_static_ladder.tex}
   }
   \begin{minipage}{\textwidth}
   \footnotesize
@@ -338,7 +331,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Standards on Building Damage per Claim}\label{fig:es-building-damage}
-  \includegraphics{output/event-study/countyfp/es-building-damage.pdf}
+  \includegraphics{output/nfip/es-building-damage.pdf}
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Figure plots Poisson event-study coefficients from Equation \eqref{eq:event-study-benefit}, in log points, relative to construction years 1992 and 1993. The shaded region is the 95\% confidence interval, with standard errors clustered by county. Nominal values are deflated to 2000 dollars. Source: OpenFEMA claims data.
@@ -351,7 +344,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Supplementary Claims Outcomes}\label{tab:claims-outcomes}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/claims-outcomes.tex}
+    \input{output/nfip/claims-outcomes.tex}
     \begin{tablenotes}
       \item Notes: Poisson regressions of Equation \eqref{eq:event-study-benefit} estimated on claim-level data, with the outcome entered as a level and the coefficients therefore reported as log rate ratios: a coefficient $b$ corresponds to a proportional change of $e^b - 1$ in expected damage or payment. Coefficients are relative to construction years 1992 and 1993. Standard errors clustered by county. Underlying damage and payment values are in thousands of 2000 dollars, and the dependent-variable means at the foot of each column are in those units. Sample sizes differ across columns because Poisson drops county $\times$ loss-year cells in which the outcome is zero throughout, and the four outcomes are zero for different sets of claims. All four outcomes are winsorized at `r winsor_cap`, which binds for `r winsor_n_bldg` building-damage records, `r winsor_n_cont` contents-damage records, no payment records, and no manufactured home. Source: OpenFEMA claims data.
     \end{tablenotes}
@@ -364,7 +357,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Static Difference-in-Differences}\label{tab:claims-outcomes-static}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/claims-outcomes-static.tex}
+    \input{output/nfip/claims-outcomes-static.tex}
     \begin{tablenotes}
       \item Notes: Single-coefficient version of Equation \eqref{eq:event-study-benefit}, replacing the construction-year interactions $\sum_k \beta_k (\mathbf{1}[\nu_i = k] \times \text{MH}_i)$ with a single $1\{\nu_i \geq 1994\} \times$ MH indicator, estimated on the same claim-level sample and county $\times$ loss-year fixed effects as Table \ref{tab:claims-outcomes}, with a separate post-1994 main effect. Poisson, so coefficients are log rate ratios and a coefficient $b$ corresponds to a proportional change of $e^b - 1$; Section \ref{results} explains why the estimates are proportional rather than dollar-denominated, and converts them into dollars per claim. Standard errors clustered by county. Underlying values are in thousands of 2000 dollars, winsorized as described in the notes to Table \ref{tab:claims-outcomes}. Source: OpenFEMA claims data.
     \end{tablenotes}
@@ -377,7 +370,7 @@ For the 22 million Americans living in manufactured homes---disproportionately l
   \centering
   \caption{Policy Composition}\label{tab:composition}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/policy-composition.tex}
+    \input{output/nfip/policy-composition.tex}
     \begin{tablenotes}
       \item Notes: Poisson regressions of Equation \eqref{eq:event-study-benefit} estimated on individual policy terms (one observation per term) rather than on cell averages, restricted to single-family residential properties and spanning calendar years 2009--2023, grouped into the same five-year periods as the claims data. The county $\times$ loss-year fixed effect of Equation \eqref{eq:event-study-benefit} is replaced by a county $\times$ calendar-period fixed effect, and standard errors are clustered at the same level. Every column enters as a level, and, as in Table \ref{tab:claims-outcomes}, the coefficients are therefore log rate ratios: a coefficient $b$ corresponds to a proportional change of $e^b - 1$. \emph{Repl. cost} is the estimated replacement cost; the `r repl_zero_pct` of policy terms recording an exact replacement cost of zero are dropped from that column, which is why its observation count is lower than the others'. \emph{Bldg covg.} and \emph{Contents covg.} are the building and contents coverage amounts, in thousands of 2000 dollars; contents coverage is unconditional, so policies carrying no contents coverage enter as zero. \emph{Elevated} indicates that the building satisfies the NFIP definition of an elevated building, and \emph{SFHA} indicates that the property is located in a Special Flood Hazard Area; both are binary (0/1) and, like the other three columns, their coefficients are log rate ratios rather than percentage-point changes. Source: OpenFEMA policy data.
     \end{tablenotes}
@@ -385,47 +378,34 @@ For the 22 million Americans living in manufactured homes---disproportionately l
 \end{table}
 \end{landscape}
 
-\begin{figure}[htbp]
+\begin{table}[htbp]
   \centering
-  \caption{NFIP Take-Up and Claim Frequency by Construction Vintage}\label{fig:takeup-claim-frequency}
-  \includegraphics{output/event-study/countyfp/es-takeup-claim-frequency.pdf}
-  \begin{minipage}{\textwidth}
-  \footnotesize
-  Notes: Poisson event-study coefficients for manufactured homes relative to single-family homes, normalized to the 1992--1993 construction bin. Policies per home uses log imputed home-years as an exposure offset; claims per policy uses log observed policy-years. Both specifications include county $\times$ calendar-period, housing-type, and construction-vintage-bin fixed effects. Calendar periods cover 2009--2023 in five-year bins. Error bars are 95\% intervals using state-clustered standard errors; markers are displaced horizontally for readability. The dotted line separates pre- and post-reform vintages. The bin labeled 1994 contains construction years 1994 and 1995. The reference-bin coefficients are normalized to zero. Appendix Section \ref{appendix-take-up} describes the imputation, and Table \ref{tab:take-up} reports the coefficients. Source: OpenFEMA claims and policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
-  \end{minipage}
-\end{figure}
+  \caption{NFIP Take-Up and Claim Frequency}\label{tab:take-up-static}
+  \begin{threeparttable}
+    \input{output/nfip/take-up-static.tex}
+    \begin{tablenotes}
+      \item Notes: Poisson regressions of policy and claim counts with a single $1\{\nu_i \geq 1994\} \times$ MH indicator and a separate post-1994 main effect. County $\times$ calendar-period and housing-type fixed effects are included. Columns (1) and (2) use log home-years as the exposure offset; column (3) uses log policy-years and requires positive policy exposure. The stock includes manufactured and single-family homes, with occupied Census vintage counts adjusted by county- and type-specific vacancy factors. Positive-stock cells with zero policies enter columns (1) and (2). All columns cluster standard errors by state. Calendar periods cover 2009--2023 in five-year bins; see Section \ref{appendix-take-up} for construction details. Source: OpenFEMA claims and policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
+    \end{tablenotes}
+  \end{threeparttable}
+\end{table}
 
 \begin{table}[htbp]
   \centering
   \caption{HUD's Forecasts and the Estimates for the 1994 Wind Standard}\label{tab:hud-comparison}
   \begin{threeparttable}
-    \input{output/results/hud-comparison.tex}
+    \input{output/cost-benefit/hud-comparison.tex}
     \begin{tablenotes}
       \item Notes: All monetary values are 2000 dollars per unit. HUD forecasts are from \citet{dacquisto_housing_2006}, Tables 4-13 (private losses), 4-15 (FEMA relief), 4-16 (production costs), and 4-17 (consumer prices), with mortality and injury benefits from Section 4.2.2; values are converted from 1992 dollars using CPI-U. Zone weights are `r hud_weight_z2_tex` for Zone II and `r hud_weight_z3_tex` for Zone III, based on the Census-imputed stock of manufactured homes built in 1994--1999. Costs and size-specific benefits use national 1988--1993 home-size shares. HUD's consumer price forecast assumes 56\% pass-through, using supply elasticity 3.0 and demand elasticity $-2.4$; full production costs include materials, labor, design, and overhead. For this paper, constant marginal cost and full pass-through are assumed, so the estimated price increase also measures resource cost. Estimates pool Zones II and III. Price effects are the state-level estimates of Appendix \ref{appendix-mhs}; they compare treated states with Zone I states, for 2000 onward relative to 1993 and earlier, omitting 1994--1999. Benefits are discounted at `r hud_rate_tex` over `r hud_life` years. Flood benefits apply Poisson estimates to the pre-1994 manufactured-home mean loss and insured claim rate. Private flood benefits equal avoided building and contents damage less reduced net NFIP payments; adding the public payment savings therefore recovers avoided damage without double counting. HUD's private benefits include wind losses and mortality and injury; all benefits add FEMA relief. Private benefit-cost ratios divide private benefits by the consumer price increase; all-benefit ratios divide all benefits by full production cost. These per-unit ratios exclude the deadweight loss from reduced sales included in HUD's original aggregate analysis. Unestimated channels are excluded. Only point estimates are shown; totals and ratios use unrounded values. Source: HUD; OpenFEMA; Census Bureau Manufactured Housing Survey.
     \end{tablenotes}
   \end{threeparttable}
 \end{table}
 
-<!--
-\begin{landscape}
-\begin{table}[htbp]
-  \centering
-  \caption{Building Damage - Robustness}\label{tab:geo-robustness}
-  \begin{threeparttable}
-    \input{output/event-study/geo-robustness.tex}
-    \begin{tablenotes}
-      \item Notes: Coefficients from Equation \eqref{eq:event-study-benefit} estimated on claim-level data (outcome: building damage, in thousands of 2000 dollars). Column (2) uses county $\times$ loss-period fixed effects (baseline, as in Table \ref{tab:claims-outcomes}). Column (1) coarsens to state $\times$ loss-period; column (3) refines to census tract $\times$ loss-period. Standard errors are clustered by county in all three columns, so that inference is held fixed while the geographic granularity of the fixed effect varies. Source: OpenFEMA claims data.
-    \end{tablenotes}
-  \end{threeparttable}
-\end{table}
-\end{landscape}
--->
 
 \clearpage
 
 \appendix
 
-# NFIP Take-Up: Stock Construction and Vintage Profiles {#appendix-take-up}
+# NFIP Take-Up: Stock Construction {#appendix-take-up}
 
 The take-up estimates in Table \ref{tab:take-up-static} divide policy counts by an imputed stock of homes of the same county, construction vintage, and housing type. Raw policy counts alone combine insurance participation with the number of homes available to insure.
 
@@ -441,64 +421,17 @@ Shares are normalized over the full Census bin before restricting the constructi
 
 The sampling frame crosses every positive-stock county, vintage, and housing-type cell with the three five-year calendar periods covering 2009--2023. I attach observed policy and claim counts to this frame and set absent counts to zero. Stock is counted once per county and vintage, regardless of how many tracts report policies. Claims are counted directly from the claims sample, including locations with no observed policies. Cells with zero policies remain in the policies-per-home and claims-per-home regressions. Claims per policy requires positive policy exposure. Poisson estimation additionally removes fixed-effect groups with an outcome of zero throughout.
 
-Home-years equal the imputed 2000 stock multiplied by the five calendar years in a period. Policy-years count policy terms. Each regression includes the logarithm of its exposure as an offset. The dynamic specification retains the housing-type and construction-vintage fixed effects of Equation \eqref{eq:event-study-benefit}, with county $\times$ calendar-period fixed effects replacing county $\times$ loss-year fixed effects. The static specification replaces the vintage interactions with a post-1994 $\times$ manufactured-home interaction and the vintage fixed effects with a post-1994 main effect, as in the static claims specification. No county $\times$ housing-type fixed effects are added. Standard errors are clustered by state because the annual manufactured-home allocation is shared by counties within a state.
+Home-years equal the imputed 2000 stock multiplied by the five calendar years in a period. Policy-years count policy terms. Each regression includes the logarithm of its exposure as an offset. The specification includes county $\times$ calendar-period fixed effects, a housing-type fixed effect, a post-1994 main effect, and a post-1994 $\times$ manufactured-home interaction, as in the static claims specification. No county $\times$ housing-type fixed effects are added. Standard errors are clustered by state because the annual manufactured-home allocation is shared by counties within a state.
 
 In cells with positive policy counts, claims per home equals policies per home times claims per policy. This identity does not imply that the three fitted coefficients add: the regressions use different exposures and, where exposure is zero, different estimation samples.
 
-## Vintage profile and interpretation
-
-Table \ref{tab:take-up} reports the dynamic estimates underlying the event studies in Figure \ref{fig:takeup-claim-frequency}; it also reports claims per home. Table \ref{tab:take-up-static} reports the pooled contrasts discussed in the main text. These estimates depend on the annual allocation within Census bins as well as the observed policy counts. A causal interpretation requires that, absent the standard, manufactured and single-family homes would have had parallel vintage profiles in insurance participation. The earliest pre-reform take-up coefficients are negative, the 1990--1991 coefficient is positive, and the first post-reform coefficient is near zero. The static contrast therefore does not describe a discrete jump at the reform.
+## Mandatory and non-mandatory purchase
 
 The mandatory-purchase component has a static coefficient of `r tk_mand_stc` (standard error `r tk_mand_stc_se`), compared with `r tk_nonmand_stc` (standard error `r tk_nonmand_stc_se`) for the non-mandated component. Mandated policies represent `r tk_mand_share` of pre-1994 manufactured-home policy-years. This split describes policies flagged by insurers as mandatory purchases; it does not isolate the building standard from contemporaneous changes in insurance-purchase enforcement, and incomplete reporting of the flag limits its interpretation.
-
-\begin{table}[htbp]
-  \centering
-  \caption{NFIP Take-Up per Housing-Unit Stock}\label{tab:take-up}
-  \begin{threeparttable}
-    \input{output/event-study/countyfp/take-up.tex}
-    \begin{tablenotes}
-      \item Notes: Dynamic version of Table \ref{tab:take-up-static}, replacing the post-1994 interaction with construction-vintage-bin interactions and the post-1994 main effect with construction-vintage-bin fixed effects. The omitted vintage bin is 1992--1993. Housing-type and county $\times$ calendar-period fixed effects, outcomes, exposure offsets, stock construction, and state clustering match the static specification. Source: OpenFEMA claims and policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
-    \end{tablenotes}
-  \end{threeparttable}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \caption{NFIP Take-Up per Housing-Unit Stock - Pre/Post 1994}\label{tab:take-up-static}
-  \begin{threeparttable}
-    \input{output/event-study/countyfp/take-up-static.tex}
-    \begin{tablenotes}
-      \item Notes: Poisson regressions of policy and claim counts with a single $1\{\nu_i \geq 1994\} \times$ MH indicator and a separate post-1994 main effect. County $\times$ calendar-period and housing-type fixed effects are included. Columns (1) and (2) use log home-years as the exposure offset; column (3) uses log policy-years and requires positive policy exposure. The stock includes manufactured and single-family homes, with occupied Census vintage counts adjusted by county- and type-specific vacancy factors. Positive-stock cells with zero policies enter columns (1) and (2). All columns cluster standard errors by state. Calendar periods cover 2009--2023 in five-year bins; see Section \ref{appendix-take-up} for construction details. Source: OpenFEMA claims and policy data; Census 2000; Survey of Manufactured Housing; Census Building Permits Survey.
-    \end{tablenotes}
-  \end{threeparttable}
-\end{table}
 
 ## Stock timing
 
 The denominator is a 2000 snapshot, while policy periods run from 2009 to 2023. Differential demolition, relocation, or changes in vacancy by construction vintage and housing type can make the later stock differ systematically from the imputation. State clustering allows correlated sampling error but does not correct such bias or uncertainty about the vacancy assumption. The estimates therefore describe insurance participation relative to a Census-anchored approximation of the stock, rather than a directly observed annual take-up rate.
-
-# Water-Depth Robustness {#appendix-water-depth}
-
-The building damage estimates condition on filing a claim but not on the severity of the flood that produced it. If post-1994 manufactured homes are flooded to different depths than pre-1994 manufactured homes, or than site-built homes of the same vintage, the estimated damage reduction could reflect that difference in exposure rather than construction quality. This appendix controls for water depth at the time of loss.
-
-A claim's recorded water depth is missing more often for manufactured homes than for site-built homes, and the gap widens after 1994: `r wd_miss_mh_pre` of pre-1994 manufactured-home claims and `r wd_miss_mh_post` of post-1994 manufactured-home claims lack a recorded depth, against `r wd_miss_sb_pre` and `r wd_miss_sb_post` for site-built claims of the same vintages. A linear control on water depth would drop every one of these claims, and would drop a growing and unequal share of the two housing types across the reform. Table \ref{tab:water-depth-robustness} instead groups water depth into six bins together with an explicit bin for claims with no recorded depth, so every claim enters every column and the count of observations is identical across columns (1)-(3).
-
-Column (1) reproduces the baseline building-damage estimate of Table \ref{tab:claims-outcomes-static}. Column (2) adds the water-depth bins as controls: the estimate is `r wd_dmg_depth` (SE `r wd_dmg_depth_se`) in log points, against the `r bldg_dmg_lp` (SE `r bldg_dmg_se`) baseline. Column (3) additionally lets the relationship between damage and water depth differ by housing type, so that the treatment estimate is identified only from variation within a depth bin and housing type; it changes little, at `r wd_dmg_depthx` (SE `r wd_dmg_depthx_se`). The building-damage effect is not an artifact of manufactured and site-built homes being flooded to different depths.
-
-Adding the depth bins raises the fit of the regression by about one percentage point. This is not because water depth is constant within a county and loss year, which would leave the depth control nothing to work with and make the stability of the estimate across columns automatic rather than informative. Depth varies substantially within the fixed-effect cells: of the `r wd_n_bins` depth bins, the average claim is in a cell containing `r wd_bins_cell` of them, and only `r wd_one_bin` of claims are in a cell where every claim falls in the same bin. The small change in fit instead reflects the fact that water depth explains little of the variation in damage across individual claims once the county and loss year are held fixed, because damage at the level of a single claim is governed mainly by the size and value of the home.
-
-\begin{table}[htbp]
-  \centering
-  \caption{Building Damage: Water-Depth Robustness}\label{tab:water-depth-robustness}
-  \begin{threeparttable}
-    \input{output/event-study/countyfp/robustness.tex}
-    \begin{tablenotes}
-      \item Notes: Single-coefficient Poisson version of Equation \eqref{eq:event-study-benefit}, on the same claim-level sample, outcome (building damage, in thousands of 2000 dollars), county $\times$ loss-year fixed effects, and clustering as Table \ref{tab:claims-outcomes-static}, with coefficients reported as log rate ratios, with a post-1994 main effect in place of the full construction-year fixed effects. Column (2) adds water depth at the time of loss, grouped into six bins---below the lowest floor; 0--1, 1--2, 2--4, and 4--8 feet above it; and 8 feet or more above it---plus a seventh bin for claims with no recorded depth, entered as fixed effects; column (3) additionally interacts these bins with the manufactured-home indicator. Water-depth-bin coefficients are omitted from the table. Observations are identical across all three columns by construction. Source: OpenFEMA claims data.
-    \end{tablenotes}
-  \end{threeparttable}
-\end{table}
-
-
 
 # Wind-Zone Triple Difference {#appendix-triple-diff}
 
@@ -517,7 +450,7 @@ Table \ref{tab:windzone-ddd-building} reports the estimates for building damage.
   \centering
   \caption{Building Damage: Wind-Zone Triple Difference}\label{tab:windzone-ddd-building}
   \begin{threeparttable}
-    \input{output/event-study/countyfp/windzone-ddd-building.tex}
+    \input{output/nfip/windzone-ddd-building.tex}
     \begin{tablenotes}
       \item Notes: Poisson regressions on the claim-level sample of Table \ref{tab:claims-outcomes-static}. The outcome is building damage in thousands of 2000 dollars, and coefficients are log rate ratios. Column (1) is the baseline single-coefficient specification. Column (2) estimates Equation \eqref{eq:triple-diff}, with Zone II/III the treated group and Zone I the comparison group. Column (3) replaces the Zone II/III indicator with separate Zone II and Zone III indicators, and the housing-type and post-1994 effects vary by wind zone. Wind zones are the county designations of the HUD Manufactured Home Construction and Safety Standards. Standard errors clustered by county, the level of wind-zone assignment. Source: OpenFEMA claims data.
     \end{tablenotes}
@@ -575,7 +508,7 @@ Figure \ref{fig:es-placements} shows the corresponding event study for log place
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Wind Standard on Manufactured Home Prices}\label{fig:es-price}
-  \includegraphics{output/event-study/es-mhs-avg_sales_price_fw_idx.pdf}
+  \includegraphics{output/mhs/es-mhs-avg_sales_price_fw_idx.pdf}
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. The outcome is the fixed-weight price index of Equation \eqref{eq:price-index}, normalized so that its national 1993 value equals 100, so coefficients are index points. The headline estimate in the text is the average of the 2000--2004 coefficients. Nominal values are deflated to 2000 dollars before the index is formed. Observations are weighted by each state's mean 1988--1993 placements. Source: Census Bureau Manufactured Housing Survey.
@@ -586,7 +519,7 @@ Figure \ref{fig:es-placements} shows the corresponding event study for log place
 \begin{figure}[htbp]
   \centering
   \caption{Effect of 1994 HUD Wind Standard on Manufactured Home Placements}\label{fig:es-placements}
-  \includegraphics{output/event-study/es-mhs-placements_ln.pdf}
+  \includegraphics{output/mhs/es-mhs-placements_ln.pdf}
   \begin{flushleft}
   \begin{footnotesize}
   Notes: Figure plots event-study coefficients from Equation \eqref{eq:event-study-cost}. Outcome is log manufactured home placements. Estimated on the `r n_plc` state-years for which the price index of Equation \eqref{eq:price-index} is also defined, so that the price and quantity effects are estimated on the same sample. Observations are weighted by each state's mean 1988--1993 placements. Source: Census Bureau Manufactured Housing Survey.
@@ -606,7 +539,7 @@ Column (1) pools the two sizes and recovers the index estimate. Column (2) inter
   \centering
   \caption{Price Effects by Home Size}\label{tab:mhs-section-type}
   \begin{threeparttable}
-    \input{output/event-study/mhs-section-type.tex}
+    \input{output/mhs/mhs-section-type.tex}
     \begin{tablenotes}
       \item Notes: The panel is stacked so that each observation is a state $\times$ year $\times$ home size, with the average real sales price for that size as the outcome, in 2000 dollars. Both columns include state $\times$ size and year $\times$ size fixed effects and weight observations by each state's mean 1988--1993 placements times the national 1988--1993 placement share of the size. Coefficients, standard errors, and the dependent variable mean are rounded to the nearest dollar. Standard errors are clustered by state. Source: Census Bureau Manufactured Housing Survey; eCFR wind zone classification.
     \end{tablenotes}

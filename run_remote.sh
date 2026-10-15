@@ -2,18 +2,20 @@
 # run_remote.sh -- run program/ANALYSIS/ANALYSIS.slurm on Rivanna and download
 # its aggregate results.
 #
-#   ./run_remote.sh corelogic                               # all scripts, in order
-#   ./run_remote.sh corelogic estimate-corelogic-prices.R   # one script
+#   ./run_remote.sh estimate-corelogic                               # all scripts, in order
+#   ./run_remote.sh estimate-corelogic estimate-corelogic-prices.R   # one script
 #
 # Workflow: edit, commit and `git push`, then run this. It resets the Rivanna
 # checkout (~/manufactured-code, cloned on first use) to origin/main, submits
 # the job, waits, checks the final Slurm state, and rsyncs
-# results/ANALYSIS/<name>/ on Rivanna into output/ANALYSIS/<name>/ here,
+# results/RESULTS/<name>/ on Rivanna into output/RESULTS/<name>/ here, where
+# RESULTS is ANALYSIS without its "estimate-" prefix (estimate-corelogic ->
+# corelogic),
 # replacing what was there. The job decides what is exported; for CoreLogic
 # that is aggregate CSV/PDF/PNG/JSON only, never licensed records.
 #
-# Local CORELOGIC_BUILD, CORELOGIC_REFERENCE, CORELOGIC_PB_SOURCE and
-# CORELOGIC_TRACTS, if set, are forwarded to the job to override its defaults.
+# Local CORELOGIC_BUILD, CORELOGIC_REFERENCE and CORELOGIC_PB_SOURCE, if set,
+# are forwarded to the job to override its defaults.
 # ALLOW_UNPUSHED=1 skips the check that local code matches origin/main.
 
 set -euo pipefail
@@ -25,8 +27,9 @@ REPO_URL="https://github.com/williamsca/manufactured-code.git"
 LOCAL_DIR_NAME=$(basename "$PWD")
 REMOTE_DIR="\$HOME/${LOCAL_DIR_NAME}"
 REMOTE_RSYNC_DIR="~/${LOCAL_DIR_NAME}"
-LOCAL_RESULTS="./output/${ANALYSIS}"
-FORWARD_VARS=(CORELOGIC_BUILD CORELOGIC_REFERENCE CORELOGIC_PB_SOURCE CORELOGIC_TRACTS)
+RESULTS="${ANALYSIS#estimate-}"
+LOCAL_RESULTS="./output/${RESULTS}"
+FORWARD_VARS=(CORELOGIC_BUILD CORELOGIC_REFERENCE CORELOGIC_PB_SOURCE)
 
 if [ ! -f "program/${ANALYSIS}/${ANALYSIS}.slurm" ]; then
   echo "ERROR: program/${ANALYSIS}/${ANALYSIS}.slurm not found (run from the repo root)."
@@ -41,7 +44,7 @@ fi
 # locally -- otherwise the results would silently come from older code.
 if [ "${ALLOW_UNPUSHED:-0}" != "1" ]; then
   git fetch -q origin main
-  CODE_PATHS=("program/${ANALYSIS}" program/lib program/tests)
+  CODE_PATHS=("program/${ANALYSIS}" program/tests)
   if ! git diff --quiet origin/main -- "${CODE_PATHS[@]}" ||
      [ -n "$(git ls-files --others --exclude-standard -- "${CODE_PATHS[@]}")" ]; then
     echo "ERROR: local ${CODE_PATHS[*]} differ from origin/main:"
@@ -159,7 +162,7 @@ ssh "$REMOTE" "cd ${REMOTE_DIR} && git fetch -q origin main && git reset -q --ha
 # scripts; a single-script run replaces only its own subfolder).
 if [ -z "$SCRIPT" ]; then
   echo "Clearing old exported results on remote..."
-  ssh "$REMOTE" "rm -rf ${REMOTE_DIR}/results/${ANALYSIS}"
+  ssh "$REMOTE" "rm -rf ${REMOTE_DIR}/results/${RESULTS}"
 fi
 
 # 3. Submit the job and capture the job ID.
@@ -182,21 +185,21 @@ check_job_status "$JOB_ID"
 
 # 5. Download each exported result folder, replacing the local copy.
 if [ -n "$SCRIPT" ]; then
-  NAMES=$(basename "$SCRIPT" .R | sed -E "s/^(prepare|estimate)-${ANALYSIS}-//")
+  NAMES=$(basename "$SCRIPT" .R | sed -E "s/^estimate-${RESULTS}-//")
 else
-  NAMES=$(ssh "$REMOTE" "ls ${REMOTE_DIR}/results/${ANALYSIS} 2>/dev/null" || true)
+  NAMES=$(ssh "$REMOTE" "ls ${REMOTE_DIR}/results/${RESULTS} 2>/dev/null" || true)
 fi
 if [ -z "$NAMES" ]; then
-  echo "Warning: nothing exported under results/${ANALYSIS}/ on remote"
+  echo "Warning: nothing exported under results/${RESULTS}/ on remote"
   exit 1
 fi
 for name in $NAMES; do
-  if ! ssh "$REMOTE" "[ -d ${REMOTE_DIR}/results/${ANALYSIS}/${name} ]"; then
-    echo "Warning: results/${ANALYSIS}/${name}/ not found on remote"
+  if ! ssh "$REMOTE" "[ -d ${REMOTE_DIR}/results/${RESULTS}/${name} ]"; then
+    echo "Warning: results/${RESULTS}/${name}/ not found on remote"
     exit 1
   fi
   mkdir -p "${LOCAL_RESULTS}/${name}"
-  rsync -avz --delete "${REMOTE}:${REMOTE_RSYNC_DIR}/results/${ANALYSIS}/${name}/" "${LOCAL_RESULTS}/${name}/"
+  rsync -avz --delete "${REMOTE}:${REMOTE_RSYNC_DIR}/results/${RESULTS}/${name}/" "${LOCAL_RESULTS}/${name}/"
   echo "Results downloaded to ${LOCAL_RESULTS}/${name}"
 done
 

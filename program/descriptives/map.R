@@ -1,6 +1,5 @@
-# This script maps US states by treatment status and counties by HUD wind zone.
-# Outputs: output/descriptives/map-mhs-treated-states.pdf
-#          output/descriptives/map-mhs-windzone-counties.pdf
+# Maps contiguous-US counties by HUD wind zone.
+# Output: output/descriptives/map-mhs-windzone-counties.pdf
 
 rm(list = ls())
 library(here)
@@ -15,7 +14,6 @@ source(here("program", "import", "rd-client.R"))
 options(tigris_use_cache = TRUE)
 Sys.setenv(TIGRIS_CACHE_DIR = file.path(tempdir(), "tigris"))
 
-v_fill <- c("Control" = "#BDBDBD", "Treated" = "#C0392B")
 v_fill_county <- c("Zone I" = "#BDBDBD", "Zone II" = "#E6A099",
                    "Zone III" = "#C0392B")
 
@@ -29,9 +27,9 @@ theme_map <- function(base_size = 14) {
 }
 
 # import ----
-# Full state x treatment-status table (databuild-mhs.R), independent of
-# the price-sample base-period-weight drop, so states with no 1988-1993
-# shipment data still appear on the map.
+# Full state table (databuild-mhs.R), independent of the price-sample
+# base-period-weight drop, so states with no 1988-1993 shipment data still
+# appear on the map.
 dt_map <- as.data.table(readRDS(here("derived", "mhs-state-treatment.Rds")))
 
 stopifnot(uniqueN(dt_map$statefp) == nrow(dt_map))
@@ -57,27 +55,9 @@ us_states <- merge(
     sort = FALSE
 )
 
-stopifnot(!anyNA(us_states$treated))
-
-us_states$group <- ifelse(us_states$treated, "Treated", "Control")
-
-# map ----
-p <- ggplot(us_states) +
-    geom_sf(aes(fill = group), color = "white", linewidth = 0.2) +
-    scale_fill_manual(values = v_fill) +
-    coord_sf(datum = NA) +
-    theme_map()
-
-ggsave(
-    here("output", "descriptives", "map-mhs-treated-states.pdf"),
-    p,
-    width = 10,
-    height = 6
-)
-
 # county wind-zone map ----
-# Use the same contiguous-US extent and pinned crosswalk as the state map
-# and treatment definitions in databuild-mhs.R.
+# Same contiguous-US state extent and pinned crosswalk as the treatment
+# definitions in databuild-mhs.R; state outlines drawn on top.
 us_counties <- counties(cb = TRUE, resolution = "5m", year = 2024, class = "sf")
 us_counties <- us_counties[us_counties$STATEFP %in% us_states$STATEFP, ]
 us_counties <- merge(
@@ -102,6 +82,7 @@ p_county <- ggplot(us_counties) +
     coord_sf(datum = NA) +
     theme_map()
 
+dir.create(here("output", "descriptives"), showWarnings = FALSE, recursive = TRUE)
 ggsave(
     here("output", "descriptives", "map-mhs-windzone-counties.pdf"),
     p_county,

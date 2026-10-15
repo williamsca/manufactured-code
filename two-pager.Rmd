@@ -29,7 +29,7 @@ Does mandated climate adaptation pay for itself? I study the 1994 HUD wind stand
 
 # 1. Data and institutions
 
-Manufactured homes make up about 6% of U.S. housing, with larger shares in rural areas and the Southeast. HUD's federal code preempts local rules. After Hurricane Andrew, HUD strengthened wind requirements effective July 1994, applying structural, sheathing, and fastening upgrades for homes placed in wind zones II and III (Figure \ref{fig:map-treated-states}).
+Manufactured homes make up about 6% of U.S. housing, with larger shares in rural areas and the Southeast. HUD's federal code preempts local rules. After Hurricane Andrew, HUD strengthened wind requirements effective July 1994, applying structural, sheathing, and fastening upgrades for homes placed in wind zones II and III (Figure \ref{fig:map-windzone-counties}).
 
 I use price and placement data from the Census Manufactured Housing Survey. The Census reports average prices for single- and double-wide units. I combine these prices into a single price index using pre-reform shares to hold the composition fixed. On the benefits side, I use OpenFEMA national flood insurance program (NFIP) claims, which cover single-family homes built 1984--1999, with losses in 1994--2023. I also estimate effects on policy characteristics. There are two downsides to these data: first, they reflect flood damage, not wind damage, although there may be some overlap; and, they cover only insured homeowners, not the full population.
 
@@ -77,18 +77,18 @@ The damage effect is driven by claims made from Zone III counties. I show this w
 
 \begin{figure}[H]
 \centering
-\caption{States exposed to the 1994 HUD wind standard}
-\label{fig:map-treated-states}
-\includegraphics[width=0.85\textwidth,height=2.65in,keepaspectratio]{output/descriptives/map-mhs-treated-states.pdf}
+\caption{HUD wind zones by county}
+\label{fig:map-windzone-counties}
+\includegraphics[width=0.85\textwidth,height=2.65in,keepaspectratio]{output/descriptives/map-mhs-windzone-counties.pdf}
 \end{figure}
 
-\noindent\footnotesize Treated states contain counties in HUD wind zones II or III; control states are in zone I. State classification does not imply that every county in a treated state faced stronger requirements. Source: HUD wind-zone classification.\normalsize
+\noindent\footnotesize Treated states contain counties in HUD wind zones II or III; control states are in zone I. Source: HUD wind-zone classification.\normalsize
 
 \begin{figure}[H]
 \centering
 \caption{Effect on manufactured-home prices}
 \label{fig:price-effect}
-\includegraphics[width=0.85\textwidth,height=2.8in,keepaspectratio]{output/event-study/es-mhs-avg_sales_price_fw_idx.pdf}
+\includegraphics[width=0.85\textwidth,height=2.8in,keepaspectratio]{output/mhs/es-mhs-avg_sales_price_fw_idx.pdf}
 \end{figure}
 
 \noindent\footnotesize State and year fixed effects event study, relative to 1993. The outcome is the fixed-weight price index, with the national 1993 value normalized to 100. Weights are each state's mean 1988--1993 shipments; standard errors are clustered by state. Source: Census Manufactured Housing Survey.\normalsize
@@ -99,7 +99,7 @@ The damage effect is driven by claims made from Zone III counties. I show this w
 \centering
 \caption{Building damage by construction vintage}
 \label{fig:building-damage}
-\includegraphics[width=0.85\textwidth,height=3in,keepaspectratio]{output/event-study/countyfp/es-building-damage.pdf}
+\includegraphics[width=0.85\textwidth,height=3in,keepaspectratio]{output/nfip/es-building-damage.pdf}
 \end{figure}
 
 \noindent\footnotesize Poisson event-study coefficients for manufactured homes relative to site-built homes, normalized to the 1992--1993 construction bin. Includes common construction-vintage, housing-type, and county $\times$ loss-year fixed effects. Standard errors are clustered by county. Coefficients are log rate ratios. Source: OpenFEMA claims.\normalsize
@@ -108,7 +108,7 @@ The damage effect is driven by claims made from Zone III counties. I show this w
 \centering
 \caption{Static estimates: building damage and supplementary claims outcomes}
 \label{tab:claims-outcomes-static}
-\resizebox{\textwidth}{!}{\input{output/event-study/countyfp/claims-outcomes-static.tex}}
+\resizebox{\textwidth}{!}{\input{output/nfip/claims-outcomes-static.tex}}
 \end{table}
 
 \noindent\footnotesize Poisson regressions with a post-1994 $\times$ manufactured-home interaction, a separate post-1994 main effect, housing-type effects, and county $\times$ loss-year effects. A coefficient $b$ corresponds to $100(e^b-1)$ percent. Dollar outcomes and dependent-variable means are in thousands of 2000 dollars. Outcomes are winsorized at `r winsor_cap`; the cap affects no manufactured-home claims or payment records. Observation counts differ because of outcome availability and removal of all-zero fixed-effect groups. Standard errors are clustered by county. Source: OpenFEMA claims.\normalsize
@@ -119,7 +119,7 @@ The damage effect is driven by claims made from Zone III counties. I show this w
 \centering
 \caption{Policy characteristics by construction vintage}
 \label{tab:policy-composition}
-\resizebox{\textwidth}{!}{\input{output/event-study/countyfp/policy-composition.tex}}
+\resizebox{\textwidth}{!}{\input{output/nfip/policy-composition.tex}}
 \end{table}
 
 \noindent\footnotesize Poisson regressions on individual policy terms, 2009--2023. Two-year construction-vintage interactions with manufactured-home status are relative to 1992--1993; bin labels give the first construction year. Includes housing-type, common construction-vintage, and county $\times$ five-year calendar-period fixed effects. Standard errors are clustered by county. All coefficients are log rate ratios: $100(e^b-1)$ is a proportional percentage change, including for the binary elevated-building and Special Flood Hazard Area (SFHA) indicators. Replacement cost and coverage means are in thousands of 2000 dollars. Zero recorded replacement costs are excluded; contents coverage includes policies with no contents coverage as zero. Source: OpenFEMA policies.\normalsize
@@ -129,7 +129,7 @@ The damage effect is driven by claims made from Zone III counties. I show this w
 \begin{table}[H]
   \centering
   \caption{HUD's Forecasts and the Estimates for the 1994 Wind Standard}\label{tab:hud-comparison}
-    \resizebox{\textwidth}{!}{\input{output/results/hud-comparison.tex}}
+    \resizebox{\textwidth}{!}{\input{output/cost-benefit/hud-comparison.tex}}
     \par\smallskip\begin{minipage}{\textwidth}\footnotesize Notes: All monetary values are 2000 dollars per unit. HUD forecasts are from \citet{dacquisto_housing_2006}, Tables 4-13 (private losses), 4-15 (FEMA relief), 4-16 (production costs), and 4-17 (consumer prices), with mortality and injury benefits from Section 4.2.2; values are converted from 1992 dollars using CPI-U. Zone weights are `r hud_weight_z2_tex` for Zone II and `r hud_weight_z3_tex` for Zone III, based on the Census-imputed stock of manufactured homes built in 1995--1999. Costs and size-specific benefits use national 1988--1993 home-size shares. HUD's consumer price forecast assumes 56\% pass-through, using supply elasticity 3.0 and demand elasticity $-2.4$; full production costs include materials, labor, design, and overhead. For this paper, constant marginal cost and full pass-through are assumed, so the estimated price increase also measures resource cost. Estimates pool Zones II and III. Price effects compare treated states with Zone I states, for 2000 onward relative to 1993 and earlier, omitting 1994--1999. Benefits are discounted at `r hud_rate_tex` over `r hud_life` years. Flood benefits apply Poisson estimates to the pre-1994 manufactured-home mean loss and insured claim rate. Private flood benefits equal avoided building and contents damage less reduced net NFIP payments; adding the public payment savings therefore recovers avoided damage without double counting. HUD's private benefits include wind losses and mortality and injury; all benefits add FEMA relief. Private benefit-cost ratios divide private benefits by the consumer price increase; all-benefit ratios divide all benefits by full production cost. These per-unit ratios exclude the deadweight loss from reduced sales included in HUD's original aggregate analysis. Unestimated channels are excluded. Only point estimates are shown; totals and ratios use unrounded values. Source: HUD; OpenFEMA; Census Bureau Manufactured Housing Survey.
     \end{minipage}
 \end{table}

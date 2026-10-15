@@ -10,7 +10,7 @@ library(here)
 library(data.table)
 library(testthat)
 
-source(here("program", "estimate", "welfare-lib.R"))
+source(here("program", "cost-benefit", "welfare-lib.R"))
 
 test_that("npv_annuity matches closed-form values", {
     # r = 0: NPV is just annual_benefit * lifespan

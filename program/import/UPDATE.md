@@ -239,7 +239,7 @@ workbooks this script parses by hand. Field names already match this project's:
 One schema difference: **`census_mhs_state_year` carries no `state_name`.**
 Names live in `geo_state` (`statefp`, `stusab`, `name`) per the framework's
 "names in one place" rule. `derived/sample-mhs.Rds` must keep `state_name`
-because `program/descriptives/map.R:31` and `program/estimate/estimate-mhs.R:252`
+because `program/descriptives/map.R:31` and `program/estimate-mhs/estimate-mhs.R`
 both read it — so `databuild-mhs.R` joins `geo_state` and renames `name` →
 `state_name`.
 

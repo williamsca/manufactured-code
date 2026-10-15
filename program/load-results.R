@@ -3,17 +3,18 @@
 # formatting helper and pre-formatted value quoted in paper.Rmd, so the
 # Rmd holds only prose.  Sourced from paper.Rmd's setup chunk.
 #
-# Run order: estimate-sumstats-nfip.R, estimate-mhs.R, estimate-nfip-*.R,
-#            then estimate-welfare.R (depends on the other two).
+# Run order (see `make estimates`): descriptives/, estimate-mhs/,
+# estimate-nfip/, then cost-benefit/ (depends on the other two). The CoreLogic
+# outputs come from estimate-corelogic/ on Rivanna.
 
 library(data.table)
 library(here)
 
-mhs_sc  <- fread(here("output", "results", "mhs-scalars.csv"))
-source(here("program", "lib", "nfip-scalars.R"))
+mhs_sc  <- fread(here("output", "mhs", "mhs-scalars.csv"))
+source(here("program", "estimate-nfip", "nfip-scalars.R"))
 nfip_sc <- read_nfip_scalars()
-welf_sc <- fread(here("output", "results", "welfare-scalars.csv"))
-ss_sc   <- fread(here("output", "results", "sumstats-nfip-scalars.csv"))
+welf_sc <- fread(here("output", "cost-benefit", "welfare-scalars.csv"))
+ss_sc   <- fread(here("output", "descriptives", "sumstats-nfip-scalars.csv"))
 
 get_mhs  <- function(nm) mhs_sc[statistic == nm,  value]
 get_nfip <- function(nm) nfip_sc[statistic == nm, value]
@@ -172,54 +173,29 @@ pctc_fmt <- function(x, digits = 1) {
     paste0(if (x >= 0) "+" else "-",
            formatC(abs(100 * (exp(x) - 1)), format = "f", digits = digits), "%")
 }
-# Column (1), take-up: the static contrast, its state- and county-clustered
-# standard errors, the pre-1994 MH level it moves from, and the 95% interval
-# in percent terms, which is what the "null but wide" reading rests on.
+# Column (1), take-up: the static contrast, its state-clustered standard error,
+# and the 95% interval in percent terms.
 tk_stc      <- lp_fmt(get_nfip("takeup_ppml_static"))
 tk_stc_se   <- se_fmt(get_nfip("takeup_ppml_static_se"))
 tk_stc_pct  <- pctc_fmt(get_nfip("takeup_ppml_static"))
-tk_stc_cty_se <- se_fmt(get_nfip("takeup_ppml_static_cty_se"))
 tk_ci_lo    <- pctc_fmt(get_nfip("takeup_ppml_static") -
                         1.96 * get_nfip("takeup_ppml_static_se"))
 tk_ci_hi    <- pctc_fmt(get_nfip("takeup_ppml_static") +
                         1.96 * get_nfip("takeup_ppml_static_se"))
-tk_pre_max    <- lp_fmt(get_nfip("takeup_ppml_pre_max"))
-tk_pre_max_se <- se_fmt(get_nfip("takeup_ppml_pre_max_se"))
-# vintage bins are labelled by their left-hand construction year and are
-# BIN_CONSTR_YEAR wide, so name the bin by the years it covers
-tk_pre_max_bin <- local({
-    y <- as.integer(get_nfip("takeup_ppml_pre_max_bin"))
-    paste0(y, "--", y + 1L)
-})
-tk_pre_first <- lp_fmt(get_nfip("takeup_ppml_pre_first"))
-tk_pre_first_se <- se_fmt(get_nfip("takeup_ppml_pre_first_se"))
-tk_clm_stc  <- lp_fmt(get_nfip("takeup_ppml_static_clmsample"))
-tk_clm_stc_se <- se_fmt(get_nfip("takeup_ppml_static_clmsample_se"))
 # Columns (2) and (3).
 ch_stc      <- lp_fmt(get_nfip("claims_home_ppml_static"))
 ch_stc_se   <- se_fmt(get_nfip("claims_home_ppml_static_se"))
 cr_stc      <- lp_fmt(get_nfip("claim_rate_ppml_static"))
 cr_stc_se   <- se_fmt(get_nfip("claim_rate_ppml_static_se"))
 cr_stc_pct  <- pctc_fmt(get_nfip("claim_rate_ppml_static"))
-cr_stc_cty_se <- se_fmt(get_nfip("claim_rate_ppml_static_cty_se"))
 cr_ci_lo    <- pctc_fmt(get_nfip("claim_rate_ppml_static") -
                         1.96 * get_nfip("claim_rate_ppml_static_se"))
 cr_ci_hi    <- pctc_fmt(get_nfip("claim_rate_ppml_static") +
                         1.96 * get_nfip("claim_rate_ppml_static_se"))
-# Pre-1994 MH levels of the three margins, quoted so the log coefficients
-# have a magnitude to attach to. These are descriptive rates, not estimates.
-ppl_home_base  <- formatC(get_nfip("policies_per_1k_homes_yr_base_mh"),
-                          format = "f", digits = 1)
+# Pre-1994 MH claims per 1,000 policy-years, the base rate the claims-per-policy
+# coefficient moves.
 clmrate_base   <- formatC(get_nfip("claim_rate_base_mh") * 1000,
                           format = "f", digits = 1)
-# Both sides of the pooled policies-per-home comparison in levels.
-lvl_fmt <- function(x) formatC(x, format = "f", digits = 1)
-ppl_mh_pre   <- lvl_fmt(get_nfip("policies_per_1k_homes_yr_mh_pre"))
-ppl_mh_post  <- lvl_fmt(get_nfip("policies_per_1k_homes_yr_mh_post"))
-ppl_sb_pre   <- lvl_fmt(get_nfip("policies_per_1k_homes_yr_sb_pre"))
-ppl_sb_post  <- lvl_fmt(get_nfip("policies_per_1k_homes_yr_sb_post"))
-tk_nogeo     <- lp_fmt(get_nfip("takeup_ppml_static_nogeo"))
-tk_nogeo_se  <- se_fmt(get_nfip("takeup_ppml_static_nogeo_se"))
 # Take-up split by mandatory-purchase status. Under a proportional
 # specification the two components no longer add to the total; each is a
 # proportional change in its own component rate, so the contribution of the
@@ -232,41 +208,6 @@ tk_nonmand_stc_se <- se_fmt(get_nfip("takeup_ppml_nonmand_static_se"))
 tk_mand_share   <- fmt_pct(get_nfip("takeup_mand_share_pre_mh") * 100, 1)
 tk_mand_contrib <- lp_fmt(get_nfip("takeup_mand_share_pre_mh") *
                           get_nfip("takeup_ppml_mand_static"))
-# Specification diagnostics for the levels-vs-counts paragraph. The level
-# figures are in annual policies per 1,000 homes; the Poisson ones in log
-# points.
-lvl_fmt2      <- function(x) signed_fmt(x, 2)
-tk_lvl_stc    <- lvl_fmt2(get_nfip("takeup_lvl_static"))
-tk_lvl_stc_se <- formatC(get_nfip("takeup_lvl_static_se"),
-                         format = "f", digits = 2)
-tk_lvl_terc   <- lvl_fmt2(get_nfip("takeup_lvl_static_tercile"))
-tk_lvl_ctymh  <- lvl_fmt2(get_nfip("takeup_lvl_static_ctymh"))
-tk_lvl_bin5   <- lvl_fmt2(get_nfip("takeup_lvl_static_bin5"))
-tk_lvl_t_low  <- lvl_fmt2(get_nfip("takeup_lvl_static_terc_low"))
-tk_lvl_t_mid  <- lvl_fmt2(get_nfip("takeup_lvl_static_terc_mid"))
-tk_lvl_t_high <- lvl_fmt2(get_nfip("takeup_lvl_static_terc_high"))
-tk_rate_low   <- lvl_fmt(get_nfip("takeup_rate_terc_low"))
-tk_rate_high  <- lvl_fmt(get_nfip("takeup_rate_terc_high"))
-tk_ppml_ctymh <- lp_fmt(get_nfip("takeup_ppml_static_ctymh"))
-tk_ppml_bin5  <- lp_fmt(get_nfip("takeup_ppml_static_bin5"))
-tk_den_max_t  <- formatC(get_nfip("takeup_den_profile_max_t"),
-                         format = "f", digits = 1)
-
-# Water-depth robustness (Chunk K): the three columns of Table
-# \ref{tab:water-depth-robustness} share the building-damage headline's
-# sample and FE, so column (1) reproduces `bldg_dmg_eff`/`bldg_dmg_se`
-# exactly (asserted at estimation time) -- only columns (2)-(3) are new.
-# These are now Poisson coefficients (log points), matching the headline scale,
-# so they are formatted as coefficients rather than as dollar amounts.
-wd_dmg_depth    <- lp_fmt(get_nfip("building_damage_static_rob_depth"))
-wd_dmg_depth_se <- se_fmt(get_nfip("building_damage_static_rob_depth_se"))
-wd_dmg_depthx    <- lp_fmt(get_nfip("building_damage_static_rob_depthx"))
-wd_dmg_depthx_se <- se_fmt(get_nfip("building_damage_static_rob_depthx_se"))
-wd_miss_mh_pre   <- fmt_pct(get_nfip("water_depth_missing_mh_pre") * 100, 1)
-wd_miss_mh_post  <- fmt_pct(get_nfip("water_depth_missing_mh_post") * 100, 1)
-wd_miss_sb_pre   <- fmt_pct(get_nfip("water_depth_missing_sb_pre") * 100, 1)
-wd_miss_sb_post  <- fmt_pct(get_nfip("water_depth_missing_sb_post") * 100, 1)
-
 # Wind-zone triple difference, building damage (Table
 # \ref{tab:windzone-ddd-building}), in log points.
 wz_lp <- function(nm) lp_fmt(get_nfip(paste0("wz_building_damage_", nm)))
@@ -281,18 +222,10 @@ wz_mh_z1_shr <- fmt_pct(100 * get_nfip("wz_n_mh_claims_z1") /
     sum(sapply(1:3, function(z) get_nfip(paste0("wz_n_mh_claims_z", z)))), 0)
 wz_n_cty_z3   <- as.integer(get_nfip("wz_n_counties_z3"))
 wz_n_state_z3 <- as.integer(get_nfip("wz_n_states_z3"))
-# Within-cell variation in the depth control, so the appendix can establish that
-# the small change in fit reflects what drives damage rather than a control with
-# nothing to vary on.
-wd_n_bins        <- as.integer(get_nfip("water_depth_n_bins"))
-wd_bins_cell     <- formatC(get_nfip("water_depth_bins_per_cell"),
-                            format = "f", digits = 1)
-wd_one_bin       <- fmt_pct(get_nfip("water_depth_single_bin_share") * 100, 1)
-
 # HUD comparison (Table \ref{tab:hud-comparison}): HUD's ex ante forecasts for
 # the 1994 standard beside the estimates, at HUD's 7% discount rate and 33-year
 # home life. Money is in $000 of 2000 dollars, as above.
-hud_sc  <- fread(here("output", "results", "hud-comparison-scalars.csv"))
+hud_sc  <- fread(here("output", "cost-benefit", "hud-comparison-scalars.csv"))
 get_hud <- function(nm) hud_sc[statistic == nm, value]
 
 hud_rate       <- fmt_pct(get_hud("hud_discount_rate") * 100)
@@ -337,11 +270,11 @@ fl_all_bcr <- formatC(get_hud("flood_bcr_all"), format = "f", digits = 2)
 # CoreLogic cost side (Chunk P): static ladder for prices (OLS, log points) and
 # surviving counts (PPML, log points), columns 1-4 as in notes/specs.md §20,
 # plus the sample sizes quoted in the data section. Read from the aggregate
-# outputs of program/corelogic/estimate-corelogic-{prices,share}.R.
+# outputs of program/estimate-corelogic/estimate-corelogic-{prices,quantities}.R.
 cl_dir <- here("output", "corelogic")
 cl_lad <- rbind(
     fread(file.path(cl_dir, "prices", "mh_static_ladder.csv"))[, outcome := "price"],
-    fread(file.path(cl_dir, "share", "mh_static_ladder.csv"))[, outcome := "count"])
+    fread(file.path(cl_dir, "quantities", "mh_static_ladder.csv"))[, outcome := "count"])
 cl_lad[, `:=`(col = as.integer(sub("ladder_", "", specification)),
               zone = fifelse(grepl("z2$", term), 2L, 3L))]
 stopifnot(nrow(cl_lad) == 16L, !anyDuplicated(cl_lad, by = c("outcome", "col", "zone")))
@@ -357,7 +290,7 @@ lad_pc <- function(o, k, z) pctc_fmt(get_lad(o, k, z))
 cl_sales <- fread(file.path(cl_dir, "prices", "sample_by_vintage.csv"))
 cl_n_mh_sales <- format(cl_sales[mh == 1, sum(sales)], big.mark = ",")
 cl_n_sb_sales <- format(cl_sales[mh == 0, sum(sales)], big.mark = ",")
-cl_support <- fread(file.path(cl_dir, "share", "mh_static_ladder_support.csv"))
+cl_support <- fread(file.path(cl_dir, "quantities", "mh_static_ladder_support.csv"))
 cl_n_mh_homes <- format(cl_support[mh == 1, sum(homes)], big.mark = ",")
 cl_n_sb_homes <- format(cl_support[mh == 0, sum(homes)], big.mark = ",")
 cl_n_cty_q <- format(cl_support[mh == 1, sum(counties[post == 0])], big.mark = ",")
@@ -366,8 +299,8 @@ lad_min <- function(o, z) pctc_fmt(min(cl_lad[outcome == o & zone == z, estimate
 lad_max <- function(o, z) pctc_fmt(max(cl_lad[outcome == o & zone == z, estimate]))
 # Count event studies (both versions): range of the Zone III coefficients for
 # construction years 1995-1999, quoted in the quantity results paragraph.
-cl_es_q <- rbind(fread(file.path(cl_dir, "share", "mh_only_vintage_coefficients.csv")),
-                 fread(file.path(cl_dir, "share", "mh_only_vintage_coefficients_state_vintage_fe.csv")))
+cl_es_q <- rbind(fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients.csv")),
+                 fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients_state_vintage_fe.csv")))
 cl_es_q[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
 stopifnot(nrow(cl_es_q) == 40L)
 cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
