@@ -20,8 +20,12 @@ source(here("program", "estimate-nfip", "nfip-setup.R"))
 #   spec, as in the other NFIP scripts.
 # ---------------------------------------------------------------------------
 
+# Only the columns the regressions use are read (the file is ~18m rows)
 dt_pol_micro <- as.data.table(arrow::read_parquet(
-    here("derived", "nfip-policy-micro.parquet")))
+    here("derived", "nfip-policy-micro.parquet"),
+    col_select = c("countyfp", "period_loss", "year_constr", "mh",
+                   "repl_cost", "building_policy_covg", "contents_policy_covg",
+                   "elevated_policy", "sfha_policy")))
 dt_pol_micro <- dt_pol_micro[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 dt_pol_micro[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
