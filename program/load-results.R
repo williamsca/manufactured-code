@@ -321,3 +321,15 @@ stopifnot(nrow(cl_es_p) == 20L)
 stopifnot(cl_es_p[grepl(":z2$", term) & vintage >= 1994,
                   all(estimate < hud_fc[wind_zone == 2, forecast])])
 cl_p_z3_1999 <- formatC(cl_es_p[term == "year_constr::1999:z3", estimate], format = "f", digits = 3)
+
+# Assessor land share of value for 1989-1993 MH parcels by wind zone
+# (estimate-corelogic-new-sales.R), and the land-adjusted forecast:
+# structure share times the forecast log change.
+cl_land <- fread(file.path(cl_dir, "new-sales", "mh_land_share_by_zone.csv"))
+stopifnot(setequal(cl_land$wind_zone, 1:3), !anyNA(cl_land$land_share_aggregate))
+land_share <- function(z) cl_land[wind_zone == z, land_share_aggregate]
+cl_land_z2 <- fmt_pct(100 * land_share(2))
+cl_land_z3 <- fmt_pct(100 * land_share(3))
+hud_fc_adj <- function(z) (1 - land_share(z)) * hud_fc[wind_zone == z, forecast]
+hud_fc_adj_z2 <- formatC(hud_fc_adj(2), format = "f", digits = 3)
+hud_fc_adj_z3 <- formatC(hud_fc_adj(3), format = "f", digits = 3)
