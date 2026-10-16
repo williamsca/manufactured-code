@@ -4,15 +4,39 @@ Work proceeds in delegated chunks (lettered below), each sized for one agent ses
 
 Verification is built in rather than ad hoc. `program/tests/` holds fake-data tests run by `make test`: each estimator is applied to simulated data with known parameters (e.g., claims data with a built-in MH x post-1994 damage effect, common vintage effects, and geography-period shocks) and must recover the truth; the same harness demonstrates *why* the spec is right (e.g., that omitting common vintage effects biases the MH-vintage coefficients). Constructed denominators get the same treatment: any imputation must pass an exact adding-up test against its source totals and a fake-data test that recovers a known take-up gradient. Data-construction steps carry the standard sanity checks (uniqueness on intended IDs, cross-field consistency, missing-value accounting, counts validated against external benchmarks like Census 2000 MH counts and MHS shipments). Agent sessions run `make test` before opening a review; any red test blocks the merge. Review comments in `coarse-output/*_review.md` are the external checklist — each addressed comment gets flipped to `[Addressed]` in that file in the commit that addresses it.
 
-# TODO
-
-## Leora (Oct. 9, 2026)
-
-
-
-## 
+# TODO 
 
 Timeline anchors: JMP-heavy through August (Chunk A only, low effort); September for B–D, with C1 early in that block since D–G all inherit its numbers; late September to mid-October for E–F; welfare table (G) once C and E land; slides and dry run by late October for APPAM (early November).
+
+## Chunk Q — Reframe around "resist vs. replace"; two checks on the CoreLogic quantity decline [Colin frames; Q1–Q2 delegated]
+Motivation (2026-10-15 discussion). The paper's "so what" is unclear. Proposed framing: under disaster risk, a household can **resist** (buy resilient, durable capital, which the 1994 HUD wind standard mandates) or **replace** (buy cheap, fast-depreciating capital and replace it after a loss, which is what MH is). In a user-cost model $u = p(r + \delta + \lambda d)$, a mandate that raises price by $\kappa$ and cuts the loss fraction by $\rho$ lowers user cost roughly iff $\lambda d \rho \gtrsim \kappa (r+\delta)$. High $\delta$ (MH) and high $r$ (chattel credit) both raise the bar; expected *dollar* loss $p d$ is what is at stake, so MH caps the loss. Ex post aid (FEMA IA) subsidizes replace, which is the cleanest case for a mandate alongside risk misperception.
+
+Under this framing the CoreLogic Zone III quantity decline is a result, not a puzzle: price up plus quantity down means the marginal buyer valued the mandated resilience below cost (mandated-benefit logic). Survival bias cannot produce the decline. If assessors reset `year_built` when a structure is replaced, storm destruction depletes pre-1994 vintages and works *against* the decline (the paper already argues this). If they don't reset it, there is no survival effect at all. The decline is then a placement effect. Q1 and Q2 test the two things that could still make it an artifact. Note the current intro contradicts this: it says there is no placement effect, so households valued the upgrade "roughly at cost" (based on MHS). Do not edit the paper text until Q1–Q2 are back.
+
+### Q1 — What `year_built` means: behavior across historical Property Basic snapshots [agent]
+Question: when a structure on a parcel is destroyed and replaced, does `year_built` change to the new structure's year, or does it keep the original? Separately, what is `effective_year_built` in practice? Working hypothesis: `year_built` = year the *current* structure was built, so it resets on replacement. `effective_year_built` = assessor's condition-adjusted age (an appraisal concept), not a construction date. Assessor practice varies by county, so establish this empirically.
+- [X] Locate the historical Property Basic vintages (roughly 2013/14–2026) and document in `notes/corelogic-databuild.md`: which snapshot years exist, file paths, fields common to all, and whether `clip` is stable across snapshots. Sanity checks: `clip` unique within each snapshot; match rate of `clip` across adjacent snapshots by county.
+- [X] Build a parcel × snapshot panel of `year_built`, `effective_year_built`, `mh` indicator, land use, improvement value, and land value. Restrict to a few storm counties to start: **Lee and Charlotte FL (Hurricane Ian, Sep 2022)** and **Bay and Gulf FL (Hurricane Michael, Oct 2018)**. Add one Zone I non-storm comparison county with a large MH stock.
+- [X] Tabulate, by MH vs. site-built and by storm vs. non-storm county-period: share of parcels whose `year_built` changes between adjacent snapshots; the distribution of (new − old) `year_built` when it changes; share whose `mh` indicator flips (MH→SB, SB→MH); share whose improvement value falls by >80% and later recovers. Then the key cross-tab: among parcels with an improvement-value collapse after the storm followed by recovery, how often did `year_built` reset to a post-storm year?
+- [X] Same tabulations for `effective_year_built`: how often it differs from `year_built`, how often it moves when `year_built` doesn't (renovation reassessment?), and whether it ever precedes `year_built` (would be a data error).
+- [X] Memo in `notes/LOG.md` with a one-line answer: "`year_built` resets on replacement in X% of identified replacements," with any county heterogeneity. Also state whether the panel looks usable for the survival analysis (Q4): snapshot frequency, assessor update lags after a storm, coverage gaps.
+
+### Q2 — Census 2000 check on the quantity decline [agent]
+The CoreLogic counts (a) are survivors as of 2023 and (b) cover only MH on owned land (parcels), excluding park and rented-lot units titled as personal property. Census 2000 counts every occupied and vacant MH unit only ~5 years after the reform, so survival barely matters and coverage includes park MH. The data are already on disk: `derived/census2000-mh-county-vintage.Rds` from `program/import/import-census.R` (HCT006, tenure × year built × units in structure). Bins are 1980–89, 1990–94, 1995–98, 1999–2000.
+- [X] Sanity checks on the input: county uniqueness, MH bins summing to the H030 total (net of pre-1980), missing counties vs. the CoreLogic quantity sample.
+- [X] Estimate the county-level analog of the quantity design by PPML: MH count by county × vintage bin with county and bin FE, plus Zone II and Zone III × {1995–98, 1999–2000} interactions. Reference bin 1990–94 (it mixes pre and post, so post-reform effects are attenuated; state this). Also the version relative to site-built/total units (county × bin FE, housing-type × bin FE), mirroring columns (3)–(4) of `tab:cost-static`. Also with state × bin FE. Cluster by county.
+- [X] Split by tenure (owner vs. renter occupied). This is not land tenure, but it is the closest available proxy for whether the decline is concentrated where CoreLogic does not see.
+- [~] Robustness: drop Miami-Dade and Monroe (Hurricane Andrew, Aug 1992, Zone III). Post-Andrew rebuilding could inflate the 1993 reference year in the CoreLogic design and the 1990–94 bin here. Re-run the CoreLogic quantity static ladder without these two counties too.
+- [X] Memo in `notes/LOG.md`: does Census 2000 show a Zone III decline in the 1995–98 MH bin comparable in sign and rough size to CoreLogic's? Does it survive dropping Andrew counties? Outputs to `output/corelogic/quantities/` (or `output/descriptives/`), with scalars to `output/results/` per the standing rules and a spec entry in `notes/specs.md`.
+
+### Q3 — Model and reframing [Colin, after Q1–Q2]
+- [ ] Write the user-cost model in `notes/` (resist vs. replace; resilience as durability; break-even $\lambda d \rho \gtrsim \kappa(r+\delta)$; MH vs. SB choice on dollar losses $p d$; role of land share and ex post aid). Map the break-even to the zone map: where does the mandate pay?
+- [ ] Reconcile the intro/abstract claim of "no placement effect / valued at cost" with the CoreLogic decline. If Q2 confirms the decline, reframe it as revealed valuation below cost and ask where displaced buyers went: site-built (columns 3–4), older pre-1994 MH held longer (a Gruenspecht-style effect that would lower stock-wide resilience), or out of the county.
+- [ ] Candidate structure: model → cost (prices) → behavioral response (quantities = revealed valuation; displacement) → benefits (flood via NFIP; wind via Q4) → where the mandate pays.
+
+### Q4 — Survival/destruction analysis = the wind channel [scope only if Q1 says the panel is usable]
+The paper currently says the wind channel "would need to deliver" a stated amount but does not test it. Parcel-level design on the historical snapshots. Outcome: structure removed or replaced within ~2 years of a storm. Treatment: post-1994 × MH × wind exposure (wind swath), with SB as comparison. Storms in window: Matthew, Harvey, Irma, Michael, Florence, Laura, Ida, Ian, Idalia, Helene, Milton. The same panel measures what replaced the destroyed units (MH, SB, vacant), i.e., the replace margin, and whether pre-1994 MH are retained longer in Zone III (Gruenspecht test).
+- [ ] Not started. Decide after Q1.
 
 ## Chunk P — Cost side moved to county x vintage CoreLogic designs [agent] — merged to `main` `5e780ec` (2026-10-12)
 Memo in `notes/LOG.md`; spec in `notes/specs.md` §20.

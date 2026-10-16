@@ -4,6 +4,82 @@ Newest entry first. See `TODO.md` PROCESS for what belongs in each memo.
 
 ---
 
+## Q1 — What `year_built` means across historical Property Basic snapshots
+
+**Answer: `year_built` resets on replacement in about 60–70% of identified replacements in Bay FL (Hurricane Michael) and is much less reliable elsewhere.** Identified replacement = MH parcel (land use 137) whose improvement value falls >80% between adjacent annual snapshots and later returns to ≥80% of its prior level.
+
+| County, interval | Collapse-and-recover with later `year_built` | Reset to year ≥ start of interval | Unchanged | Changed to earlier year | Missing |
+|---|---|---|---|---|---|
+| Bay, 2018→19 (Michael) | 249 | 148 (59%; 67% of non-missing) | 62 | 11 | 28 |
+| Bay, other intervals | 104+ | 73 (70% of non-missing) | 18 | 13 | 30 |
+| Gulf, 2018→19 | 14 | 3 | 6 | 1 | 4 |
+| Charlotte, all | 16 | 6 | 8 | 0 | 2 |
+| Lee, all | 699+ | 47 (7%) | 648 | 4 | 13 |
+| Maricopa, all | 27 | 5 | 11 | 4 | 14 |
+
+Heterogeneity is large. Bay resets. Lee mostly does not: most Lee collapses keep `year_built` (they look like revaluations, not rebuilds; 2013, 2016, 2018). Gulf, Charlotte and Maricopa are too thin to say.
+
+**Michael signal.** Bay MH parcels with an >80% improvement drop: 5.76% in 2018→19 vs ~0.5% in other intervals (Gulf 2.67% vs 0.3%). Site-built: 0.78% / 0.28% (Bay). Bay MH `year_built` change rate is 1.35% in 2019 vs 1.11% otherwise, so most collapses reset *only* when paired with a collapse; the base rate of `year_built` changes is ~1% per interval for MH. Gulf 2019: 4.31% vs 1.18%.
+
+**Flips.** MH→SB (land use) is common (Bay 1,251 over the panel, Lee 856), SB→MH rarer. Land-use flips are mostly reclassification noise, not rebuilds.
+
+**`effective_year_built`.** Differs from `year_built` for a minority; moves without `year_built` moving in 2–10% of MH parcel-intervals (Lee ~10%: bulk reassessment updates, 20,393 of 20,922 changes with `year_built` unchanged), so it is an appraisal-age concept, not a construction date. It precedes `year_built` in only 102 rows (Bay 68, Gulf 34). Michael-year change shares: Bay 2.66% vs 2.22% otherwise; Gulf 5.34% vs 2.54%.
+
+**Usability for Q4 (survival).** Partly.
+- Good: annual frequency 2008–2022; `clip` unique and stable; no key problems; Michael has 2019–2022 post-storm snapshots.
+- Bad: **Ian cannot be analyzed.** Data end at tax year 2022 (roll mostly pre-Ian; assessor updates only to Mar 2023). The 2023 curated file is the same snapshot.
+- Bad: MH indicator unusable before 2016; land use 137 has gaps in Lee (2009–10) and a step in Maricopa (2012).
+- Bad: no `previous_clip`, so replacement can only be inferred from value collapses, not observed. Replacement identification depends on county practice (Bay resets; Lee does not).
+- Assessor update dates missing in early Bay snapshots; see `tab-update-timing.csv` for post-storm update lags.
+- Recommended: use Michael counties (Bay, Gulf, plus Mexico Beach / Calhoun / Jackson FL) and add Irma (2017: Collier 12021, Monroe 12087) and other pre-2022 storms. Do not rely on `year_built` alone for destruction; use value collapse and check reset by county.
+
+Outputs: `output/import-corelogic-snapshots/tabulate/`; code `program/import-corelogic-snapshots/`; documentation `notes/corelogic-databuild.md`.
+
+---
+
+## Chunk Q2 — Census 2000 check on the CoreLogic quantity decline (2026-10-15)
+
+**Answer.** Census 2000 shows a Zone III decline in the 1995-98 MH bin of the same sign and about the same size as CoreLogic's, and it does not depend on the Andrew counties. It is concentrated in owner-occupied units, not renter-occupied ones.
+
+### What was done
+- `program/import/import-census-tenure.R` (new, in `make data`): HCT006 occupied units by tenure x year built x {MH, 1-unit site-built}, all nine vintages, plus H030 MH totals. Written to `derived/census2000-tenure-county-vintage.Rds`. The existing `census2000-mh-county-vintage.Rds` pools owners and renters, so it could not support the tenure split.
+- `program/estimate-census/` (new): `estimate-census.R`, `census-lib.R`. PPML on county x bin counts, same four-column ladder as `tab:cost-static`, plus dynamic coefficients with 1990-94 as the reference. Outputs in `output/census/`; scalars in `census-scalars.csv`. Spec in `notes/specs.md` §21. Wired into `make estimates`.
+- `program/tests/test-census-quantity.R` (new): fake counts with a known MH x post x Zone III effect and a common Zone III shock. Columns 3-4 recover the truth, column 1 recovers truth plus the common shock, and the zero-effect placebo returns zero.
+
+### Results (Zone III x post, log points, county-clustered SE)
+| | Col 1 | Col 2 | Col 3 | Col 4 |
+|---|---|---|---|---|
+| Census 2000, all occupied | -0.979 (0.122) | -0.730 (0.100) | -0.740 (0.124) | -0.701 (0.119) |
+| CoreLogic (`mh_static_ladder.tex`) | -0.921 (0.115) | -0.687 (0.117) | -0.776 (0.130) | -0.789 (0.157) |
+| Census, owner-occupied | -1.072 (0.132) | -0.813 (0.107) | -0.849 (0.132) | -0.798 (0.126) |
+| Census, renter-occupied | -0.431 (0.118) | -0.167 (0.137) | -0.072 (0.151) | -0.153 (0.168) |
+| Census, excl. Miami-Dade and Monroe | -0.979 (0.133) | -0.743 (0.105) | -0.767 (0.132) | -0.737 (0.120) |
+
+Zone II x post: -0.24, -0.14, -0.14, -0.23 (Census) against -0.24, -0.11, -0.19, -0.25 (CoreLogic). The vacancy-adjusted pooled counts give the same Zone III estimates within 0.03.
+
+Dynamic (column 2, relative to 1990-94): Zone III is -0.585 in 1995-98 and -0.608 in 1999-2000.
+
+### Reading it
+- **Survival and coverage do not explain the decline.** Census counts occupied units about five years after the reform, including park units, and still shows a decline of about 50% (exp(-0.74) - 1 = -52%) in Zone III. CoreLogic's survivor and owned-parcel restrictions cannot be what produces it.
+- **Not concentrated where CoreLogic cannot see.** Renter-occupied units show a much smaller and mostly insignificant decline (-0.07 to -0.43), owner-occupied units a larger one (-0.80 to -1.07). Caveat: tenure is occupant tenure, not land tenure; an owner-occupied unit in a park is still owner-occupied here.
+- **Andrew.** Dropping Miami-Dade and Monroe moves no coefficient by more than 0.04.
+- **Pre-trend caveat.** The 1980-89 Zone III coefficient is positive (+0.19 to +0.48 across columns; +0.26 in column 3), i.e. Zone III's MH share was already falling toward 1990-94. The static ladder puts 1980-89 in the pre-period, so it partly picks this up; the dynamic estimates against 1990-94 alone are -0.56 to -0.64. This is a decline from a 1980s high, with the reform bins a continuation of a level shift that started by 1990-94 (the reference bin, which is itself mixed). Compare the CoreLogic event study, which has no 1980s.
+- **Attenuation.** 1990-94 mixes pre- and post-reform years, and 1999-2000 is only 1.25 years, so post-reform effects are understated.
+
+### Verified
+- Sanity checks (`output/census/census-sanity-checks.csv`): (county, vintage, tenure) unique; no missing values; occupied MH over all nine vintages never exceeds H030 MH (aggregate ratio 0.84, consistent with vacancy); the four bins reproduce `census2000-mh-county-vintage.Rds` exactly; owner + renter MH partitions the pooled count exactly; the four 1980-2000 bins hold 60% of occupied MH.
+- Zone assignment: 148 Zone II and 26 Zone III counties in the panel. Seven Census 2000 counties are not in `ecfr-windzone.csv` (four NYC boroughs, Shannon SD, two inland Virginia cities merged later) and are set to Zone I; the script asserts this is exactly that list.
+- Coverage against the CoreLogic quantity sample: 2,455 CoreLogic counties against 3,109 Census counties with any MH. Two CoreLogic counties are not in Census (08014 Broomfield, created 2001; 12025 historical Dade). 656 Census counties are not in CoreLogic, holding 12% of 1980-2000 MH.
+- `test-census-quantity.R` passes. I did not run the full `make test`.
+
+### Open / not done
+1. **CoreLogic ladder without Andrew counties not re-run.** It needs Rivanna and the licensed build. The Census side is done; the CoreLogic quantity script needs a second ladder with 12086, 12087 and historical Dade 12025 excluded.
+2. **Census bins cannot isolate 1994.** The reference bin is five years and mixes both regimes, so a clean pre/post contrast at the 1994 boundary is not available here.
+3. Site-built here is 1-unit occupied structures, not the CoreLogic site-built dwelling universe; I did not check how the two comparison groups differ, so columns 3-4 are comparable in design but not necessarily in the comparison group.
+4. Not wired into `paper.Rmd`, per the Chunk Q instruction not to edit paper text until Q1-Q2 are back.
+
+---
+
 ## Chunk P — Cost side moved to county x vintage CoreLogic designs; 1994 retained in take-up (2026-10-12)
 
 Branch `chunk-p-county-vintage-cost-side`. Colin's request 2026-10-12: replace

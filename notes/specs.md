@@ -1566,3 +1566,39 @@ vs SB comparison is within county and vintage.
 1990:1994`); `takeup-panel.R` and `estimate-sumstats-nfip.R` no longer drop it;
 HUD-comparison zone weights use 1994-1999 stock. The 1994-1995 take-up bin now
 holds both years. The claim-level NFIP design already included 1994.
+
+
+## 21. Census 2000 check on the CoreLogic quantity decline (Chunk Q2, 2026-10-15)
+
+**Script:** `program/estimate-census/estimate-census.R` (formulas in
+`census-lib.R`); input `derived/census2000-tenure-county-vintage.Rds` from
+`program/import/import-census-tenure.R` (HCT006, all nine vintages, owner and
+renter separately); zones from `derived/ecfr-windzone.csv`. Outputs in
+`output/census/`; scalars `census-scalars.csv`; checks `census-sanity-checks.csv`.
+Fake-data test: `program/tests/test-census-quantity.R`.
+
+**Data.** County x vintage-bin counts of *occupied* units: MH, and 1-unit
+(detached or attached) site-built. Bins 1980-89, 1990-94, 1995-98, 1999-2000;
+1990-94 is the reference and mixes pre- and post-reform years, so post-reform
+effects are attenuated. Panel: counties with any MH in the four bins (analog of
+`cl_mh_count_panel`), Alaska and Hawaii excluded, all bins retained with zeros.
+Census counties missing from the zone list (36005, 36047, 36081, 36085, 46113,
+51515, 51560) are Zone I.
+
+**Static ladder** (same four columns as `tab:cost-static`, PPML,
+`post = 1[bin in {1995-98, 1999-2000}]`, so the 1980s bin enters the pre-period):
+
+| Col | Sample | Regressors | FE |
+|---|---|---|---|
+| 1 | MH | `post_z2 + post_z3` | `countyfp + bin` |
+| 2 | MH | same | `countyfp + statefp^bin` |
+| 3 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^mh + countyfp^bin + mh^bin` |
+| 4 | MH + SB | same | `countyfp^mh + countyfp^bin + statefp^bin^mh` |
+
+**Dynamic:** `i(bin, z2, ref = "1990_1994") + i(bin, z3, ref = "1990_1994")` in
+columns 1-2; the same with `z2 * mh`, `z3 * mh` in 3-4. Clustering: county.
+
+**Samples:** all occupied; owner-occupied; renter-occupied (tenure of the
+occupant, not land tenure); excluding Miami-Dade (12086) and Monroe (12087),
+the Hurricane Andrew counties; vacancy-adjusted pooled counts
+(`census2000-takeup-county-vintage.Rds`).

@@ -74,6 +74,7 @@ data:
 	Rscript program/import/import-cpi.R
 	Rscript program/import/import-census.R
 	Rscript program/import/import-census-takeup.R
+	Rscript program/import/import-census-tenure.R
 	Rscript program/import/databuild-mhs.R
 	Rscript program/import/impute-stock.R
 	Rscript program/import/databuild-nfip.R
@@ -89,6 +90,7 @@ estimates:
 	Rscript program/estimate-nfip/estimate-nfip-composition.R
 	Rscript program/estimate-nfip/estimate-nfip-takeup.R
 	Rscript program/estimate-nfip/estimate-nfip-windzone.R
+	Rscript program/estimate-census/estimate-census.R
 	Rscript program/cost-benefit/estimate-welfare.R
 	Rscript program/cost-benefit/estimate-hud-comparison.R
 	Rscript program/cost-benefit/hud-cost-forecast.R
