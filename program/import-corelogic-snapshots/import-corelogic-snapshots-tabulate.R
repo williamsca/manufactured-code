@@ -6,9 +6,9 @@
 #   SNAPSHOT_PANEL    panel.parquet from the panel script
 #   SNAPSHOT_RESULTS  new output directory (required)
 #
+# Housing type (MH / SB / Other) is defined from land use; see the CASE expression below.
 # Unit of comparison: (clip, adjacent snapshots a -> b), where b is the next snapshot in
-# time (snap_idx = chronological rank of snapshot_year) and the clip is present in both. Types are by the classification at a:
-# MH (mobile-home indicator), SB (single-family, no MH flag), Other (unclassified).
+# time (snap_idx = chronological rank of snapshot_year) and the clip is present in both. Types are by the classification at a.
 
 library(data.table)
 library(DBI)
@@ -49,7 +49,15 @@ on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
     SELECT clip, previous_clip, fips, dense_rank() OVER (ORDER BY snapshot_year) AS snap_idx,
         rp.snap_idx AS src_idx, snapshot_year, mh,
         year_built AS yb, eff_year_built AS eff, impr_val_calc AS impr,
-        CASE mh WHEN 1 THEN 'MH' WHEN 0 THEN 'SB' ELSE 'Other' END AS type,
+        -- MH by land use, not by the MH indicator: the indicator is contaminated before 2014-16
+        -- (it flags condominium land use 163 in Lee, and is absent in Bay and Maricopa), while
+        -- land use 137 is stable across snapshots. SB: single-family property code with no
+        -- mobile-home-type or condominium land use and no MH flag.
+        CASE WHEN land_use_code = '137' THEN 'MH'
+             WHEN property_indicator_code = '10'
+               AND coalesce(land_use_code, '') NOT IN ('135', '136', '137', '138', '454', '163')
+               AND coalesce(mobile_home_indicator, '') <> 'Y' THEN 'SB'
+             ELSE 'Other' END AS type,
         last_assessor_update, mobile_home_indicator, property_indicator_code, land_use_code
     FROM read_parquet('%s') rp", panel_file))
 
