@@ -55,8 +55,13 @@ snap_rows <- function(s) {
         # K: outside the requested counties
         row("K", s, 1990, 50000, fips = "99999")))
 }
+# Zip numbering is not chronological: the first three snapshots are numbered newest-first
+# (03, 02, 01) and the newest snapshot is a late extra (15) with a different date and a
+# space in its file name, as in the real delivery.
+zip_idx <- c(3, 2, 1, 15)
 for (s in 1:4) {
-    d <- file.path(src, "20240814", sprintf("14%02d00", s))
+    k <- zip_idx[s]
+    d <- file.path(src, "20240814", sprintf("14%02d00", k))
     dir.create(d, recursive = TRUE)
     txt <- file.path(root, sprintf("fixture_%02d_FL.txt", s))
     tmp <- tempfile()
@@ -64,18 +69,23 @@ for (s in 1:4) {
     lines <- readLines(tmp)
     eol <- if (s == 2) "\r\n" else "\n"   # snapshot 2 carries CRLF line endings
     writeBin(charToRaw(paste0(paste(lines, collapse = eol), eol)), txt)
-    stem <- sprintf("university_of_virginia_hist_property_basic1_dpc_01468305_%02d_20240814_14%02d00_data_FL", s, s)
+    stem <- if (k == 15) {
+        "University of Virginia_hist_property_basic1_dpc_01468305_15_20240815_151041_data_FL"
+    } else {
+        sprintf("university_of_virginia_hist_property_basic1_dpc_01468305_%02d_20240814_14%02d00_data_FL", k, k)
+    }
     file.copy(txt, file.path(d, paste0(stem, ".txt")))
     owd <- setwd(d)
-    system2("zip", c("-q", paste0(stem, ".zip"), paste0(stem, ".txt")))
+    system2("zip", c("-q", shQuote(paste0(stem, ".zip")), shQuote(paste0(stem, ".txt"))))
     unlink(paste0(stem, ".txt"))
     setwd(owd)
+    stopifnot(file.exists(file.path(d, paste0(stem, ".zip"))))
 }
 
 run <- function(script, ...) {
     out <- system2("Rscript", here("program", "import-corelogic-snapshots", script),
         env = c("SNAPSHOT_ALLOW_LOCAL=1", sprintf("SNAPSHOT_SOURCE=%s", src), "SNAPSHOT_COUNTIES=12071",
-            "SNAPSHOT_DELIVERY=20240814", ...), stdout = TRUE, stderr = TRUE)
+            "SNAPSHOT_DELIVERY=2024081[45]", ...), stdout = TRUE, stderr = TRUE)
     status <- attr(out, "status")
     if (!is.null(status) && status != 0) stop(paste(c("Script failed:", script, tail(out, 25)), collapse = "\n"))
     invisible(out)
@@ -90,13 +100,13 @@ con <- dbConnect(duckdb())
 on.exit(dbDisconnect(con, shutdown = TRUE))
 panel <- as.data.table(dbGetQuery(con, sprintf("SELECT * FROM read_parquet('%s')", file.path(panel_dir, "panel.parquet"))))
 snapshots <- fread(file.path(panel_dir, "snapshots.csv"))
-stopifnot(identical(snapshots$snapshot_year, 2021:2024))
+stopifnot(identical(snapshots$snapshot_year, c(2023L, 2022L, 2021L, 2024L)))
 # Row accounting: 9 parcels in the county per snapshot (A,B,C,D,G,I,J + E or F) plus G's duplicate in 2.
 stopifnot(!"K" %in% panel$clip, all(panel$fips == "12071"))
 stopifnot(nrow(panel[clip == "G"]) == 3, nrow(panel[clip == "E"]) == 2, nrow(panel[clip == "F"]) == 2)
 stopifnot(!anyDuplicated(panel[, .(clip, snap_idx)]))
-stopifnot(panel[clip == "B" & snap_idx == 4, year_built] == 2023L)
-stopifnot(panel[clip == "A", unique(mh)] == 1L, panel[clip == "I" & snap_idx == 1, mh] == 0L)
+stopifnot(panel[clip == "B" & snapshot_year == 2024L, year_built] == 2023L)
+stopifnot(panel[clip == "A", unique(mh)] == 1L, panel[clip == "I" & snapshot_year == 2021L, mh] == 0L)
 
 tab <- function(name) fread(file.path(tab_dir, paste0(name, ".csv")), colClasses = c(fips = "character"))
 cr <- tab("tab-collapse-recovery")

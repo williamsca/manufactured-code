@@ -6,8 +6,8 @@
 #   SNAPSHOT_PANEL    panel.parquet from the panel script
 #   SNAPSHOT_RESULTS  new output directory (required)
 #
-# Unit of comparison: (clip, adjacent snapshots a -> b), where b = a + 1 in the
-# snapshot index and the clip is present in both. Types are by the classification at a:
+# Unit of comparison: (clip, adjacent snapshots a -> b), where b is the next snapshot in
+# time (snap_idx = chronological rank of snapshot_year) and the clip is present in both. Types are by the classification at a:
 # MH (mobile-home indicator), SB (single-family, no MH flag), Other (unclassified).
 
 library(data.table)
@@ -38,16 +38,20 @@ county_meta <- data.table(
 
 con <- dbConnect(duckdb())
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
-dbExecute(con, sprintf("SET threads=%d", threads))
-dbExecute(con, sprintf("SET memory_limit='%s'", Sys.getenv("SNAPSHOT_DUCKDB_MEMORY", "40GB")))
-dbExecute(con, sprintf("SET temp_directory='%s'", file.path(out_dir, "duckdb-spill")))
-dbWriteTable(con, "county_meta", county_meta)
-dbExecute(con, sprintf("CREATE VIEW p AS
-    SELECT clip, previous_clip, fips, snap_idx, snapshot_year, mh,
+.rc <- dbExecute(con, sprintf("SET threads=%d", threads))
+.rc <- dbExecute(con, sprintf("SET memory_limit='%s'", Sys.getenv("SNAPSHOT_DUCKDB_MEMORY", "40GB")))
+.rc <- dbExecute(con, sprintf("SET temp_directory='%s'", file.path(out_dir, "duckdb-spill")))
+.rc <- dbWriteTable(con, "county_meta", county_meta)
+# The zip index is not chronological (the 2024 delivery numbers snapshots from newest to
+# oldest, with a late extra one), so snap_idx here is the rank of snapshot_year, oldest = 1.
+# `src_idx` is the zip index.
+.rc <- dbExecute(con, sprintf("CREATE TABLE p AS
+    SELECT clip, previous_clip, fips, dense_rank() OVER (ORDER BY snapshot_year) AS snap_idx,
+        rp.snap_idx AS src_idx, snapshot_year, mh,
         year_built AS yb, eff_year_built AS eff, impr_val_calc AS impr,
         CASE mh WHEN 1 THEN 'MH' WHEN 0 THEN 'SB' ELSE 'Other' END AS type,
-        last_assessor_update
-    FROM read_parquet('%s')", panel_file))
+        last_assessor_update, mobile_home_indicator, property_indicator_code, land_use_code
+    FROM read_parquet('%s') rp", panel_file))
 
 query <- function(sql) as.data.table(dbGetQuery(con, sql))
 save_tab <- function(dt, name) {
@@ -58,7 +62,7 @@ save_tab <- function(dt, name) {
     dt
 }
 
-dbExecute(con, "CREATE TABLE pairs AS
+.rc <- dbExecute(con, "CREATE TABLE pairs AS
     SELECT a.clip, a.fips, a.snap_idx AS idx_a, b.snap_idx AS idx_b,
         a.snapshot_year AS yr_a, b.snapshot_year AS yr_b, a.type AS type_a, b.type AS type_b,
         a.yb AS yb_a, b.yb AS yb_b, a.eff AS eff_a, b.eff AS eff_b,
@@ -73,6 +77,13 @@ cover <- save_tab(query("
         avg((impr > 0)::INTEGER) AS share_impr_pos,
         avg((previous_clip IS NOT NULL)::INTEGER) AS share_previous_clip
     FROM p GROUP BY ALL ORDER BY ALL"), "tab-coverage")
+
+# --- 1b. What the MH indicator holds, by snapshot --------------------------------------------
+mh_values <- save_tab(query("
+    SELECT fips, snap_idx, snapshot_year, coalesce(mobile_home_indicator, '(null)') AS mobile_home_indicator,
+        coalesce(property_indicator_code, '(null)') AS property_indicator_code,
+        coalesce(land_use_code, '(null)') AS land_use_code, count(*) AS n
+    FROM p GROUP BY ALL ORDER BY ALL"), "tab-mh-values")
 
 # --- 2. Clip stability across adjacent snapshots ------------------------------------
 match <- save_tab(query("
@@ -124,7 +135,7 @@ delta <- save_tab(query("
 # Collapse: improvement value falls by more than 80% between adjacent snapshots.
 # Recovery: at a later snapshot c, improvement value is back to >= 80% of its level at a.
 # yb_c is compared with yb_a and with the start year of the collapse interval.
-dbExecute(con, "CREATE TABLE collapse AS
+.rc <- dbExecute(con, "CREATE TABLE collapse AS
     WITH ev AS (SELECT * FROM pairs WHERE impr_a > 0 AND impr_b < 0.2 * impr_a),
     rec AS (SELECT e.clip, e.idx_a, min(c.snap_idx) AS idx_c
         FROM ev e JOIN p c ON c.clip = e.clip AND c.snap_idx > e.idx_b AND c.impr >= 0.8 * e.impr_a

@@ -12,7 +12,8 @@
 # Environment:
 #   SNAPSHOT_RESULTS   new private output directory (required)
 #   SNAPSHOT_SOURCE    root of the historical Property Basic deliveries
-#   SNAPSHOT_DELIVERY  delivery date in the zip names (default 20240814)
+#   SNAPSHOT_DELIVERY  regular expression for the delivery date in the zip names
+#                      (default 2024081[45]; the 2023 delivery is 20230817)
 #   SNAPSHOT_COUNTIES  comma-separated 5-digit county FIPS codes
 
 library(data.table)
@@ -30,7 +31,8 @@ env <- function(key, default) {
     if (nzchar(value)) value else default
 }
 src_root <- env("SNAPSHOT_SOURCE", "/project/crebe_hufl_corelogic/historic_property")
-want_delivery <- env("SNAPSHOT_DELIVERY", "20240814")
+# Regular expression for the delivery date: snapshot 15 was cut a day after the rest.
+want_delivery <- env("SNAPSHOT_DELIVERY", "2024081[45]")
 counties <- strsplit(env("SNAPSHOT_COUNTIES", "12071,12015,12005,12045,04013"), ",", fixed = TRUE)[[1]]
 out_dir <- Sys.getenv("SNAPSHOT_RESULTS")
 if (!nzchar(out_dir)) stop("Set SNAPSHOT_RESULTS")
@@ -91,7 +93,7 @@ inv <- data.table(path = all_zips,
     delivery = vapply(parsed, `[`, "", 3),
     state = vapply(parsed, `[`, "", 5),
     size_gb = file.size(all_zips) / 1e9)
-inv <- inv[delivery == want_delivery]
+inv <- inv[grepl(paste0("^(", want_delivery, ")$"), delivery)]
 if (!nrow(inv)) stop("No zips for delivery ", want_delivery, " under ", src_root)
 if (anyDuplicated(inv[, .(snap_idx, state)])) stop("Duplicate (snapshot, state) zips in delivery")
 snap_idx_all <- sort(unique(inv$snap_idx))
