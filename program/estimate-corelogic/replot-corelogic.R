@@ -9,8 +9,8 @@ for (analysis in c("prices", "quantities")) {
     out_dir <- here("output", "corelogic", analysis)
     quantity <- analysis == "quantities"
     tab <- fread(file.path(out_dir, "mh_only_vintage_coefficients.csv"))
-    forecast <- if (quantity) NULL else fread(here("output", "cost-benefit", "hud-cost-forecast.csv"))
-    cl_mh_only_paper_plot(tab, out_dir, quantity = quantity, forecast = forecast)
     tab_state <- fread(file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
+    forecast <- if (quantity) NULL else fread(here("output", "cost-benefit", "hud-cost-forecast.csv"))
+    cl_mh_only_paper_plot(tab_state, out_dir, quantity = quantity, forecast = forecast)
     cl_mh_only_compare_plot(tab, tab_state, out_dir, quantity = quantity)
 }

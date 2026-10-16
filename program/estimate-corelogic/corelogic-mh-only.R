@@ -32,11 +32,12 @@ cl_mh_only_coefficients <- function(model, id) {
     tab
 }
 
-# Paper figure: baseline vintage-FE event study, in log points, no caption.
+# Paper figure: state x vintage FE event study, in log points, no caption.
 # `forecast` (optional): one row per comparison with HUD's forecast log cost
 # change, drawn as a dashed path rising from 0 at 1993.5 to the forecast in
 # 1994, with a common legend below the panels.
 cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NULL) {
+    stopifnot(all(grepl("_state_vintage_fe$", tab$specification)))
     x <- copy(tab)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
@@ -92,14 +93,20 @@ cl_type_count_panel <- function(cells) {
     x
 }
 
-# Static ladder shared by prices and counts. Columns 1-2 use MH only; 3-4 add site-built homes.
-# (1) vintage FE; (2) state x vintage FE; (3) county x vintage and type x vintage FE;
-# (4) county x vintage and state x vintage x type FE.
-cl_mh_static_formula <- function(column, quantity = FALSE) {
+# Price columns 3-4 retain the housing-type triple difference. Quantity columns
+# 3-4 instead replicate columns 1-2 on site-built counts, allowing substitution.
+cl_mh_static_formula <- function(column, quantity = FALSE, size = FALSE) {
     stopifnot(column %in% 1:4)
+    stopifnot(!size || !quantity)
+    if (quantity) {
+        vintage <- if (column %in% c(2L, 4L)) "statefp^year_constr" else "year_constr"
+        return(as.formula(paste("homes ~ post_z2 + post_z3 | countyfp +", vintage)))
+    }
     outcome <- if (quantity) "homes" else "log_price"
     place <- if (quantity) "countyfp" else "countyfp^year_sale"
     rhs <- if (column <= 2) "post_z2 + post_z3" else "post_mh_z2 + post_mh_z3"
+    if (size) rhs <- paste(rhs, if (column <= 2) "+ log_living_area + log_lot_size" else
+        "+ log_living_area + log_lot_size + mh:log_living_area + mh:log_lot_size")
     fe <- switch(column,
         paste(place, "+ year_constr"),
         paste(place, "+ statefp^year_constr"),
@@ -108,12 +115,12 @@ cl_mh_static_formula <- function(column, quantity = FALSE) {
     as.formula(paste(outcome, "~", rhs, "|", fe))
 }
 
-# Columns 1-2 take MH rows only; 3-4 take all rows. Returns the four fits and their cluster counts.
+# Quantity columns 3-4 take SB only; price columns 3-4 take both types.
 cl_mh_static_fits <- function(x, quantity = FALSE) {
     est <- if (quantity) fepois else feols
     fits <- list(); counties <- integer(4)
     for (k in 1:4) {
-        d <- if (k <= 2) x[mh == 1] else x
+        d <- if (k <= 2) x[mh == 1] else if (quantity) x[mh == 0] else x
         m <- est(cl_mh_static_formula(k, quantity), d, vcov = ~countyfp, mem.clean = TRUE)
         counties[k] <- uniqueN(d$countyfp[obs(m)])
         fits[[k]] <- summary(m, lean = TRUE)
@@ -121,12 +128,39 @@ cl_mh_static_fits <- function(x, quantity = FALSE) {
     list(fits = fits, counties = counties)
 }
 
+# Three price variants per design: common vintage, state x vintage, and
+# state x vintage plus size. Keep full samples for unadjusted columns.
+cl_price_static_fits <- function(x) {
+    original <- c(1L, 2L, 2L, 3L, 4L, 4L)
+    fits <- list(); counties <- integer(6)
+    common <- list()
+    for (k in 1:6) {
+        d <- if (k <= 3) x[mh == 1] else x
+        adjusted <- k %in% c(3L, 6L)
+        if (adjusted) d <- d[valid_size == TRUE]
+        m <- feols(cl_mh_static_formula(original[k], size = adjusted), d,
+            vcov = ~countyfp, mem.clean = TRUE)
+        counties[k] <- uniqueN(d$countyfp[obs(m)])
+        if (adjusted) {
+            # Same retained observations and FEs isolate controls from coverage.
+            common[[paste0("common_sample_", k)]] <- summary(feols(
+                cl_mh_static_formula(original[k]), d[obs(m)], vcov = ~countyfp,
+                mem.clean = TRUE), lean = TRUE)
+        }
+        fits[[k]] <- summary(m, lean = TRUE)
+    }
+    list(fits = fits, counties = counties, common_sample = common)
+}
+
 cl_mh_static_table <- function(res, file, quantity = FALSE) {
-    stopifnot(length(res$fits) == 4L)
+    n_models <- length(res$fits)
+    stopifnot(n_models == 4L || (!quantity && n_models == 6L))
     place <- if (quantity) "County" else "County $\\times$ sale year"
-    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = "r3", fitstat = "n",
+    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = "r3",
+        fitstat = c("n", if (quantity) "pr2" else "r2"),
         keep = "%post_", style.tex = style.tex(tablefoot = FALSE), depvar = FALSE,
-        headers = list("Sample:" = list("MH" = 2, "MH and site-built" = 2)),
+        headers = if (quantity) list("Outcome:" = list("MH" = 2, "Site-built" = 2)) else
+            list("Sample:" = list("MH" = n_models / 2, "MH and site-built" = n_models / 2)),
         dict = c(post_z2 = "Zone II $\\times$ post", post_mh_z2 = "Zone II $\\times$ post",
             post_z3 = "Zone III $\\times$ post", post_mh_z3 = "Zone III $\\times$ post",
             countyfp = "County", "countyfp^year_sale" = place, year_constr = "Vintage",
@@ -134,7 +168,8 @@ cl_mh_static_table <- function(res, file, quantity = FALSE) {
             "countyfp^mh" = "County $\\times$ type", "countyfp^year_sale^mh" = paste(place, "$\\times$ type"),
             "countyfp^year_constr" = "County $\\times$ vintage", "mh^year_constr" = "Type $\\times$ vintage",
             "statefp^year_constr^mh" = "State $\\times$ vintage $\\times$ type"),
-        extralines = list("Counties" = format(res$counties, big.mark = ",")),
+        extralines = c(list("Counties" = format(res$counties, big.mark = ",")),
+            if (n_models == 6L) list("Size controls" = c("No", "No", "Yes", "No", "No", "Yes"))),
         notes = NULL)
 }
 

@@ -272,12 +272,15 @@ fl_all_bcr <- formatC(get_hud("flood_bcr_all"), format = "f", digits = 2)
 # plus the sample sizes quoted in the data section. Read from the aggregate
 # outputs of program/estimate-corelogic/estimate-corelogic-{prices,quantities}.R.
 cl_dir <- here("output", "corelogic")
-cl_lad <- rbind(
-    fread(file.path(cl_dir, "prices", "mh_static_ladder.csv"))[, outcome := "price"],
-    fread(file.path(cl_dir, "quantities", "mh_static_ladder.csv"))[, outcome := "count"])
+cl_lad <- rbindlist(list(
+    fread(file.path(cl_dir, "prices", "mh_static_ladder.csv"))[
+        grepl("z[23]$", term)][, outcome := "price"],
+    fread(file.path(cl_dir, "quantities", "mh_static_ladder.csv"))[
+        , outcome := fifelse(housing_type == "MH", "count", "count_sb")]), fill = TRUE)
 cl_lad[, `:=`(col = as.integer(sub("ladder_", "", specification)),
               zone = fifelse(grepl("z2$", term), 2L, 3L))]
-stopifnot(nrow(cl_lad) == 16L, !anyDuplicated(cl_lad, by = c("outcome", "col", "zone")))
+cl_lad[, size_adjusted := outcome == "price" & col %in% c(3L, 6L)]
+stopifnot(nrow(cl_lad) == 20L, !anyDuplicated(cl_lad, by = c("outcome", "col", "zone")))
 get_lad <- function(o, k, z, what = "estimate") {
     x <- cl_lad[outcome == o & col == k & zone == z, get(what)]
     stopifnot(length(x) == 1L)
@@ -287,6 +290,13 @@ get_lad <- function(o, k, z, what = "estimate") {
 lad_b  <- function(o, k, z) formatC(get_lad(o, k, z), format = "f", digits = 3)
 lad_se <- function(o, k, z) se_fmt(get_lad(o, k, z, "se"))
 lad_pc <- function(o, k, z) pctc_fmt(get_lad(o, k, z))
+cl_size_common <- fread(file.path(cl_dir, "prices", "size_common_sample_coefficients.csv"))
+size_common_pc <- function(k, z) {
+    b <- cl_size_common[specification == paste0("common_sample_", k) &
+        grepl(paste0("z", z, "$"), term), estimate]
+    stopifnot(length(b) == 1L)
+    pctc_fmt(b)
+}
 cl_sales <- fread(file.path(cl_dir, "prices", "sample_by_vintage.csv"))
 cl_n_mh_sales <- format(cl_sales[mh == 1, sum(sales)], big.mark = ",")
 cl_n_sb_sales <- format(cl_sales[mh == 0, sum(sales)], big.mark = ",")
@@ -294,15 +304,15 @@ cl_support <- fread(file.path(cl_dir, "quantities", "mh_static_ladder_support.cs
 cl_n_mh_homes <- format(cl_support[mh == 1, sum(homes)], big.mark = ",")
 cl_n_sb_homes <- format(cl_support[mh == 0, sum(homes)], big.mark = ",")
 cl_n_cty_q <- format(cl_support[mh == 1, sum(counties[post == 0])], big.mark = ",")
-# Range of an outcome-zone's estimates across the four columns, as % changes.
-lad_min <- function(o, z) pctc_fmt(min(cl_lad[outcome == o & zone == z, estimate]))
-lad_max <- function(o, z) pctc_fmt(max(cl_lad[outcome == o & zone == z, estimate]))
-# Count event studies (both versions): range of the Zone III coefficients for
+# Headline price ranges retain the four unadjusted specifications: conditioning
+# on size changes the estimand if the regulation affects home or lot size.
+lad_min <- function(o, z) pctc_fmt(min(cl_lad[outcome == o & zone == z & !size_adjusted, estimate]))
+lad_max <- function(o, z) pctc_fmt(max(cl_lad[outcome == o & zone == z & !size_adjusted, estimate]))
+# Plotted state x vintage count event study: range of the Zone III coefficients for
 # construction years 1995-1999, quoted in the quantity results paragraph.
-cl_es_q <- rbind(fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients.csv")),
-                 fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients_state_vintage_fe.csv")))
+cl_es_q <- fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_es_q[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
-stopifnot(nrow(cl_es_q) == 40L)
+stopifnot(nrow(cl_es_q) == 20L)
 cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
 cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
 cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)
@@ -313,7 +323,7 @@ hud_fc <- fread(here("output", "cost-benefit", "hud-cost-forecast.csv"))
 stopifnot(setequal(hud_fc$wind_zone, 2:3))
 hud_fc_z2 <- formatC(hud_fc[wind_zone == 2, forecast], format = "f", digits = 3)
 hud_fc_z3 <- formatC(hud_fc[wind_zone == 3, forecast], format = "f", digits = 3)
-cl_es_p <- fread(file.path(cl_dir, "prices", "mh_only_vintage_coefficients.csv"))
+cl_es_p <- fread(file.path(cl_dir, "prices", "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_es_p[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
 stopifnot(nrow(cl_es_p) == 20L)
 # The cost-results text states that every post-1994 Zone II point estimate
@@ -333,3 +343,26 @@ cl_land_z3 <- fmt_pct(100 * land_share(3))
 hud_fc_adj <- function(z) (1 - land_share(z)) * hud_fc[wind_zone == z, forecast]
 hud_fc_adj_z2 <- formatC(hud_fc_adj(2), format = "f", digits = 3)
 hud_fc_adj_z3 <- formatC(hud_fc_adj(3), format = "f", digits = 3)
+
+# Paper's county-level price benchmark and geographically matched benefits.
+# Dollar scalars here are in dollars, unlike the legacy $000 welfare outputs.
+cl_comparison <- fread(here("output/cost-benefit/corelogic-comparison-scalars.csv"))
+get_cl <- function(nm) {
+    x <- cl_comparison[statistic == nm, value]
+    stopifnot(length(x) == 1L, is.finite(x))
+    x
+}
+cl_d <- function(nm) fmt_d(get_cl(nm) / 1000)
+cl_share <- function(nm) fmt_pct(100 * get_cl(nm))
+cl_price_base <- cl_d("price_base")
+cl_premium <- cl_d("premium_baseline")
+cl_premium_lo <- cl_d("premium_min")
+cl_premium_hi <- cl_d("premium_max")
+cl_flood_pv <- cl_d("gross_pv")
+cl_retained_pv <- cl_d("retained_pv")
+cl_public_pv <- cl_d("public_pv")
+cl_flood_share <- cl_share("gross_share_baseline")
+cl_flood_share_lo <- cl_share("gross_share_min")
+cl_flood_share_hi <- cl_share("gross_share_max")
+cl_private_share <- cl_share("private_share_baseline")
+cl_private_gap <- cl_d("private_gap")

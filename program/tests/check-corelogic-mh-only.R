@@ -61,7 +61,7 @@ for (key in c("z2", "z3")) {
     v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
     stopifnot(length(b) == 10, max(abs(b - c(z2 = .2, z3 = -.1)[[key]] * (v >= 1994))) < 1e-8)
 }
-# Static ladder: a county x vintage shock common to both types biases only columns 1-2;
+# Price ladder: a county x vintage shock common to both types biases only columns 1-2;
 # a state x vintage shock specific to MH biases only columns 1 and 3. Column 4 absorbs both.
 ladder <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = 1989:1999, mh = 0:1)
 ladder <- ladder[!(state == 3 & wind_zone == 1)]
@@ -80,9 +80,8 @@ ladder_check <- function(common, state_mh) {
     d2[, log_price := lmu + .05 * (year_sale - 2000)]
     vapply(1:4, function(k) {
         sub <- function(x) if (k <= 2) x[mh == 1] else x
-        q <- coef(fepois(cl_mh_static_formula(k, quantity = TRUE), sub(d), notes = FALSE))
         p <- coef(feols(cl_mh_static_formula(k), sub(d2), notes = FALSE))
-        max(abs(c(q, p) - rep(truth, 2)))
+        max(abs(p - truth))
     }, numeric(1))
 }
 err <- ladder_check(0, 0); stopifnot(all(err < 1e-6))
@@ -97,12 +96,63 @@ type_panel <- cl_type_count_panel(type_cells)
 stopifnot(nrow(type_panel) == 2L * nrow(cl_mh_count_panel(type_cells)),
     type_panel[countyfp == "02001" & year_constr == 1995, all(homes == 0)],
     type_panel[mh == 0 & !(countyfp == "02001" & year_constr == 1995) & countyfp != "01001", all(homes == 100)])
-ladder_fits <- cl_mh_static_fits(ladder[, homes := exp(5 + county / 10 + mh + truth[1] * post * mh * z2)], quantity = TRUE)
+# Separate count outcomes: large negative MH effects and small positive SB
+# substitution effects must be recovered separately, rather than differenced.
+count_truth <- list(MH = c(-.2, -.8), SB = c(.01, .02))
+count_fixture <- function(state_shock = 0) {
+    d <- copy(ladder)
+    d[, homes := exp(5 + county / 10 + mh + .02 * (year_constr - 1993) * (1 + mh) +
+        fifelse(mh == 1, count_truth$MH[1], count_truth$SB[1]) * post_z2 +
+        fifelse(mh == 1, count_truth$MH[2], count_truth$SB[2]) * post_z3 +
+        state_shock * state * (1 + mh) * (year_constr - 1993) / 10)]
+    d
+}
+ladder_fits <- cl_mh_static_fits(count_fixture(), quantity = TRUE)
+for (k in 1:4) {
+    expected <- count_truth[[if (k <= 2) "MH" else "SB"]]
+    stopifnot(max(abs(coef(ladder_fits$fits[[k]]) - expected)) < 1e-6)
+}
+state_count_fits <- cl_mh_static_fits(count_fixture(1), quantity = TRUE)
+for (k in c(2L, 4L)) {
+    expected <- count_truth[[if (k == 2) "MH" else "SB"]]
+    stopifnot(max(abs(coef(state_count_fits$fits[[k]]) - expected)) < 1e-6)
+}
+stopifnot(abs(coef(state_count_fits$fits[[3]])[["post_z3"]] - count_truth$SB[2]) > .01)
 ladder_tex <- tempfile(fileext = ".tex")
 cl_mh_static_table(ladder_fits, ladder_tex, quantity = TRUE)
 ladder_lines <- readLines(ladder_tex)
 stopifnot(sum(grepl("^ *Zone II \\$\\\\times\\$ post", ladder_lines)) == 1L,
-    sum(grepl("^ *Zone III \\$\\\\times\\$ post", ladder_lines)) == 1L, ladder_fits$counties == 32L)
+    sum(grepl("^ *Zone III \\$\\\\times\\$ post", ladder_lines)) == 1L,
+    any(grepl("Site-built", ladder_lines, fixed = TRUE)),
+    any(grepl("Outcome:", ladder_lines, fixed = TRUE)),
+    !any(grepl("County $\\times$ vintage", ladder_lines, fixed = TRUE)),
+    ladder_fits$counties == 32L)
 
 cat("MH-only price and quantity event studies recover known zone effects, absorb state vintage shocks, and preserve zero counts.\n")
-cat("Static ladder: each column absorbs exactly the shocks its fixed effects target.\n")
+cat("Price ladder absorbs its target shocks; separate MH and SB count regressions recover substitution effects.\n")
+
+# Size controls recover the known premium when size changes with treatment;
+# the DDD permits different hedonic slopes by housing type.
+set.seed(941)
+size_fixture <- ladder[rep(seq_len(.N), each = 2L)]
+size_fixture[, year_sale := rep(2000:2001, times = .N / 2)]
+size_fixture[, `:=`(log_living_area = 7 + .4 * post_mh_z3 + rnorm(.N, sd = .2),
+    log_lot_size = 9 + .2 * post_mh_z2 + rnorm(.N, sd = .3))]
+size_fixture[, log_price := 10 + county / 10 + .2 * mh + .03 * year_sale +
+    .02 * year_constr * (1 + mh) + .2 * post_mh_z2 - .1 * post_mh_z3 +
+    (.4 + .2 * mh) * log_living_area + (.3 - .1 * mh) * log_lot_size]
+size_fixture[, valid_size := TRUE]
+size_fixture[seq_len(10), `:=`(valid_size = FALSE, log_lot_size = NA_real_)]
+size_fits <- cl_price_static_fits(size_fixture)
+for (k in c(3L, 6L)) {
+    b <- coef(size_fits$fits[[k]])
+    stopifnot(max(abs(b[grepl("^post_", names(b))] - c(.2, -.1))) < 1e-7,
+        nobs(size_fits$fits[[k]]) == nobs(size_fits$common_sample[[paste0("common_sample_", k)]]))
+}
+stopifnot(nobs(size_fits$fits[[2]]) > nobs(size_fits$fits[[3]]),
+    nobs(size_fits$fits[[5]]) > nobs(size_fits$fits[[6]]),
+    abs(coef(size_fits$fits[[2]])[["post_z3"]] + .1) > .05)
+size_tex <- tempfile(fileext = ".tex")
+cl_mh_static_table(size_fits, size_tex)
+stopifnot(any(grepl("Size controls", readLines(size_tex), fixed = TRUE)))
+cat("Six-column price table recovers size-adjusted premiums and compares identical retained samples.\n")

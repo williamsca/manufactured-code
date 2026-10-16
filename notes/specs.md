@@ -1520,43 +1520,95 @@ figure (`price_eff`, abstract/intro/discussion/conclusion, HUD table, BCR) is
 
 ### 20.1 Event studies (paper Eqs. `es-cost-price`, `es-cost-quantity`)
 
-- **Scripts:** `program/corelogic/estimate-corelogic-prices.R`,
-  `program/corelogic/estimate-corelogic-share.R`; helpers in
-  `program/lib/corelogic-mh-only.R`. Run on Rivanna via
-  `./run_remote.sh corelogic <script>`.
-- **Price:** `log_price ~ i(year_constr, z2, ref = 1993) + i(year_constr, z3, ref = 1993) | countyfp^year_sale + year_constr`
+- **Scripts:** `program/estimate-corelogic/estimate-corelogic-prices.R`,
+  `program/estimate-corelogic/estimate-corelogic-quantities.R`; helpers in
+  `program/estimate-corelogic/corelogic-mh-only.R`. Run on Rivanna via
+  `./run_remote.sh estimate-corelogic <script>`.
+- **Price:** `log_price ~ i(year_constr, z2, ref = 1993) + i(year_constr, z3, ref = 1993) | countyfp^year_sale + statefp^year_constr`
   on MH sales only (`eligible_sale`, sale years 2000-2023, vintages 1989-1999,
   sale date >= Jan 1 of vintage; 1994 included). OLS, unweighted.
-- **Quantity:** `mh_homes ~ <same interactions> | countyfp + year_constr`, PPML,
+- **Quantity:** `mh_homes ~ <same interactions> | countyfp + statefp^year_constr`, PPML,
   on surviving 2023 Property Basic MH parcels by county x vintage, balanced over
   counties with any MH in 1989-1999, zeros retained (`cl_mh_count_panel`).
-- **Robustness:** both with `statefp^year_constr` in place of `year_constr`
-  (`cl_mh_only_formula(state = TRUE)`).
+- **Main dynamic specification (October 16):** state x vintage effects
+  (`cl_mh_only_formula(state = TRUE)`). Common vintage effects remain in the
+  comparison figures and static tables.
 - **Clustering:** county. **Reference:** 1993.
-- **Paper figures:** `output/corelogic/{prices,share}/mh_only_vintage_{prices,quantities}_paper.pdf`
-  overlay both versions in log points (`cl_mh_only_compare_plot`).
+- **Paper figures:** `output/corelogic/{prices,quantities}/mh_only_vintage_{prices,quantities}_paper.pdf`
+  use the state x vintage coefficients. Separate `*_compare.pdf` figures
+  overlay both versions (`cl_mh_only_compare_plot`). The plotting helper
+  rejects non-state-specific coefficient tables for the paper figures.
 
 ### 20.2 Static ladder (paper Table `tab:cost-static`)
 
 `post = 1[year_constr >= 1994]` (1994 coded post). `cl_mh_static_formula(k)`:
 
-| Col | Sample | Regressors | Fixed effects (price; quantity swaps `countyfp^year_sale` -> `countyfp`) |
+| Col | Sample | Regressors | Price fixed effects |
 |---|---|---|---|
 | 1 | MH | `post_z2 + post_z3` | `countyfp^year_sale + year_constr` |
 | 2 | MH | `post_z2 + post_z3` | `countyfp^year_sale + statefp^year_constr` |
 | 3 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + countyfp^year_constr + mh^year_constr` |
 | 4 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + countyfp^year_constr + statefp^year_constr^mh` |
 
-Price: OLS on the full matched sale sample (MH rows only in 1-2). Quantity:
-PPML on `cl_type_count_panel` (MH and SB = `homes - mh_homes` counts over the
-same MH-support counties, zeros retained). Clustering by county. Outputs:
+The price table now inserts a size-adjusted third variant for each design:
+columns 1--3 are MH-only DiDs, and columns 4--6 are MH/SB DDDs. The first two
+variants in each block retain the FE combinations above. Column 3 adds log
+living area and log lot size to the state x vintage DiD; column 6 adds these
+controls and their interactions with MH to the state x type x vintage DDD.
+The helper `cl_price_static_fits()` maps these six displayed columns to the
+four underlying FE designs in `cl_mh_static_formula()`.
+
+Price: OLS on the full matched sale sample for columns 1, 2, 4, and 5.
+Adjusted columns 3 and 6 retain only positive, finite
+`living_square_feet_all_buildings` and `land_square_footage` from the pinned
+2023 Property Basic snapshot, joined by clip with county agreement. No area
+imputation or upper trimming. Both controls enter in logs; DDD slopes differ
+by housing type. `size_sample_coverage.csv` exports coverage by zone, type, and
+pre/post vintage. `size_common_sample_coefficients.csv` reports unadjusted
+state-FE fits on exactly the adjusted models' retained observations, allowing
+coverage changes to be distinguished from size adjustment. Headline premium
+ranges and the cost-benefit comparison continue to use the four unadjusted
+price specifications because conditioning on potentially endogenous size
+changes the estimand. The paper table retains R2 and cluster counts.
+
+As of October 16, the quantity table instead uses separate outcomes to allow
+substitution into site-built housing:
+
+| Col | Outcome/sample | Regressors | Quantity fixed effects |
+|---|---|---|---|
+| 1 | MH count | `post_z2 + post_z3` | `countyfp + year_constr` |
+| 2 | MH count | `post_z2 + post_z3` | `countyfp + statefp^year_constr` |
+| 3 | SB count | `post_z2 + post_z3` | `countyfp + year_constr` |
+| 4 | SB count | `post_z2 + post_z3` | `countyfp + statefp^year_constr` |
+
+Quantity: PPML on the relevant type rows of `cl_type_count_panel` (MH and SB =
+`homes - mh_homes`, using the same MH-support counties, with zero cohorts
+retained; all-zero SB counties can be removed by PPML). Clustering by county. Outputs:
 `mh_static_ladder.{tex,csv}` in each output folder; the paper table stacks the
 two `.tex` files as Panels A and B. Known-truth test
-(`check-corelogic-mh-only.R`): a county x vintage shock common to both types
+(`check-corelogic-mh-only.R`): for prices, a county x vintage shock common to both types
 biases only columns 1-2; an MH-specific state x vintage shock biases only
-columns 1 and 3; column 4 absorbs both.
+columns 1 and 3; column 4 absorbs both. Separate count checks recover large MH
+declines and small SB increases, and verify that columns 2 and 4 absorb
+type-specific state x vintage shocks. Quantity CSVs now include `housing_type`;
+`type_counts_by_vintage.csv` exports counts by zone, type, and vintage.
+The paper's Panel B now uses these separate outcomes, with header `Outcome:`
+and groups `MH` and `Site-built`; its prose and loader distinguish SB counts
+from MH counts when computing ranges or reporting individual coefficients.
 
-Column 3 uses county x vintage FE, not the `year_constr^wind_zone` FE of the
+Initial revised run: Rivanna Slurm job 21458378 (completed, exit 0), staged
+from the local edited scripts without changing the remote checkout. Aggregate
+exports are in `output/corelogic/substitution/`; the static table and support
+exports have also been promoted into `output/corelogic/quantities/`, with
+`static-substitution-manifest.json` recording their provenance separately from
+the existing dynamic estimates. MH columns match the previous columns 1-2 exactly. SB Zone III
+is -11.75% (95% interval -23.21 to +1.43%) with vintage FE and +3.95%
+(-13.19 to +24.49%) with state x vintage FE. SB Zone II is -9.13%
+(-17.76 to +0.40%) and -1.19% (-10.73 to +9.39%), respectively. There is no
+precise positive substitution estimate; the intervals do not exclude increases
+large enough to absorb substantial MH displacement.
+
+Price column 3 uses county x vintage FE, not the `year_constr^wind_zone` FE of the
 existing `cl_ddd_formula` triple difference (§ corelogic-prices.md), so the MH
 vs SB comparison is within county and vintage.
 

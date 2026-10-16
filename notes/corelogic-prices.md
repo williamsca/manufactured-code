@@ -1,5 +1,59 @@
 # CoreLogic vintage prices
 
+## Paper dollar conversion and benefit comparison (October 16, 2026)
+
+The price table now has three variants per design: common vintage effects,
+state x vintage effects, and state x vintage effects plus log living area and
+log lot size. Displayed columns 1--3 are MH DiDs; 4--6 are MH/SB DDDs. The DDD
+allows size slopes to differ by housing type. Dedicated living area and lot
+area come from the pinned 2023 Property Basic snapshot, matched by clip and
+county. Positive finite values are required only in the adjusted columns;
+there is no imputation or upper trimming. Snapshot size need not equal size at
+sale, and conditioning on size may remove part of a regulatory response.
+
+Rivanna job 21460694 completed the six-column analysis. The adjusted Zone III
+coefficients are 0.04848 (SE 0.03836; +4.97%) for MH DiD and 0.05105
+(SE 0.03261; +5.24%) for DDD. On the same retained observations, the respective
+unadjusted effects are +5.19% and +6.80%. Adjusted sample sizes are 273,738
+and 7,993,636. Coverage and common-sample comparison coefficients are exported
+in `size_sample_coverage.csv` and `size_common_sample_coefficients.csv`.
+All four original unadjusted estimates are unchanged and now occupy columns
+1, 2, 4, and 5; headline premium ranges retain those four specifications.
+
+The main dynamic price and quantity figures now use state x construction-year
+fixed effects. `replot-corelogic.R` and both estimation entrypoints select the
+`*_state_vintage_fe.csv` coefficient tables for `*_paper.pdf`; the comparison
+figures continue to show both specifications. The paper's equations, figure
+notes, and quoted dynamic coefficients use the same state-specific model.
+
+The paper uses the mean transaction price of Zone III MH built in 1989--1993
+as the dollar base: $90,508.7588 in 2000 dollars, from 5,358 transactions.
+Multiplying this by `expm1(b)` for the four static Zone III coefficients gives
+$6,804.52, $5,589.70, $2,086.52, and $7,576.94. These are illustrative
+land-inclusive resale premiums, not identified upfront production costs.
+The range across specifications is not a confidence interval.
+
+`output/corelogic/prices/mh_price_summary.csv` contains the aggregate means
+and medians by zone and pre/post vintage. The initial export was computed in
+Rivanna Slurm job 21456739 using the sale filters in `cl_price_sample()`, the
+continental-v2-20261008 build, and job 21416978's wind-zone crosswalk. It uses
+the matched sample before fixed-effect singleton removal; all 299,681 MH
+transactions are accounted for. `estimate-corelogic-prices.R` now produces
+the same summary in future price runs. No licensed transaction records were
+downloaded.
+
+`program/cost-benefit/estimate-corelogic-comparison.R` generates the paper's
+new table and scalars. It takes only the Zone III flood-benefit, discounting,
+and CPI scalars from `hud-comparison-scalars.csv`; it does not use that file's
+state-level price estimates. The existing zone-specific flood calculation
+implies $970.69 in avoided damage, $255.16 in reduced NFIP payments, and
+$715.53 in retained-loss benefits. Avoided damage is 14.27% of the baseline
+resale premium and 12.81--46.52% across specifications. HUD forecasts in the
+new table also refer to Zone III, using national pre-reform home-size shares.
+Population differences between NFIP-insured homes and transacted homes on
+owner-held land remain explicit in the paper. The MHS-based outputs remain
+available for the appendix and other documents.
+
 The analysis uses **2000–2023 sales**, construction vintages **1989–1999**,
 and log land-inclusive sale price in 2000 dollars. Treatment follows
 `estimate-corelogic-share.R`: HUD zones II and III are compared separately

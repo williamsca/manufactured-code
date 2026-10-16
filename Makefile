@@ -1,8 +1,15 @@
 # Citations seem good enough for now, but can change formatting with CSL
 # CSL = chicago-author-date
 
-paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib
+paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
+	output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex
 	Rscript -e "rmarkdown::render('$<')"
+
+output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex &: \
+	program/cost-benefit/estimate-corelogic-comparison.R \
+	output/corelogic/prices/mh_static_ladder.csv output/corelogic/prices/mh_price_summary.csv \
+	output/cost-benefit/hud-comparison-scalars.csv output/mhs/mhs-scalars.csv notes/hud-wind-forecasts.csv
+	Rscript program/cost-benefit/estimate-corelogic-comparison.R
 
 two-pager.pdf: two-pager.Rmd program/load-results.R program/estimate-nfip/nfip-scalars.R manufactured-code.bib \
 	$(wildcard output/*/*.csv output/*/*.tex output/*/*.pdf)
@@ -93,6 +100,7 @@ estimates:
 	Rscript program/estimate-census/estimate-census.R
 	Rscript program/cost-benefit/estimate-welfare.R
 	Rscript program/cost-benefit/estimate-hud-comparison.R
+	Rscript program/cost-benefit/estimate-corelogic-comparison.R
 	Rscript program/cost-benefit/hud-cost-forecast.R
 	Rscript program/estimate-corelogic/replot-corelogic.R
 
