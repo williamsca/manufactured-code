@@ -30,13 +30,7 @@ The CoreLogic counts (a) are survivors as of 2023 and (b) cover only MH on owned
 - [X] Memo in `notes/LOG.md`: does Census 2000 show a Zone III decline in the 1995–98 MH bin comparable in sign and rough size to CoreLogic's? Does it survive dropping Andrew counties? Outputs to `output/corelogic/quantities/` (or `output/descriptives/`), with scalars to `output/results/` per the standing rules and a spec entry in `notes/specs.md`.
 
 ### Q3 — Model and reframing [Colin, after Q1–Q2]
-- [ ] Write the user-cost model in `notes/` (resist vs. replace; resilience as durability; break-even $\lambda d \rho \gtrsim \kappa(r+\delta)$; MH vs. SB choice on dollar losses $p d$; role of land share and ex post aid). Map the break-even to the zone map: where does the mandate pay?
-- [ ] Reconcile the intro/abstract claim of "no placement effect / valued at cost" with the CoreLogic decline. If Q2 confirms the decline, reframe it as revealed valuation below cost and ask where displaced buyers went: site-built (columns 3–4), older pre-1994 MH held longer (a Gruenspecht-style effect that would lower stock-wide resilience), or out of the county.
-- [ ] Candidate structure: model → cost (prices) → behavioral response (quantities = revealed valuation; displacement) → benefits (flood via NFIP; wind via Q4) → where the mandate pays.
-
-### Q4 — Survival/destruction analysis = the wind channel [scope only if Q1 says the panel is usable]
-The paper currently says the wind channel "would need to deliver" a stated amount but does not test it. Parcel-level design on the historical snapshots. Outcome: structure removed or replaced within ~2 years of a storm. Treatment: post-1994 × MH × wind exposure (wind swath), with SB as comparison. Storms in window: Matthew, Harvey, Irma, Michael, Florence, Laura, Ida, Ian, Idalia, Helene, Milton. The same panel measures what replaced the destroyed units (MH, SB, vacant), i.e., the replace margin, and whether pre-1994 MH are retained longer in Zone III (Gruenspecht test).
-- [ ] Not started. Decide after Q1.
+- [ ] Decide whether to implement an analysis using *assessment* data (on improvement value) in a yearly panel around hurricane events to estimate actual storm damage (and repair costs?)
 
 ## Chunk P — Cost side moved to county x vintage CoreLogic designs [agent] — merged to `main` `5e780ec` (2026-10-12)
 Memo in `notes/LOG.md`; spec in `notes/specs.md` §20.
