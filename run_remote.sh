@@ -185,7 +185,7 @@ check_job_status "$JOB_ID"
 
 # 5. Download each exported result folder, replacing the local copy.
 if [ -n "$SCRIPT" ]; then
-  NAMES=$(basename "$SCRIPT" .R | sed -E "s/^estimate-${RESULTS}-//")
+  NAMES=$(basename "$SCRIPT" .R | sed -E "s/^(estimate-)?${RESULTS}-//")
 else
   NAMES=$(ssh "$REMOTE" "ls ${REMOTE_DIR}/results/${RESULTS} 2>/dev/null" || true)
 fi
