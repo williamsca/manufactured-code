@@ -205,3 +205,15 @@ public references remain the explicitly staged legacy project bundle; the
 wind-zone mapping still needs reconciliation/refresh before estimation. Hurricane
 exposure joins and estimation are subsequent stages; no reform or hurricane
 coefficients have been estimated in this workstream yet.
+
+
+## Historical Property Basic snapshots (Q1 panel)
+
+Built by `program/import-corelogic-snapshots/` (Slurm: `import-corelogic-snapshots.slurm`; launch with `./run_remote.sh import-corelogic-snapshots`). Licensed panel stays at `/scratch/chv7bg/manufactured-code/corelogic-snapshots/panel/current/panel.parquet`; only aggregate CSV/JSON come back to `output/import-corelogic-snapshots/{panel,tabulate}/`.
+
+- **Source:** `/project/crebe_hufl_corelogic/historic_property/`. One zip per state per snapshot index holding one pipe-delimited `.txt` (~210 columns). The 2024 delivery (`20240814/`, plus index 15 in `20240814/151041/`, delivery date 20240815, file names contain a space) is used. The 2023 delivery (`20230817`, indices 01–14, some states missing) is a subset and is not used.
+- **Snapshots:** 15 annual snapshots, tax years 2008–2022. The zip index is *not* chronological: index 1 = tax year 2022, …, 14 = 2009, 15 = 2008. The panel dates each snapshot by its modal `TAX YEAR`. Nothing exists after tax year 2022: the curated 2023 Property Basic (`cl_property_basic/v2026-10-07`) is identical to index 1 (max assessor update 2023-03-30).
+- **Panel:** key (`clip`, `snap_idx`); fields: `year_built`, `effective_year_built` (values outside 1700–2100 set to missing), land use, property indicator, MH indicator, improvement/land/total value, tax year, assessor update date, `previous_clip`. Counties (configurable): Lee 12071, Charlotte 12015, Bay 12005, Gulf 12045, Maricopa AZ 04013 (Zone I comparison). 27,825,589 rows.
+- **Checks (job 21432406):** no missing state×snapshot zips; rows read = rows written for every zip; 154,750 rows with null `clip` excluded (counted in `check-null-clip.csv`); 0 duplicate (`clip`, snapshot) keys.
+- **Clip stability:** `clip` is unique within snapshot. Adjacent-snapshot match rates are in `tab-clip-match.csv`. `PREVIOUS CLIP` is essentially never populated, so there is no linkage across clip changes; a replaced structure on the same parcel keeps its `clip`.
+- **Data-quality caveats:** The MH indicator is unusable before ~2016 (Lee flags ~145k parcels, mostly condos, before 2016 vs ~17.5k after; Bay none before 2014; Maricopa none before 2015). The tabulations define MH as land use 137, which is stable except Lee (zero parcels in 2009–10) and Maricopa (22k in 2008–11, 17.3k in 2012, ~19k later). Assessor update date is missing in the first three snapshots in Bay. Maricopa effective year is ~3% populated. `year_built` after the snapshot year: Lee 38,697, Maricopa 9,174 rows. Effective year before `year_built`: Bay 68, Gulf 34 rows.
