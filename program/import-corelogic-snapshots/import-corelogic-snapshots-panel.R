@@ -187,7 +187,7 @@ fwrite(import_log, file.path(out_dir, "import-log.csv"))
 # The zip names carry only an index; the tax and assessed years identify what each
 # snapshot is. snapshot_year is the modal tax year (assessed year if tax year is empty).
 parts_glob <- cl_sql_string(file.path(out_dir, "parts", "*", "*.parquet"))
-dbExecute(con, sprintf("CREATE VIEW raw_panel AS SELECT * FROM read_parquet(%s, hive_partitioning=false)", parts_glob))
+.rc <- dbExecute(con, sprintf("CREATE VIEW raw_panel AS SELECT * FROM read_parquet(%s, hive_partitioning=false)", parts_glob))
 year_freq <- as.data.table(dbGetQuery(con, "
     SELECT snap_idx, tax_year, assessed_year,
         TRY_CAST(substr(taxroll_cert_date, 1, 4) AS INTEGER) AS cert_year, count(*) AS n
@@ -215,8 +215,14 @@ dbWriteTable(con, "snapshots", snapshots[, .(snap_idx, snapshot_year)], overwrit
 # --- 4. Stack into the panel ------------------------------------------------------------
 # A (clip, snap_idx) with more than one row cannot identify a structure; those keys
 # are dropped from the panel (and counted), never silently collapsed.
-dbExecute(con, "CREATE TEMP TABLE dup_keys AS
-    SELECT clip, snap_idx, count(*) AS n_rows FROM raw_panel GROUP BY clip, snap_idx HAVING count(*) > 1")
+# Rows with no CLIP cannot be followed across snapshots (and would slip through the
+# duplicate-key join, since NULL never matches), so they are excluded and counted.
+null_clip <- as.data.table(dbGetQuery(con, "
+    SELECT fips, snap_idx, count(*) AS n_null_clip FROM raw_panel WHERE clip IS NULL GROUP BY ALL ORDER BY ALL"))
+fwrite(null_clip, file.path(out_dir, "check-null-clip.csv"))
+.rc <- dbExecute(con, "CREATE TEMP TABLE dup_keys AS
+    SELECT clip, snap_idx, count(*) AS n_rows FROM raw_panel WHERE clip IS NOT NULL
+    GROUP BY clip, snap_idx HAVING count(*) > 1")
 n_dup_keys <- dbGetQuery(con, "SELECT count(*) AS n, coalesce(sum(n_rows), 0) AS rows FROM dup_keys")
 dup_by_county <- as.data.table(dbGetQuery(con, "
     SELECT p.fips, p.snap_idx, count(*) AS n_rows FROM raw_panel p
@@ -225,28 +231,29 @@ fwrite(dup_by_county, file.path(out_dir, "check-duplicate-keys.csv"))
 
 mh_sql <- cl_type_sql("p.mobile_home_indicator", "p.property_indicator_code", "p.land_use_code")
 panel_file <- file.path(out_dir, "panel.parquet")
-dbExecute(con, sprintf("COPY (
+.rc <- dbExecute(con, sprintf("COPY (
     SELECT p.* EXCLUDE (state), p.state, s.snapshot_year, %s AS mh
     FROM raw_panel p
     JOIN snapshots s USING (snap_idx)
     ANTI JOIN dup_keys d USING (clip, snap_idx)
+    WHERE p.clip IS NOT NULL
     ORDER BY p.clip, p.snap_idx) TO %s (FORMAT parquet, COMPRESSION zstd)",
     mh_sql, cl_sql_string(panel_file)))
-dbExecute(con, sprintf("CREATE VIEW panel AS SELECT * FROM read_parquet(%s)", cl_sql_string(panel_file)))
+.rc <- dbExecute(con, sprintf("CREATE VIEW panel AS SELECT * FROM read_parquet(%s)", cl_sql_string(panel_file)))
 
 # --- 5. Sanity checks ------------------------------------------------------------------
 n_panel <- dbGetQuery(con, "SELECT count(*) AS n FROM panel")$n
 checks <- list(
     delivery = want_delivery, counties = counties, snapshots = nrow(snapshots),
     rows_raw = sum(import_log$n_raw), rows_panel = n_panel,
-    dup_keys = n_dup_keys$n, dup_rows = n_dup_keys$rows,
+    dup_keys = n_dup_keys$n, dup_rows = n_dup_keys$rows, null_clip_rows = sum(null_clip$n_null_clip),
     # Uniqueness on the panel key.
     panel_key_unique = dbGetQuery(con, "SELECT count(*) = count(DISTINCT (clip, snap_idx)) AS ok FROM panel")$ok,
     # Every row is in a requested county.
     fips_in_request = dbGetQuery(con, sprintf("SELECT bool_and(fips IN (%s)) AS ok FROM panel",
         paste(cl_sql_string(counties), collapse = ",")))$ok,
     missing_clip = dbGetQuery(con, "SELECT count(*) AS n FROM panel WHERE clip IS NULL")$n,
-    rows_add_up = n_panel + n_dup_keys$rows == sum(import_log$n_raw))
+    rows_add_up = n_panel + n_dup_keys$rows + sum(null_clip$n_null_clip) == sum(import_log$n_raw))
 stopifnot(isTRUE(checks$panel_key_unique), isTRUE(checks$fips_in_request),
     checks$missing_clip == 0, isTRUE(checks$rows_add_up))
 write_json(checks, file.path(out_dir, "checks.json"), auto_unbox = TRUE, pretty = TRUE)

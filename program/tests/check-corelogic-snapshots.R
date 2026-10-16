@@ -50,6 +50,8 @@ snap_rows <- function(s) {
         row("I", s, if (s >= 3) 1996 else 1995, 85000),
         # J: effective year built precedes year built (data error)
         row("J", s, 2005, 75000, eff = 2000),
+        # L: no CLIP in snapshots 3 and 4 (cannot be tracked, must be excluded and counted)
+        if (s >= 3) rbind(row("", s, 1990, 50000), row("", s, 1991, 51000)),
         # K: outside the requested counties
         row("K", s, 1990, 50000, fips = "99999")))
 }
@@ -129,6 +131,6 @@ stopifnot(em[, sum(n_eff_changed)] == 2, em[, sum(n_eff_changed_yb_changed)] == 
 up <- tab("tab-update-timing")
 stopifnot(all(up$n_update_missing == 0), all(up$n_updated_in_snapshot_year == up$n))
 chk <- jsonlite::fromJSON(file.path(panel_dir, "checks.json"))
-stopifnot(chk$dup_keys == 1, chk$dup_rows == 2, isTRUE(chk$panel_key_unique))
+stopifnot(chk$dup_keys == 1, chk$dup_rows == 2, chk$null_clip_rows == 4, isTRUE(chk$panel_key_unique))
 cat("check-corelogic-snapshots: all assertions passed\n")
 unlink(root, recursive = TRUE)
