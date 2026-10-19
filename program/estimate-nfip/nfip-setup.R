@@ -10,10 +10,10 @@ library(ggplot2)
 # BIN_CONSTR_YEAR: width of construction-year bins.
 #   1993 is always the right-end of the last pre-treatment bin, so that the
 #   HUD 1994 cutoff falls cleanly at a bin boundary.
-#     N=1 → annual (no binning); ref period = 1993
-#     N=2 → 1992-1993, 1994-1995, ...;  ref period = 1992
-# A script sets BIN_CONSTR_DEFAULT before sourcing this file; the claim-level
-# scripts use annual vintages, the cell-level ones two-year bins.
+#     N=1 → annual (no binning); ref period = 1992-1993
+#     N=2 → ..., 1990-1991, 1992-1993, 1994-1995, ...;  ref period = 1992
+# A script sets BIN_CONSTR_DEFAULT before sourcing this file; the default is
+# two-year bins, which all NFIP scripts use.
 BIN_CONSTR_YEAR <- if (exists("BIN_CONSTR_DEFAULT")) BIN_CONSTR_DEFAULT else 2L
 # Location fixed effects are county x period throughout.
 agg_geo <- "countyfp"
@@ -34,13 +34,12 @@ bin_constr <- function(y, N) {
         1994L      + ((y - 1994L) %/% N) * N
     )
 }
-# Omitted vintages: the last two pre-reform years. With annual vintages both
-# 1992 and 1993 are omitted jointly, so the normalization matches the two-year
-# bin and does not rest on one year's MH claims (about 400 in 1993).
-ref_period <- if (BIN_CONSTR_YEAR == 1L) c(1992L, 1993L) else 1994L - BIN_CONSTR_YEAR
-# x position of the reform line in event-study plots (1993.5 annual, 1992.5
-# with two-year bins)
-vline_constr <- 1993.5 - (BIN_CONSTR_YEAR - 1L)
+# Omitted vintages: the last pre-reform bin, 1992-1993. Annual vintages omit
+# 1992 and 1993 jointly so the normalization matches the two-year bin.
+ref_period <- if (BIN_CONSTR_YEAR == 1L) c(1992L, 1993L) else bin_constr(1993L, BIN_CONSTR_YEAR)
+# x position of the reform line in event-study plots: between the last
+# pre-reform bin's label and the first post-reform bin's label
+vline_constr <- 1993.5 - (BIN_CONSTR_YEAR - 1L) / 2
 
 v_dict <- c(
     "claims_n" = "Claims (#)",

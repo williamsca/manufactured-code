@@ -4,7 +4,6 @@
 
 rm(list = ls())
 library(here)
-BIN_CONSTR_DEFAULT <- 1L
 source(here("program", "estimate-nfip", "nfip-setup.R"))
 source(here("program", "estimate-nfip", "nfip-claims-sample.R"))
 source(here("program", "estimate-nfip", "plot-es.R"))
@@ -179,7 +178,7 @@ etable(
 
 # static ----
 # Headline ATT: single post_mh coefficient in place of the event study's
-# eleven individually-noisy period_constr x mh terms. Same sample, FE
+# individually-noisy period_constr x mh terms. Same sample, FE
 # structure, and clustering as fmla_claim_es, collapsing the vintage
 # profile to a pre/post-1994 comparison.
 fmla_static <- as.formula(paste0(

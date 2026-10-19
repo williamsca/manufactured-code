@@ -14,7 +14,6 @@
 
 rm(list = ls())
 library(here)
-BIN_CONSTR_DEFAULT <- 1L
 source(here("program", "estimate-nfip", "nfip-setup.R"))
 source(here("program", "estimate-nfip", "nfip-claims-sample.R"))
 
