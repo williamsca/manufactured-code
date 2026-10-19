@@ -195,6 +195,35 @@ static_table <- function(res, file) {
         extralines = list("Counties" = format(res$counties, big.mark = ",")),
         notes = NULL)
 }
+# Paper table: same layout as the CoreLogic quantity ladder. Columns 1-2 MH,
+# 3-4 site-built as its own outcome (same two specifications), 5-6 owner- and
+# renter-occupied MH with the column-2 specification.
+paper_fit <- function(x, k) {
+    m <- fepois(ladder_formula(k), x, vcov = ~countyfp, mem.clean = TRUE)
+    list(fit = summary(m, lean = TRUE), counties = uniqueN(x$countyfp[obs(m)]))
+}
+six_in <- list(panels$all[mh == 1L], panels$all[mh == 1L], panels$all[mh == 0L], panels$all[mh == 0L],
+               panels$owner[mh == 1L], panels$renter[mh == 1L])
+six_k  <- c(1, 2, 1, 2, 2, 2)
+six    <- Map(paper_fit, six_in, six_k)
+six_fits <- lapply(six, `[[`, "fit"); six_counties <- sapply(six, `[[`, "counties")
+etable(six_fits, tex = TRUE, file = file.path(out_dir, "census-static-paper.tex"), replace = TRUE,
+    digits = "r3", fitstat = c("n", "pr2"), keep = "%post_", style.tex = style.tex(tablefoot = FALSE),
+    depvar = FALSE,
+    headers = list("Outcome:" = list("MH" = 2, "Site-built" = 2, "MH" = 2),
+                   "Occupants:" = list("All" = 4, "Owner" = 1, "Renter" = 1)),
+    dict = c(post_z2 = "Zone II $\\times$ post", post_z3 = "Zone III $\\times$ post",
+        countyfp = "County", bin = "Vintage", "statefp^bin" = "State $\\times$ vintage"),
+    extralines = list("Counties" = format(six_counties, big.mark = ",")), notes = NULL)
+six_tab <- rbindlist(lapply(1:6, function(j) {
+    tab <- as.data.table(coeftable(six_fits[[j]]), keep.rownames = "term")
+    setnames(tab, names(tab)[2:5], c("estimate", "se", "t", "p"))
+    tab[, `:=`(column = j, zone = sub("^.*z([23])$", "\\1", term), n = nobs(six_fits[[j]]),
+               counties = six_counties[j], pct = 100 * expm1(estimate))]
+}))
+stopifnot(nrow(six_tab) == 12, all(six_tab$zone %in% c("2", "3")))
+fwrite(six_tab, file.path(out_dir, "census-static-paper-coefficients.csv"))
+
 for (s in names(ladders)) static_table(ladders[[s]], file.path(out_dir, sprintf("census-static-%s.tex", s)))
 
 plot_dynamic <- function(s, k) {
@@ -225,6 +254,9 @@ sc <- rbindlist(lapply(seq_len(nrow(stat)), function(i) with(stat[i], data.table
 sc <- rbind(sc, rbindlist(lapply(seq_len(nrow(dyn[sample == "all"])), function(i) with(dyn[sample == "all"][i],
     data.table(statistic = sprintf("census_dyn_c%d_z%s_%s_%s", column, zone, bin, c("est", "se")),
                value = c(estimate, se))))))
+sc <- rbind(sc, rbindlist(lapply(seq_len(nrow(six_tab)), function(i) with(six_tab[i], data.table(
+    statistic = sprintf("census_paper_c%d_z%s_%s", column, zone, c("est", "se", "pct")),
+    value = c(estimate, se, pct))))))
 sc <- rbind(sc, data.table(statistic = paste0("census_panel_counties_", names(panels)),
                            value = sapply(panels, function(x) uniqueN(x$countyfp))))
 stopifnot(!anyDuplicated(sc$statistic), !anyNA(sc$value))

@@ -16,10 +16,14 @@ nfip_sc <- read_nfip_scalars()
 welf_sc <- fread(here("output", "cost-benefit", "welfare-scalars.csv"))
 ss_sc   <- fread(here("output", "descriptives", "sumstats-nfip-scalars.csv"))
 
+census_sc <- fread(here("output", "census", "census-scalars.csv"))
+
 get_mhs  <- function(nm) mhs_sc[statistic == nm,  value]
 get_nfip <- function(nm) nfip_sc[statistic == nm, value]
 get_welf <- function(nm) welf_sc[statistic == nm, value]
 get_ss   <- function(nm) ss_sc[statistic == nm,   value]
+
+get_census <- function(nm) census_sc[statistic == nm, value]
 
 # Formatting helpers.  All monetary values stored in $000 (2000 dollars).
 fmt_d <- function(x, digits = 0) {
@@ -60,6 +64,19 @@ fmt_lp <- function(x, digits = 2) {
     paste0(if (x >= 0) "" else "-",
            formatC(abs(x), format = "f", digits = digits))
 }
+# Census 2000 vintage-bin counts (appendix-census). `cen_b` and `cen_se` are
+# log-point coefficients and standard errors; `cen_pc` is the percent change.
+cen_stat <- function(s, k, z, what)
+    get_census(sprintf("census_static_%s_c%d_z%d_%s", s, k, z, what))
+cen_b  <- function(s, k, z) fmt_lp(cen_stat(s, k, z, "est"), 3)
+cen_se <- function(s, k, z) fmt_lp(cen_stat(s, k, z, "se"), 3)
+cen_pc <- function(s, k, z) paste0(formatC(cen_stat(s, k, z, "pct"), format = "f", digits = 0), "\\%")
+cen_p <- function(k, z, what) get_census(sprintf("census_paper_c%d_z%d_%s", k, z, what))
+cen_pb  <- function(k, z) fmt_lp(cen_p(k, z, "est"), 3)
+cen_pse <- function(k, z) fmt_lp(cen_p(k, z, "se"), 3)
+cen_ppc <- function(k, z) paste0(formatC(cen_p(k, z, "pct"), format = "f", digits = 0), "\\%")
+cen_n_counties <- format(as.integer(get_census("census_panel_counties_all")), big.mark = ",")
+
 plc_eff    <- fmt_lp(get_mhs("placements_effect_static"))
 plc_se     <- fmt_lp(get_mhs("placements_effect_static_se"))
 plc_ci_lo  <- fmt_lp(get_mhs("placements_effect_static") -
@@ -294,6 +311,15 @@ lad_se <- function(o, k, z) se_fmt(get_lad(o, k, z, "se"))
 lad_pc <- function(o, k, z) pctc_fmt(get_lad(o, k, z))
 cl_count_drop_z2 <- fmt_pct(abs(100 * (exp(get_lad("count", 2, 2)) - 1)), 1)
 cl_count_drop_z3 <- fmt_pct(abs(100 * (exp(get_lad("count", 2, 3)) - 1)), 1)
+# Appendix sample-exclusion comparison, generated alongside its LaTeX table.
+cl_donut <- fread(file.path(cl_dir, "donut-comparison-20261019", "static-appendix.csv"))
+donut_pc <- function(o, s, z) {
+    b <- cl_donut[outcome == o & sample == s & zone == z, estimate]
+    stopifnot(length(b) == 1L)
+    pctc_fmt(b)
+}
+cl_donut_n_counties <- jsonlite::fromJSON(file.path(cl_dir,
+    "continental-donut-50mi-20261019", "manifest.json"))$donut$excluded_counties
 cl_size_common <- fread(file.path(cl_dir, "prices", "size_common_sample_coefficients.csv"))
 size_common_pc <- function(k, z) {
     b <- cl_size_common[specification == paste0("common_sample_", k) &
