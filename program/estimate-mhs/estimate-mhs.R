@@ -31,6 +31,7 @@ n_dropped_states <- readRDS(here("derived", "mhs-dropped-states.Rds"))$n_dropped
 # weight rather than through having no data.
 v_all_out <- unique(c(
     "avg_sales_price_fw", "avg_sales_price_fw_idx", "avg_sales_price_fw_ln",
+    "avg_sales_price_fw_hpi", "avg_sales_price_fw_hpi_ln",
     "avg_sales_price_comp", "avg_sales_price", "avg_sales_price_ln",
     "avg_sales_price_single", "avg_sales_price_double",
     "avg_sales_price_single_ln", "avg_sales_price_double_ln",
@@ -72,9 +73,12 @@ dt_common <- dt[!is.na(avg_sales_price_fw)]
 # databuild-mhs.R, which holds the single-/multi-section mix at a national
 # pre-reform basket, so a shift toward multi-section units cannot register
 # as a price effect. `avg_sales_price` is retained for comparison and
-# `avg_sales_price_comp` isolates the mix shift on its own.
+# `avg_sales_price_comp` isolates the mix shift on its own. The `_hpi`
+# outcomes divide the index by the state house price index (databuild-mhs.R),
+# so a general housing boom in treated states does not load on the reform.
 v_out_p <- c("avg_sales_price_fw", "avg_sales_price_fw_idx",
-             "avg_sales_price_fw_ln", "avg_sales_price_comp",
+             "avg_sales_price_fw_ln", "avg_sales_price_fw_hpi",
+             "avg_sales_price_fw_hpi_ln", "avg_sales_price_comp",
              "avg_sales_price", "avg_sales_price_ln",
              "avg_sales_price_single", "avg_sales_price_double",
              "avg_sales_price_single_ln", "avg_sales_price_double_ln")
@@ -108,6 +112,10 @@ est_q <- feols(fmla_q, data = dt_common, weights = ~placements_base,
 # it silently returns the wrong equation; match on the model index
 # instead.
 pick_lhs <- function(est, lhs) {
+    if (!inherits(est, "fixest_multi")) {
+        stopifnot(as.character(est$fml[[2]]) == lhs)
+        return(est)
+    }
     i <- which(models(est)$lhs == lhs)
     stopifnot(length(i) == 1L)
     est[[i]]
@@ -129,6 +137,18 @@ fmla_static_bin <- avg_sales_price_fw ~ post_treated | statefp + year
 est_static_bin <- feols(fmla_static_bin, data = dt, weights = ~placements_base,
                         cluster = ~statefp)
 
+# Housing-cycle checks. The state house price index as an outcome shows
+# whether treated states had a differential housing boom over the same window
+# and sample; the log index and its HPI-deflated counterpart are then
+# estimated on one sample so the deflation is the only difference.
+est_hpi_es <- feols(hpi_state_ln ~ i(year, treated, ref = 1993) | statefp + year,
+                    data = dt_common, weights = ~placements_base,
+                    cluster = ~statefp)
+est_hpi_static <- feols(
+    c(hpi_state_ln, avg_sales_price_fw_ln, avg_sales_price_fw_hpi_ln) ~
+        post_treated | statefp + year,
+    data = dt_common, weights = ~placements_base, cluster = ~statefp)
+
 # Quantity-side counterpart of `est_static_bin`: one post-1994 coefficient
 # on log placements, on the same index sample as the price estimates, so
 # the paper can report a single semi-elasticity and its standard error
@@ -136,6 +156,12 @@ est_static_bin <- feols(fmla_static_bin, data = dt, weights = ~placements_base,
 est_q_static <- feols(placements_ln ~ post_treated | statefp + year,
                       data = dt_common, weights = ~placements_base,
                       cluster = ~statefp)
+
+v_dict_hpi <- c(
+    "hpi_state_ln"              = "State house price index (log)",
+    "avg_sales_price_fw_ln"     = "Fixed-weight price index (log)",
+    "avg_sales_price_fw_hpi_ln" = "HPI-deflated fixed-weight price index (log)"
+)
 
 dict_static <- c(
     "post_treated"          = "Post 1994 x Treated",
@@ -152,6 +178,8 @@ dict_static <- c(
 
 etable(est_static_bin, dict = dict_static, fitstat = c("n", "r2", "my"),
        digits = 3)
+etable(est_hpi_static, dict = c(dict_static, v_dict_hpi), digits = 3,
+       fitstat = c("n", "r2", "my"))
 
 # Composition decomposition ----
 # Four static DiDs that separate two distinct reasons the headline number
@@ -274,6 +302,9 @@ v_dict <- c(
     "avg_sales_price_fw"        = "Fixed-weight price index (000s)",
     "avg_sales_price_fw_idx"    = "Fixed-weight price index (1993 = 100)",
     "avg_sales_price_fw_ln"     = "Fixed-weight price index (log)",
+    "avg_sales_price_fw_hpi"    = "HPI-deflated fixed-weight price index (000s)",
+    "avg_sales_price_fw_hpi_ln" = "HPI-deflated fixed-weight price index (log)",
+    "hpi_state_ln"              = "State house price index (log)",
     "avg_sales_price_comp"      = "Composition-only index (000s)",
     "avg_sales_price"           = "Average sales price (000s)",
     "avg_sales_price_single"    = "Average sales price, single-wide (000s)",
@@ -353,6 +384,12 @@ plot_es(est_p, "avg_sales_price_fw_idx", yscale = 1,
         path = file.path(out_dir, "es-mhs-avg_sales_price_fw_idx.pdf"))
 plot_es(est_q, "placements_ln",
         path = file.path(out_dir, "es-mhs-placements_ln.pdf"))
+
+# Housing-cycle robustness figures: HPI-deflated price and the state HPI.
+plot_es(est_p, "avg_sales_price_fw_hpi_ln",
+        path = file.path(out_dir, "es-mhs-avg_sales_price_fw_hpi_ln.pdf"))
+plot_es(est_hpi_es, "hpi_state_ln",
+        path = file.path(out_dir, "es-mhs-hpi_state_ln.pdf"))
 
 # Static table for every other price and quantity outcome: one post-1994 x
 # treated coefficient per outcome, on the same samples, weights, and fixed
@@ -463,9 +500,32 @@ placements_effect_static    <- coef(est_q_static)[["post_treated"]]
 placements_effect_static_se <- se(est_q_static)[["post_treated"]]
 n_placements <- nobs(est_q_static)
 
+# Housing-cycle deflation, log points: the state HPI response, the log
+# index, and the HPI-deflated log index on one sample (static), plus the
+# post-LASTING_START_MHS event-study average of the deflated index and its
+# dollar counterpart in thousands of 2000 dollars.
+hpi_static <- function(lhs) {
+    e <- pick_lhs(est_hpi_static, lhs)
+    c(coef(e)[["post_treated"]], se(e)[["post_treated"]])
+}
+hpi_effect_static     <- hpi_static("hpi_state_ln")
+price_ln_static       <- hpi_static("avg_sales_price_fw_ln")
+price_hpi_ln_static   <- hpi_static("avg_sales_price_fw_hpi_ln")
+price_hpi_ln_level    <- post_avg(est_p, "avg_sales_price_fw_hpi_ln", scale = 1)
+price_hpi_level       <- post_avg(est_p, "avg_sales_price_fw_hpi")
+ct_hpi <- as.data.table(coeftable(est_hpi_es), keep.rownames = TRUE)
+ct_hpi[, year := as.integer(regmatches(rn, regexpr("[0-9]{4}", rn)))]
+hpi_effect_level      <- ct_hpi[grepl(":treated$", rn) & year >= LASTING_START_MHS,
+                                mean(Estimate)]
+
 fwrite(
     data.table(
-        statistic = c("price_effect_level", "price_effect_1994",
+        statistic = c("hpi_effect_static", "hpi_effect_static_se",
+                      "price_ln_static", "price_ln_static_se",
+                      "price_hpi_ln_static", "price_hpi_ln_static_se",
+                      "price_hpi_ln_level", "price_hpi_level",
+                      "hpi_effect_level",
+                      "price_effect_level", "price_effect_1994",
                       "avg_price_treated_pre", "price_effect_pct",
                       "price_effect_idx", "price_effect_raw_level",
                       "price_effect_comp_level", "price_effect_raw_cmn_level",
@@ -480,7 +540,9 @@ fwrite(
                       "mean_price_double", "price_ratio_double_single",
                       "placements_effect_level", "placements_effect_static",
                       "placements_effect_static_se", "n_placements"),
-        value     = c(price_effect_level, price_effect_1994,
+        value     = c(hpi_effect_static, price_ln_static, price_hpi_ln_static,
+                      price_hpi_ln_level, price_hpi_level, hpi_effect_level,
+                      price_effect_level, price_effect_1994,
                       avg_price_treated_pre, price_effect_pct,
                       price_effect_idx, price_effect_raw_level,
                       price_effect_comp_level, price_effect_raw_cmn_level,

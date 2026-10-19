@@ -19,6 +19,20 @@ main <- function() {
     on.exit(dbDisconnect(con, shutdown = TRUE))
     dbExecute(con, "SET threads=4")
     dbExecute(con, "SET memory_limit='8GB'")
+    if (isTRUE(meta$donut$enabled)) {
+        geography <- fread(file.path(run, "audit", "donut_counties.csv"),
+            colClasses = c(GEOID = "character"))
+        excluded <- geography[donut_excluded == TRUE, .(countyfp = GEOID)]
+        stopifnot(nrow(excluded) == meta$donut$excluded_counties,
+            all(geography[donut_excluded == TRUE, wind_zone] == 1L))
+        dbWriteTable(con, "donut_exclusions", as.data.frame(excluded))
+        for (kind in c("properties", "transfers", "sales", "pairs")) {
+            violations <- dbGetQuery(con, sprintf("SELECT COUNT(*) AS n
+                FROM read_parquet(%s) JOIN donut_exclusions USING (countyfp)",
+                cl_sql_string(file.path(run, kind, "*.parquet"))))$n
+            stopifnot(violations == 0)
+        }
+    }
     for (kind in c("transfers", "sales", "pairs")) {
         dbExecute(con, sprintf("CREATE VIEW %s AS SELECT * FROM read_parquet(%s)",
             kind, cl_sql_string(file.path(run, kind, "*.parquet"))))

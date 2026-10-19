@@ -20,8 +20,22 @@ $(CL_RUNS): $(CL_SRC)
 
 paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
 	$(CL_RUNS) \
+	output/corelogic/donut-comparison-20261019/static-appendix.tex \
+	output/corelogic/donut-comparison-20261019/static-appendix.csv \
+	output/census/census-scalars.csv output/census/census-static-paper.tex \
 	output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex
 	Rscript -e "rmarkdown::render('$<')"
+
+CL_DONUT = output/corelogic/donut-comparison-20261019
+CL_DONUT_INPUTS = $(foreach sample,baseline donut,$(foreach analysis,prices quantities,\
+	$(CL_DONUT)/$(sample)/$(analysis)/mh_static_ladder.csv \
+	$(CL_DONUT)/$(sample)/$(analysis)/manifest.json))
+
+$(CL_DONUT)/static-appendix.tex $(CL_DONUT)/static-appendix.csv &: \
+	program/descriptives/table-corelogic-donut.R $(CL_DONUT_INPUTS) \
+	output/corelogic/continental-donut-50mi-20261019/manifest.json \
+	output/corelogic/prices/mh_static_ladder.csv output/corelogic/quantities/mh_static_ladder.csv
+	Rscript program/descriptives/table-corelogic-donut.R
 
 output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex &: \
 	program/cost-benefit/estimate-corelogic-comparison.R $(CL_RUNS) \
@@ -96,6 +110,7 @@ test-corelogic:
 
 data:
 	Rscript program/import/import-cpi.R
+	Rscript program/import/import-fhfa-hpi.R
 	Rscript program/import/import-census.R
 	Rscript program/import/import-census-takeup.R
 	Rscript program/import/import-census-tenure.R

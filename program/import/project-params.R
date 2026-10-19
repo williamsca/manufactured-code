@@ -77,6 +77,12 @@ NFIP_VERSION <- "v2-2026-09-02"
 # designs, so an eCFR amendment must not silently move it.
 ECFR_WIND_ZONE_VERSION <- "v2026-09-03"
 
+# research-database curated snapshot of fhfa_hpi (FHFA county-level all-
+# transactions HPI, 2000 = 100). Pinned like the other sources; read by
+# import-fhfa-hpi.R to build the state housing price index that databuild-mhs.R
+# uses to deflate MH prices.
+FHFA_HPI_VERSION <- "v2026-10-19"
+
 # Hosted CoreLogic full builds of the August 2023 delivery. Partial-state
 # source versions must never be selected through rd_latest_version().
 CORELOGIC_PB_VERSION <- "v2026-10-07"

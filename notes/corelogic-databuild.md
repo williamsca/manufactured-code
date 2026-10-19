@@ -207,6 +207,60 @@ exposure joins and estimation are subsequent stages; no reform or hurricane
 coefficients have been estimated in this workstream yet.
 
 
+## Zone I spillover doughnut (2026-10-19)
+
+`--donut-miles=50` builds a separate sample excluding every Zone I county
+whose minimum polygon-to-polygon distance to any Zone II/III county is at most
+50 statute miles. Distances use spherical geometry, cross state boundaries,
+and include proximity across water. This retains all treated counties and drops
+225 Zone I counties. Minimum boundary distance is conservative: a county is
+removed even if only its closest edge is within the buffer. The bandwidth is
+a design choice, not an estimated plant delivery radius; 25 and 100 miles are
+natural sensitivity checks (137 and 409 excluded counties, respectively).
+Omitting the option preserves the original sample;
+`--donut-miles=0` instead excludes touching/intersecting controls.
+
+The shared helper `program/lib/corelogic-donut.R` uses Census 2020 1:5,000,000
+cartographic county boundaries. This vintage preserves the Connecticut county
+FIPS used by CoreLogic, rather than the planning-region FIPS in 2024 geography.
+HUD labels come from `cl_windzone_counties()`, the corrected classification used
+by the CoreLogic estimators, including the historical Dade code in the build's
+zone crosswalk. Thus the doughnut is defined independently of transaction
+prices, construction vintages, and the set of states selected for a build.
+
+The exclusion filters both property and transfer inputs before cohort selection
+and pair construction, for MH and site-built observations alike. All four saved
+panels exclude these counties. Each build saves the complete public county list,
+distances and exclusion flags in `audit/donut_counties.csv`, the corrected zone
+crosswalk, and the bandwidth and method in `manifest.json`. Named runs launched
+through `corelogic.slurm` also verify the saved panels, including zero surviving
+records in excluded counties.
+
+```bash
+sbatch program/import/corelogic.slurm --donut-miles=50 \
+  --run-id=continental-donut-50mi-20261019 \
+  --reference-dir=/scratch/chv7bg/manufactured-code/public-reference
+```
+
+`program/descriptives/map.R` adds
+`output/descriptives/map-corelogic-windzone-donut.pdf` and its public county CSV.
+Retained Zone I counties are blue, excluded controls gray, and Zones II/III retain
+their red fills. Set `CORELOGIC_DONUT_MILES` to change the mapped bandwidth.
+`CORELOGIC_COUNTY_GEOMETRY` can point to a staged copy of the 2020 county file
+for either script, avoiding downloads inside the allocation.
+
+The continental 50-mile build completed as Slurm job `21602898` in 5 minutes
+28 seconds, including persisted-panel verification. Its private artifacts are
+at `/scratch/chv7bg/manufactured-code/corelogic/continental-donut-50mi-20261019`.
+Verification passed all original sample rules and found zero excluded-county
+records in properties, transfers, sales, or pairs. The job used an isolated code
+snapshot under `/scratch/chv7bg/manufactured-code/donut-runs/` and preserved the
+remote checkout. Aggregate summaries, the public county list and manifests are
+saved locally in `output/corelogic/continental-donut-50mi-20261019/`.
+All 49 states/DC passed verification. The retained sample has 465,425 eligible
+MH sales (baseline: 494,221) and 12,587,899 eligible site-built sales (baseline:
+13,218,377). The downloaded county exclusion list matches the map exactly.
+
 ## Historical Property Basic snapshots (Q1 panel)
 
 Built by `program/import-corelogic-snapshots/` (Slurm: `import-corelogic-snapshots.slurm`; launch with `./run_remote.sh import-corelogic-snapshots`). Licensed panel stays at `/scratch/chv7bg/manufactured-code/corelogic-snapshots/panel/current/panel.parquet`; only aggregate CSV/JSON come back to `output/import-corelogic-snapshots/{panel,tabulate}/`.

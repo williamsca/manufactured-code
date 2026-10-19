@@ -154,6 +154,30 @@ IDX_BASE_1993 <- dt[year == 1993L, {
 
 dt[, avg_sales_price_fw_idx := 100 * avg_sales_price_fw / IDX_BASE_1993]
 
+# Housing-cycle-deflated index. Treated states may also have had a general
+# housing boom after 1994, which the state fixed effects and common year
+# effects cannot absorb. Dividing the index by the state house price index
+# (import-fhfa-hpi.R) nets out movements in the state's housing market from
+# the MH price. The level version rebases the state index to 1993 = 1 so it
+# is in 1993 housing-market dollars; the log version is the log price minus
+# the log state index, which a state fixed effect would absorb any rebasing of.
+dt_hpi <- fread(here("derived", "hpi-state.csv"), colClasses = list(character = "statefp"))
+stopifnot(!anyDuplicated(dt_hpi, by = c("statefp", "year")))
+dt <- merge(dt, dt_hpi[, .(statefp, year, hpi_state)],
+            by = c("statefp", "year"), all.x = TRUE)
+
+v_nohpi <- dt[!is.na(avg_sales_price_fw) & year %between% c(MIN_YEAR_MHS, MAX_YEAR_MHS) &
+              is.na(hpi_state), unique(statefp)]
+if (length(v_nohpi) > 0) {
+    message("index-sample states with no state HPI: ", paste(v_nohpi, collapse = ", "))
+}
+
+dt[, hpi_state_1993 := hpi_state[year == 1993L], by = statefp]
+dt[, avg_sales_price_fw_hpi := avg_sales_price_fw / (hpi_state / hpi_state_1993)]
+dt[, avg_sales_price_fw_hpi_ln := log(avg_sales_price_fw) - log(hpi_state)]
+dt[, hpi_state_ln := log(hpi_state)]
+dt[, hpi_state_1993 := NULL]
+
 # Composition-only counterfactual: the state-year's actual mix valued at
 # fixed national base prices. Its event-study coefficient is the part of
 # the raw average-price effect attributable purely to the mix shift, and

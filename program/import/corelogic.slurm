@@ -21,3 +21,10 @@ export CORELOGIC_DUCKDB_MEMORY="${CORELOGIC_DUCKDB_MEMORY:-40GB}"
 export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
 Rscript program/tests/check-corelogic-databuild.R
 Rscript program/import/databuild-corelogic.R "$@"
+# Resolve the same default run-id explicitly when launching if verification is
+# needed; every named build is verified before this job can report success.
+for arg in "$@"; do
+    if [[ "$arg" == --run-id=* ]]; then
+        Rscript program/tests/verify-corelogic-build.R "$CORELOGIC_OUTPUT_ROOT/${arg#--run-id=}"
+    fi
+done
