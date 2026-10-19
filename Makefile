@@ -1,13 +1,30 @@
+# CoreLogic results (output/ is gitignored) come from Rivanna. Each remote-run.txt
+# is stamped by run_remote.sh, so a result directory is stale when any script
+# in program/estimate-corelogic/ is newer than its stamp. `make paper.pdf` stops
+# with that diagnosis instead of a missing-file or missing-column error;
+# `make corelogic` (push first) refreshes both. Needs SSH to Rivanna.
+CL_DIR  = program/estimate-corelogic
+CL_SRC  = $(wildcard $(CL_DIR)/*.R)
+CL_RUNS = output/corelogic/prices/remote-run.txt output/corelogic/quantities/remote-run.txt
+
+.PHONY: corelogic
+corelogic:
+	./run_remote.sh estimate-corelogic
+
+$(CL_RUNS): $(CL_SRC)
+	@echo "ERROR: $@ is missing or older than $(CL_DIR)/*.R."; \
+	echo "       Push your commits, then run: make corelogic"; exit 1
+
 # Citations seem good enough for now, but can change formatting with CSL
 # CSL = chicago-author-date
 
 paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
+	$(CL_RUNS) \
 	output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex
 	Rscript -e "rmarkdown::render('$<')"
 
 output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex &: \
-	program/cost-benefit/estimate-corelogic-comparison.R \
-	output/corelogic/prices/mh_static_ladder.csv output/corelogic/prices/mh_price_summary.csv \
+	program/cost-benefit/estimate-corelogic-comparison.R $(CL_RUNS) \
 	output/cost-benefit/hud-comparison-scalars.csv output/mhs/mhs-scalars.csv notes/hud-wind-forecasts.csv
 	Rscript program/cost-benefit/estimate-corelogic-comparison.R
 
