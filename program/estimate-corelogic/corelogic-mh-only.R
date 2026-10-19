@@ -35,9 +35,9 @@ cl_mh_only_coefficients <- function(model, id, years = 1989:1999, reference = 19
 }
 
 # Paper figure: state x vintage FE event study, in log points, no caption.
-# `forecast` (optional): one row per comparison with HUD's forecast log cost
-# change, drawn as a dashed path rising from 0 at 1993.5 to the forecast in
-# 1994, with a common legend below the panels.
+# `forecast` (optional): one row per comparison with a forecast log price gap
+# (`forecast`) and a common legend `label`, drawn as a dashed path rising from 0
+# at 1993.5 to the forecast in 1994, with a common legend below the panels.
 cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NULL) {
     stopifnot(all(grepl("_state_vintage_fe$", tab$specification)))
     x <- copy(tab)
@@ -52,7 +52,9 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
     x <- rbind(x, data.table(comparison = labels, vintage = reference,
         estimate = 0, ci_low = 0, ci_high = 0), fill = TRUE)
     x[, comparison := factor(comparison, levels = labels)]
-    series <- c("Regression estimates", "HUD production cost forecast")
+    series <- c("Regression estimates",
+        if (is.null(forecast)) "Forecast" else unique(forecast$label))
+    stopifnot(length(series) == 2L)
     x[, series := factor(series[1], levels = series)]
     p <- ggplot(x, aes(vintage, estimate, color = series, linetype = series)) +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +

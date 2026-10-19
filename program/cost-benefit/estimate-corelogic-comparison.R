@@ -2,6 +2,10 @@
 # other documents; this table uses county-level prices and Zone III benefits.
 # Benefits are the zone-specific outputs of estimate-hud-comparison.R, NOT its
 # MHS price estimates or pooled benefit-cost ratios. Money below is dollars.
+# The table separates the cost of the standard, which raises the price of new
+# homes and is not identified by the vintage comparison, from the capitalized
+# private value of resilience, which the vintage resale gap measures and which
+# HUD's private benefit forecast predicts.
 library(here)
 library(data.table)
 library(kableExtra)
@@ -21,6 +25,11 @@ price <- prices[grepl("z3$", term) &
     specification %in% paste0("ladder_", c(1L, 2L, 4L, 5L))][order(specification)]
 stopifnot(nrow(price) == 4L, all(price$estimate > 0))
 premium <- base * expm1(price$estimate)
+premium_lo <- base * expm1(price$ci_low)
+premium_hi <- base * expm1(price$ci_high)
+count <- fread(here("output/corelogic/quantities/mh_static_ladder.csv"))[
+    term == "post_z3" & specification == "ladder_2" & housing_type == "MH"]
+stopifnot(nrow(count) == 1L)
 gross <- 1000 * get_b("flood_private_pv_z3") # avoided damage, before NFIP payments
 public <- 1000 * get_b("flood_public_pv_z3")
 private <- gross - public
@@ -51,23 +60,37 @@ sc <- c(price_base = base, premium_baseline = premium[1],
     private_gap = premium[1] - private,
     hud_price = hud_price, hud_resource_cost = hud_resource,
     hud_private_ratio = hud_private / hud_price,
-    hud_all_ratio = (hud_private + hud_public) / hud_resource)
+    hud_all_ratio = (hud_private + hud_public) / hud_resource,
+    hud_private = hud_private, hud_public = hud_public, hud_private_cost_ratio = hud_private / hud_resource,
+    premium_ci_lo_1 = premium_lo[1], premium_ci_hi_1 = premium_hi[1],
+    premium_2 = premium[2], premium_ci_lo_2 = premium_lo[2], premium_ci_hi_2 = premium_hi[2])
 stopifnot(all(is.finite(sc)), gross > 0, private > 0, public > 0)
 fwrite(data.table(statistic = names(sc), value = unname(sc)),
     here("output/cost-benefit/corelogic-comparison-scalars.csv"))
-fd <- function(x) paste0("\\$", formatC(round(x), format = "f", digits = 0, big.mark = ","))
+fd <- function(x) sub("\\$-", "$-$\\$", paste0("\\$", formatC(round(x), format = "f",
+    digits = 0, big.mark = ",")), fixed = TRUE)
+ci <- function(lo, hi) paste0("[", fd(lo), ", ", fd(hi), "]")
 ratio <- function(x) formatC(x, format = "f", digits = 2)
 tab <- data.table(
-    item = c("Consumer price increase / resale premium", "Production cost increase",
+    item = c("Consumer price increase", "Production cost increase",
+        "Vintage resale price gap, column (1)", "\\quad 95\\% interval",
+        "Vintage resale price gap, column (2)", "\\quad 95\\% interval",
         "Reduced wind losses, mortality and injury", "Reduced flood losses, net of NFIP payouts",
-        "Reduced FEMA relief", "Reduced NFIP payouts", "Private benefits",
-        "All measured benefits", "Private benefits / price", "All benefits / resource cost",
-        "All measured benefits / resale premium"),
-    hud = c(fd(hud_price), fd(hud_resource), fd(hud_private), "---",
-        fd(hud_public), "---", fd(hud_private), fd(hud_private + hud_public),
-        ratio(hud_private / hud_price), ratio((hud_private + hud_public) / hud_resource), "---"),
-    estimate = c(fd(premium[1]), "---", "---", fd(private), "---", fd(public),
-        fd(private), fd(gross), ratio(private / premium[1]), "---", ratio(gross / premium[1])))
-writeLines(as.character(kbl(tab, format = "latex", booktabs = TRUE, escape = FALSE,
-    col.names = c("", "HUD forecast", "Estimate"), align = c("l", "r", "r"))),
+        "Reduced FEMA relief", "Reduced NFIP payouts",
+        "Surviving MH count, column (2)", "Private benefits / production cost"),
+    hud = c(fd(hud_price), fd(hud_resource), fd(hud_private), "", "", "",
+        fd(hud_private), "---", fd(hud_public), "---", "---",
+        ratio(hud_private / hud_resource)),
+    estimate = c("---", "---", fd(premium[1]), ci(premium_lo[1], premium_hi[1]),
+        fd(premium[2]), ci(premium_lo[2], premium_hi[2]), "---", fd(private),
+        "---", fd(public), sub("-", "$-$", paste0(formatC(100 * expm1(count$estimate), format = "f", digits = 1),
+            "\\%"), fixed = TRUE),
+        "---"))
+writeLines(as.character(
+    kbl(tab, format = "latex", booktabs = TRUE, escape = FALSE,
+        col.names = c("", "HUD forecast", "Estimate"), align = c("l", "r", "r")) |>
+    pack_rows("A. Cost of the standard (price of new homes)", 1, 2, escape = FALSE) |>
+    pack_rows("B. Capitalized private value of resilience", 3, 8, escape = FALSE) |>
+    pack_rows("C. Public benefits", 9, 10, escape = FALSE) |>
+    pack_rows("D. Quantity and ratio", 11, 12, escape = FALSE)),
     here("output/cost-benefit/corelogic-comparison.tex"))

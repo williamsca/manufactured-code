@@ -348,32 +348,26 @@ cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
 cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
 cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)
 
-# HUD's production cost forecast in log points by wind zone
-# (program/cost-benefit/hud-cost-forecast.R), drawn on the price event study.
-hud_fc <- fread(here("output", "cost-benefit", "hud-cost-forecast.csv"))
+# HUD's private benefit forecast as a log vintage price gap by wind zone
+# (program/cost-benefit/hud-benefit-forecast.R), drawn on the price event study.
+hud_fc <- fread(here("output", "cost-benefit", "hud-benefit-forecast.csv"))
 stopifnot(setequal(hud_fc$wind_zone, 2:3))
 hud_fc_z2 <- formatC(hud_fc[wind_zone == 2, forecast], format = "f", digits = 3)
 hud_fc_z3 <- formatC(hud_fc[wind_zone == 3, forecast], format = "f", digits = 3)
 cl_es_p <- fread(file.path(cl_dir, "prices", "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_es_p[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
 stopifnot(nrow(cl_es_p) == 20L)
-# The cost-results text states that every post-1994 Zone II point estimate
-# lies below the Zone II forecast.
-stopifnot(cl_es_p[grepl(":z2$", term) & vintage >= 1994,
-                  all(estimate < hud_fc[wind_zone == 2, forecast])])
-cl_p_z3_1999 <- formatC(cl_es_p[term == "year_constr::1999:z3", estimate], format = "f", digits = 3)
-
-# Assessor land share of value for 1989-1993 MH parcels by wind zone
-# (estimate-corelogic-new-sales.R), and the land-adjusted forecast:
-# structure share times the forecast log change.
-cl_land <- fread(file.path(cl_dir, "new-sales", "mh_land_share_by_zone.csv"))
-stopifnot(setequal(cl_land$wind_zone, 1:3), !anyNA(cl_land$land_share_aggregate))
-land_share <- function(z) cl_land[wind_zone == z, land_share_aggregate]
-cl_land_z2 <- fmt_pct(100 * land_share(2))
-cl_land_z3 <- fmt_pct(100 * land_share(3))
-hud_fc_adj <- function(z) (1 - land_share(z)) * hud_fc[wind_zone == z, forecast]
-hud_fc_adj_z2 <- formatC(hud_fc_adj(2), format = "f", digits = 3)
-hud_fc_adj_z3 <- formatC(hud_fc_adj(3), format = "f", digits = 3)
+# The cost-results text states that every post-1994 interval in both zones
+# contains the forecast, and counts the Zone III intervals that contain zero.
+stopifnot(cl_es_p[vintage >= 1994, all(ci_low < hud_fc[match(as.integer(sub(".*:z", "", term)), wind_zone), forecast] &
+                                       ci_high > hud_fc[match(as.integer(sub(".*:z", "", term)), wind_zone), forecast])])
+cl_es_p_z3_zero <- cl_es_p[grepl(":z3$", term) & vintage >= 1994, sum(ci_low < 0 & ci_high > 0)]
+# Static Zone III price specifications without size controls whose 95%
+# intervals contain zero, and whether all contain the HUD forecast.
+cl_static_p3 <- cl_lad[outcome == "price" & zone == 3 & !size_adjusted]
+stopifnot(nrow(cl_static_p3) == 4L,
+          cl_static_p3[, all(ci_low < hud_fc[wind_zone == 3, forecast] & ci_high > hud_fc[wind_zone == 3, forecast])])
+cl_static_p3_zero <- cl_static_p3[, sum(ci_low < 0 & ci_high > 0)]
 
 # Paper's county-level price benchmark and geographically matched benefits.
 # Dollar scalars here are in dollars, unlike the legacy $000 welfare outputs.
@@ -397,3 +391,12 @@ cl_flood_share_lo <- cl_share("gross_share_min")
 cl_flood_share_hi <- cl_share("gross_share_max")
 cl_private_share <- cl_share("private_share_baseline")
 cl_private_gap <- cl_d("private_gap")
+cl_hud_private <- cl_d("hud_private")
+cl_hud_resource <- cl_d("hud_resource_cost")
+cl_hud_public <- cl_d("hud_public")
+cl_premium_ci_lo <- cl_d("premium_ci_lo_1")
+cl_premium_ci_hi <- cl_d("premium_ci_hi_1")
+cl_premium_2 <- cl_d("premium_2")
+# Signed: the column (2) interval may extend below zero.
+cl_premium_2_ci_lo <- paste0(if (get_cl("premium_ci_lo_2") < 0) "$-$" else "", cl_d("premium_ci_lo_2"))
+cl_premium_2_ci_hi <- cl_d("premium_ci_hi_2")

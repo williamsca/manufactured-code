@@ -1,5 +1,5 @@
 # Coverage of near-new MH sales: candidate land-inclusive base price for HUD's
-# cost forecast (program/cost-benefit/hud-cost-forecast.R). A near-new sale is
+# forecasts (program/cost-benefit/hud-benefit-forecast.R). A near-new sale is
 # an eligible MH sale within MAX_AGE years of the construction year, for the
 # pre-reform vintages 1989-1993. Also reports the assessor land share of
 # value for the same MH parcels, as a direct check on how much land the

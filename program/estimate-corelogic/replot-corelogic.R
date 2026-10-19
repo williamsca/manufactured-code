@@ -10,7 +10,7 @@ for (analysis in c("prices", "quantities")) {
     quantity <- analysis == "quantities"
     tab <- fread(file.path(out_dir, "mh_only_vintage_coefficients.csv"))
     tab_state <- fread(file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
-    forecast <- if (quantity) NULL else fread(here("output", "cost-benefit", "hud-cost-forecast.csv"))
+    forecast <- if (quantity) NULL else fread(here("output", "cost-benefit", "hud-benefit-forecast.csv"))
     cl_mh_only_paper_plot(tab_state, out_dir, quantity = quantity, forecast = forecast)
     cl_mh_only_compare_plot(tab, tab_state, out_dir, quantity = quantity)
 }
