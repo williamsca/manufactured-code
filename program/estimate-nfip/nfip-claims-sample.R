@@ -23,7 +23,7 @@
 # --- claim-level data ---
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- dt_claims[
-    between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) &
+    between(year_constr, MIN_YEAR_CONSTR_NFIP, MAX_YEAR_CONSTR_NFIP) &
     between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)]
 dt_claims[, statefp := substr(countyfp, 1L, 2L)]
 dt_claims[, geo := get(agg_geo)]

@@ -30,8 +30,8 @@ library(arrow)
 source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
 
-year_min <- MIN_YEAR_CONSTR
-year_max <- MAX_YEAR_CONSTR
+year_min <- MIN_YEAR_CONSTR_NFIP
+year_max <- MAX_YEAR_CONSTR_NFIP
 occ_sf   <- paste(OCCUPANCY_TYPE_SF, collapse = ", ")
 
 dt_cpi <- fread(here("derived", "cpi-bls.csv"))

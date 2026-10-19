@@ -9,8 +9,13 @@ library(data.table)
 library(kableExtra)
 source(here("program", "import", "project-params.R"))
 
+# Policy panel and stock are defined for 1984-1999 vintages only (Census 2000
+# stock); the claim panel uses the window of the claim-level event studies.
 in_window <- function(year) {
     between(year, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)
+}
+in_window_claims <- function(year) {
+    between(year, MIN_YEAR_CONSTR_NFIP, MAX_YEAR_CONSTR_NFIP)
 }
 tag_groups <- function(d) {
     d[, housing_type := fifelse(mh == 1L, "Manufactured", "Site-built")]
@@ -50,7 +55,7 @@ pol_stats[, policies_per_1k_homes := 1000 * policies_tot / (15 * homes_tot)]
 
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- tag_groups(dt_claims[
-    in_window(year_constr) & between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
+    in_window_claims(year_constr) & between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
 ])
 dt_claims[, damage_pct := fifelse(
     is.finite(building_value) & building_value > 0 & is.finite(building_damage),

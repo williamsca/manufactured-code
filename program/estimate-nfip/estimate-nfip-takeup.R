@@ -5,7 +5,13 @@
 
 rm(list = ls())
 library(here)
+# The housing-stock denominator ends with the 1999 vintage and is defined from
+# 1984, so this design keeps two-year bins and the 1984-1999 window rather than
+# the three-year, 1985-2002 window of the claim-level event studies.
+BIN_CONSTR_DEFAULT <- 2L
 source(here("program", "estimate-nfip", "nfip-setup.R"))
+MIN_YEAR_CONSTR_NFIP <- MIN_YEAR_CONSTR
+MAX_YEAR_CONSTR_NFIP <- MAX_YEAR_CONSTR
 source(here("program", "estimate-nfip", "nfip-claims-sample.R"))
 
 # Calendar years per period_loss bin. The cell panel's five-year bins are

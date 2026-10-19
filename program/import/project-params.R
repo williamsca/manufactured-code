@@ -26,6 +26,15 @@ MAX_CLAIM_LOSS <- 1000
 MIN_YEAR_CONSTR <- 1984L
 MAX_YEAR_CONSTR <- 1999L
 
+# Construction-vintage window for the claim-level and policy-composition event
+# studies, which bin construction years in threes anchored on 1993: 1985-1987,
+# 1988-1990, 1991-1993 (reference), 1994-1996, 1997-1999, 2000-2002. The window
+# ends before the 2001 Florida Building Code took effect (March 2002) and does
+# not depend on the Census 2000 stock, so it extends past MAX_YEAR_CONSTR, which
+# keeps bounding the take-up designs and the balanced policy panel.
+MIN_YEAR_CONSTR_NFIP <- 1985L
+MAX_YEAR_CONSTR_NFIP <- 2002L
+
 # Single-family-residential restriction on occupancy_type, shared by every
 # NFIP claim and policy query (databuild-nfip.R, databuild-nfip-policy.R) so
 # the two samples cannot drift apart. occupancy_type mixes two FEMA coding

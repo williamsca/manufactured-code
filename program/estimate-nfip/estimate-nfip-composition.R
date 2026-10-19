@@ -26,7 +26,7 @@ dt_pol_micro <- as.data.table(arrow::read_parquet(
     col_select = c("countyfp", "period_loss", "year_constr", "mh",
                    "repl_cost", "building_policy_covg", "contents_policy_covg",
                    "elevated_policy", "sfha_policy")))
-dt_pol_micro <- dt_pol_micro[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
+dt_pol_micro <- dt_pol_micro[between(year_constr, MIN_YEAR_CONSTR_NFIP, MAX_YEAR_CONSTR_NFIP)]
 dt_pol_micro[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
 # All five composition outcomes are estimated by PPML (fepois), on the same
