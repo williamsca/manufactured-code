@@ -14,7 +14,9 @@ geo_file <- file.path(ref, "geo_county.parquet")
 wz <- cl_windzone_counties(read_corelogic(paste("SELECT countyfp,statefp,name FROM read_parquet(", quote_path(geo_file), ")")))
 # Match the price dwelling universe using snapshot fields; no sale eligibility screen.
 glob <- quote_path(file.path(input, "properties", "*.parquet"))
-cells <- cl_inventory_cells(glob)
+dynamic_years <- 1986:1999
+reference <- 1991L
+cells <- cl_inventory_cells(glob, years = dynamic_years)
 cells <- cells[, .(homes = sum(homes), mh_homes = sum(mh_homes), parcels = sum(parcels)),
     by = .(countyfp, year_constr)]
 stopifnot(all(cells$homes == cells$parcels))
@@ -24,10 +26,10 @@ cells <- cells[!is.na(wind_zone)]
 models <- list()
 # MH-only quantities by construction vintage, with zero-count county-vintage cells.
 # No site-built denominator, parcel weighting, or sale screen enters this count model.
-quantity <- cl_mh_count_panel(cells)
-quantity_model <- fepois(cl_mh_only_formula(quantity = TRUE), quantity,
+quantity <- cl_mh_count_panel(cells, years = dynamic_years)
+quantity_model <- fepois(cl_mh_only_formula(quantity = TRUE, reference = reference), quantity,
     vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
-quantity_tab <- cl_mh_only_coefficients(quantity_model, "mh_only_quantity_dynamic")
+quantity_tab <- cl_mh_only_coefficients(quantity_model, "mh_only_quantity_dynamic", dynamic_years, reference)
 fwrite(quantity_tab, file.path(out_dir, "mh_only_vintage_coefficients.csv"))
 fwrite(quantity, file.path(out_dir, "mh_counts_by_county_vintage.csv"))
 fwrite(quantity[, .(mh_homes = sum(mh_homes), counties = .N, zero_cells = sum(mh_homes == 0)),
@@ -35,16 +37,16 @@ fwrite(quantity[, .(mh_homes = sum(mh_homes), counties = .N, zero_cells = sum(mh
 models[["mh_only_quantity_dynamic"]] <- quantity_model
 # Main paper figure: state x vintage FE, so zone contrasts use within-state variation.
 # Florida has no Zone I county, so it informs III minus II but not either contrast with Zone I.
-quantity_state_model <- fepois(cl_mh_only_formula(quantity = TRUE, state = TRUE), quantity,
+quantity_state_model <- fepois(cl_mh_only_formula(quantity = TRUE, state = TRUE, reference = reference), quantity,
     vcov = ~countyfp, mem.clean = TRUE, lean = TRUE)
-quantity_state_tab <- cl_mh_only_coefficients(quantity_state_model, "mh_only_quantity_dynamic_state_vintage_fe")
+quantity_state_tab <- cl_mh_only_coefficients(quantity_state_model, "mh_only_quantity_dynamic_state_vintage_fe", dynamic_years, reference)
 fwrite(quantity_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 models[["mh_only_quantity_dynamic_state_vintage_fe"]] <- quantity_state_model
 cl_mh_only_paper_plot(quantity_state_tab, out_dir, quantity = TRUE)
 cl_mh_only_compare_plot(quantity_tab, quantity_state_tab, out_dir, quantity = TRUE)
 # Static counts: (1)-(2) MH, (3)-(4) site-built on the same MH-support county universe.
 # SB is an outcome, not a comparison type: substitution can change its cohort counts.
-type_counts <- cl_type_count_panel(cells)
+type_counts <- cl_type_count_panel(cells[year_constr >= 1989L])
 ladder <- cl_mh_static_fits(type_counts, quantity = TRUE)
 cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"), quantity = TRUE)
 fwrite(rbindlist(lapply(1:4, function(k) cl_coeftable(ladder$fits[[k]], paste0("ladder_", k))[,
@@ -68,7 +70,8 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     paper_figure_specification = "mh_only_quantity_dynamic_state_vintage_fe",
     mh_static_ladder = "Static PPML post x zone II/III: (1) MH counts, county + vintage FE; (2) MH counts, county + state x vintage FE; (3) SB counts, county + vintage FE; (4) SB counts, county + state x vintage FE; all on the MH-support county universe with zero cohorts retained",
     pb_source_manifest_md5 = unname(tools::md5sum(file.path(Sys.getenv("CORELOGIC_PB_SOURCE"), "_meta.json"))),
-    construction_window = c(1989L,1999L), reference_vintage = 1993L, post_from = 1994L,
+    construction_window = range(dynamic_years), reference_vintage = reference,
+    static_construction_window = c(1989L, 1999L), post_from = 1994L,
     outcome = "Counts of surviving 2023 dwelling parcels by county, vintage and type; effects in log points",
     code_reference_md5 = as.list(tools::md5sum(c(files, geo_file))),
     session = capture.output(sessionInfo())), file.path(out_dir, "manifest.json"), pretty = TRUE, auto_unbox = TRUE)

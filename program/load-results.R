@@ -152,6 +152,8 @@ nfip_sav_m     <- paste0("$", round(get_welf("nfip_savings_total") / 1000),
                           " million")
 n_mh_claims    <- format(as.integer(get_ss("total_claims_mh")), big.mark = ",")
 mh_claim_pct   <- round(get_ss("mh_claim_share") * 100, 1)
+mh_value_gap_pct <- fmt_pct(100 * (1 - get_ss("median_building_value_mh") /
+                                      get_ss("median_building_value_sb")))
 
 # Take-up per housing-unit stock (Chunk E; third margin added in Chunk I;
 # moved to Poisson counts with an exposure offset in Chunk N).
@@ -290,6 +292,8 @@ get_lad <- function(o, k, z, what = "estimate") {
 lad_b  <- function(o, k, z) formatC(get_lad(o, k, z), format = "f", digits = 3)
 lad_se <- function(o, k, z) se_fmt(get_lad(o, k, z, "se"))
 lad_pc <- function(o, k, z) pctc_fmt(get_lad(o, k, z))
+cl_count_drop_z2 <- fmt_pct(abs(100 * (exp(get_lad("count", 2, 2)) - 1)), 1)
+cl_count_drop_z3 <- fmt_pct(abs(100 * (exp(get_lad("count", 2, 3)) - 1)), 1)
 cl_size_common <- fread(file.path(cl_dir, "prices", "size_common_sample_coefficients.csv"))
 size_common_pc <- function(k, z) {
     b <- cl_size_common[specification == paste0("common_sample_", k) &
@@ -312,7 +316,8 @@ lad_max <- function(o, z) pctc_fmt(max(cl_lad[outcome == o & zone == z & !size_a
 # construction years 1995-1999, quoted in the quantity results paragraph.
 cl_es_q <- fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_es_q[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
-stopifnot(nrow(cl_es_q) == 20L)
+stopifnot(nrow(cl_es_q) == 26L,
+          setequal(cl_es_q$vintage, setdiff(1986:1999, 1991L)))
 cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
 cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
 cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)

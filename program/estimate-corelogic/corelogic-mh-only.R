@@ -1,29 +1,31 @@
 # MH-only county comparisons: price DiD and count PPML, with no site-built term.
 # state = TRUE replaces vintage FE with state x vintage FE: zone contrasts are then within state.
-cl_mh_only_formula <- function(quantity = FALSE, state = FALSE) {
+cl_mh_only_formula <- function(quantity = FALSE, state = FALSE, reference = 1993L) {
     outcome <- if (quantity) "mh_homes" else "log_price"
     vintage <- if (state) "statefp^year_constr" else "year_constr"
     fe <- paste(if (quantity) "countyfp" else "countyfp^year_sale", "+", vintage)
-    as.formula(paste(outcome, "~ i(year_constr, z2, ref = 1993) + i(year_constr, z3, ref = 1993) |", fe))
+    as.formula(sprintf("%s ~ i(year_constr, z2, ref = %d) + i(year_constr, z3, ref = %d) | %s",
+        outcome, reference, reference, fe))
 }
 
 # Balance every county with any eligible MH over all vintages; retain zero cohorts.
-cl_mh_count_panel <- function(cells) {
+cl_mh_count_panel <- function(cells, years = 1989:1999) {
+    cells <- cells[year_constr %in% years]
     support <- cells[, .(mh_total = sum(mh_homes)), by = .(countyfp, wind_zone)][mh_total > 0]
     stopifnot(!anyDuplicated(support$countyfp))
-    x <- merge(CJ(countyfp = support$countyfp, year_constr = 1989:1999),
+    x <- merge(CJ(countyfp = support$countyfp, year_constr = years),
         support[, .(countyfp, wind_zone)], by = "countyfp")
     x <- merge(x, cells[, .(mh_homes = sum(mh_homes)), by = .(countyfp, year_constr)],
         by = c("countyfp", "year_constr"), all.x = TRUE)
     x[is.na(mh_homes), mh_homes := 0]
     x[, `:=`(statefp = substr(countyfp, 1, 2), z2 = as.integer(wind_zone == 2), z3 = as.integer(wind_zone == 3))]
-    stopifnot(all(x$mh_homes >= 0), nrow(x) == 11L * nrow(support))
+    stopifnot(all(x$mh_homes >= 0), nrow(x) == length(years) * nrow(support))
     x
 }
 
-cl_mh_only_coefficients <- function(model, id) {
+cl_mh_only_coefficients <- function(model, id, years = 1989:1999, reference = 1993L) {
     tab <- cl_coeftable(model, id)
-    expected <- setdiff(1989:1999, 1993L)
+    expected <- setdiff(years, reference)
     for (key in c("z2", "z3")) {
         found <- as.integer(sub("year_constr::([0-9]+):.*", "\\1",
             tab[grepl(paste0(":", key, "$"), term), term]))
@@ -41,16 +43,20 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
     x <- copy(tab)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
-    stopifnot(nrow(x) == 20L, !anyDuplicated(x, by = c("comparison", "vintage")))
+    reference <- if (quantity) 1991L else 1993L
+    years <- if (quantity) 1986:1999 else 1989:1999
+    stopifnot(nrow(x) == 2L * (length(years) - 1L),
+        setequal(x$vintage, setdiff(years, reference)),
+        !anyDuplicated(x, by = c("comparison", "vintage")))
     labels <- c("Zone II minus Zone I", "Zone III minus Zone I")
-    x <- rbind(x, data.table(comparison = labels, vintage = 1993L,
+    x <- rbind(x, data.table(comparison = labels, vintage = reference,
         estimate = 0, ci_low = 0, ci_high = 0), fill = TRUE)
     x[, comparison := factor(comparison, levels = labels)]
     series <- c("Regression estimates", "HUD production cost forecast")
     x[, series := factor(series[1], levels = series)]
     p <- ggplot(x, aes(vintage, estimate, color = series, linetype = series)) +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
-        geom_vline(xintercept = 1993.5, linetype = "dotted", color = "black") +
+        cl_mh_timing_lines(quantity) +
         geom_ribbon(aes(ymin = ci_low, ymax = ci_high), fill = "#0072B2", alpha = .2,
             color = NA, show.legend = FALSE) +
         geom_line() +
@@ -66,8 +72,8 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
             list(geom_line(data = f, linewidth = .6),
                  guides(color = guide_legend(override.aes = list(shape = c(16, NA)))))
         }) +
-        scale_x_continuous(breaks = seq(1989, 1999, 2)) +
-        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1993" else "Log MH sale price, relative to 1993") +
+        scale_x_continuous(breaks = if (quantity) seq(1986, 1998, 2) else seq(1989, 1999, 2)) +
+        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993") +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (is.null(forecast)) "none" else "bottom",
             legend.key.width = unit(2, "lines"),
@@ -175,30 +181,47 @@ cl_mh_static_table <- function(res, file, quantity = FALSE) {
 
 # Overlay vintage and state x vintage specifications, both in log points.
 cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
+    reference <- if (quantity) 1991L else 1993L
     x <- rbindlist(list(copy(tab)[, specification := "Vintage FE"],
         copy(tab_state)[, specification := "State x vintage FE"]), use.names = TRUE, fill = TRUE)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
     x <- rbind(x, CJ(specification = unique(x$specification), comparison = unique(x$comparison))[
-        , `:=`(vintage = 1993L, estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
+        , `:=`(vintage = reference, estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
     x[, specification := factor(specification, levels = c("Vintage FE", "State x vintage FE"))]
     p <- ggplot(x, aes(vintage, estimate, color = specification, fill = specification,
         shape = specification, linetype = specification)) +
         geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = .15, color = NA) +
         geom_line() + geom_point(size = 2) +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
-        geom_vline(xintercept = 1993.5, linetype = "dotted") +
+        cl_mh_timing_lines(quantity) +
         facet_wrap(~comparison, ncol = 2) +
         scale_color_manual(values = c("#0072B2", "#D55E00")) +
         scale_fill_manual(values = c("#0072B2", "#D55E00")) +
         scale_shape_manual(values = c(16, 17)) +
         scale_linetype_manual(values = c("solid", "dashed")) +
-        scale_x_continuous(breaks = seq(1989, 1999, 2)) +
-        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1993" else "Log MH sale price, relative to 1993",
+        scale_x_continuous(breaks = if (quantity) seq(1986, 1998, 2) else seq(1989, 1999, 2)) +
+        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993",
             color = NULL, fill = NULL, shape = NULL, linetype = NULL) +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = "bottom", panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
     filename <- if (quantity) "mh_only_vintage_quantities_compare" else "mh_only_vintage_prices_compare"
     for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0(filename, ".", ext)),
         p, width = 9, height = 5, dpi = 150)
+}
+
+# Fractional calendar dates mark the events within annual construction cohorts.
+cl_mh_timing_lines <- function(quantity = FALSE) {
+    if (!quantity) return(geom_vline(xintercept = 1993.5, linetype = "dotted", color = "black"))
+    dates <- c(1992 + 236 / 366, 1994 + 193 / 365)
+    list(
+        geom_vline(xintercept = dates[1], linetype = "dotdash", color = "black"),
+        geom_vline(xintercept = dates[2], linetype = "dotted", color = "black"),
+        annotate("text", x = dates[1], y = -Inf,
+            label = "Hurricane Andrew", angle = 90,
+            hjust = -.05, vjust = -.35, size = 3.2, family = "serif"),
+        annotate("text", x = dates[2], y = -Inf,
+            label = "HUD code reform", angle = 90,
+            hjust = -.05, vjust = -.35, size = 3.2, family = "serif")
+    )
 }

@@ -137,7 +137,8 @@ fwrite(data.table(
     statistic = c("policies_mh", "policies_sb", "claim_rate_mh", "claim_rate_sb",
                   "avg_building_damage_mh", "avg_building_damage_sb",
                   "avg_contents_damage_mh", "avg_contents_damage_sb",
-                  "total_claims_mh", "total_claims_all", "mh_claim_share"),
+                  "total_claims_mh", "total_claims_all", "mh_claim_share",
+                  "median_building_value_mh", "median_building_value_sb"),
     value = c(pol_pooled[housing_type == "Manufactured", policies_tot],
               pol_pooled[housing_type == "Site-built", policies_tot],
               pol_pooled[housing_type == "Manufactured", claim_rate],
@@ -149,5 +150,7 @@ fwrite(data.table(
               claim_pooled[housing_type == "Manufactured", total_claims],
               sum(claim_pooled$total_claims),
               claim_pooled[housing_type == "Manufactured", total_claims] /
-                  sum(claim_pooled$total_claims))
+                  sum(claim_pooled$total_claims),
+              claim_pooled[housing_type == "Manufactured", median_bldg_value * 1000],
+              claim_pooled[housing_type == "Site-built", median_bldg_value * 1000])
 ), here("output", "descriptives", "sumstats-nfip-scalars.csv"))

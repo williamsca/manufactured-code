@@ -156,3 +156,24 @@ size_tex <- tempfile(fileext = ".tex")
 cl_mh_static_table(size_fits, size_tex)
 stopifnot(any(grepl("Size controls", readLines(size_tex), fixed = TRUE)))
 cat("Six-column price table recovers size-adjusted premiums and compares identical retained samples.\n")
+
+# Expanded timing study: early cohorts and a pre-Andrew reference must recover
+# both a 1993 information shock and an additional 1994 regulatory shock.
+timing <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = 1986:1999)
+timing[, countyfp := sprintf("%02d%d%02d", state, wind_zone, county)]
+timing[, mh_homes := exp(5 + county / 10 + state * (year_constr - 1991) / 20 +
+    (wind_zone == 2) * (-.1 * (year_constr >= 1993) - .2 * (year_constr >= 1994)) +
+    (wind_zone == 3) * (-.3 * (year_constr >= 1993) - .5 * (year_constr >= 1994)))]
+timing_panel <- cl_mh_count_panel(timing, years = 1986:1999)
+timing_fit <- fepois(cl_mh_only_formula(quantity = TRUE, state = TRUE, reference = 1991L),
+    timing_panel, vcov = ~countyfp, notes = FALSE)
+stopifnot(nrow(timing_panel) == 14L * uniqueN(timing$countyfp),
+    length(coef(timing_fit)) == 26L, !any(grepl("::1991:", names(coef(timing_fit)))))
+for (key in c("z2", "z3")) {
+    b <- coef(timing_fit)[grepl(paste0(":", key, "$"), names(coef(timing_fit)))]
+    v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
+    truth <- if (key == "z2") -.1 * (v >= 1993) - .2 * (v >= 1994) else
+        -.3 * (v >= 1993) - .5 * (v >= 1994)
+    stopifnot(max(abs(b - truth)) < 1e-6)
+}
+cat("Expanded 1986-1999 study with 1991 reference recovers distinct 1993 and 1994 shocks.\n")

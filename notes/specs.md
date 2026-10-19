@@ -1527,13 +1527,16 @@ figure (`price_eff`, abstract/intro/discussion/conclusion, HUD table, BCR) is
 - **Price:** `log_price ~ i(year_constr, z2, ref = 1993) + i(year_constr, z3, ref = 1993) | countyfp^year_sale + statefp^year_constr`
   on MH sales only (`eligible_sale`, sale years 2000-2023, vintages 1989-1999,
   sale date >= Jan 1 of vintage; 1994 included). OLS, unweighted.
-- **Quantity:** `mh_homes ~ <same interactions> | countyfp + statefp^year_constr`, PPML,
+- **Quantity (October 19):** `mh_homes ~ i(year_constr, z2, ref = 1991) + i(year_constr, z3, ref = 1991) | countyfp + statefp^year_constr`, PPML,
   on surviving 2023 Property Basic MH parcels by county x vintage, balanced over
-  counties with any MH in 1989-1999, zeros retained (`cl_mh_count_panel`).
+  counties with any MH in 1986-1999, zeros retained (`cl_mh_count_panel`).
+  Dynamic quantities use 1986-1999; static counts retain 1989-1999 and their
+  original county support. Quantity figures label Andrew (August 24, 1992)
+  and the HUD code reform (July 13, 1994) with separate vertical lines.
 - **Main dynamic specification (October 16):** state x vintage effects
   (`cl_mh_only_formula(state = TRUE)`). Common vintage effects remain in the
   comparison figures and static tables.
-- **Clustering:** county. **Reference:** 1993.
+- **Clustering:** county. **Reference:** 1993 for prices; 1991 for dynamic quantities.
 - **Paper figures:** `output/corelogic/{prices,quantities}/mh_only_vintage_{prices,quantities}_paper.pdf`
   use the state x vintage coefficients. Separate `*_compare.pdf` figures
   overlay both versions (`cl_mh_only_compare_plot`). The plotting helper
