@@ -52,13 +52,13 @@ hud_price <- forecast("consumer_price")
 hud_resource <- forecast("production_cost")
 hud_private <- forecast("private_benefit_pv") + forecast("mortality_benefit_pv")
 hud_public <- forecast("public_benefit_pv")
-sc <- c(price_base = base, premium_baseline = premium[1],
+sc <- c(price_base = base, premium_baseline = premium[2],
     premium_min = min(premium), premium_max = max(premium),
     gross_pv = gross, retained_pv = private, public_pv = public,
-    gross_share_baseline = gross / premium[1],
+    gross_share_baseline = gross / premium[2],
     gross_share_min = min(gross / premium), gross_share_max = max(gross / premium),
-    private_share_baseline = private / premium[1],
-    private_gap = premium[1] - private,
+    private_share_baseline = private / premium[2],
+    private_gap = premium[2] - private,
     hud_price = hud_price, hud_resource_cost = hud_resource,
     hud_private_ratio = hud_private / hud_price,
     hud_all_ratio = (hud_private + hud_public) / hud_resource,

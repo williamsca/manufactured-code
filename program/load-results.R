@@ -169,6 +169,7 @@ nfip_sav_m     <- paste0("$", round(get_welf("nfip_savings_total") / 1000),
                           " million")
 n_mh_claims    <- format(as.integer(get_ss("total_claims_mh")), big.mark = ",")
 mh_claim_pct   <- round(get_ss("mh_claim_share") * 100, 1)
+mh_med_value   <- fmt_d(get_ss("median_building_value_mh") / 1000)
 mh_value_gap_pct <- fmt_pct(100 * (1 - get_ss("median_building_value_mh") /
                                       get_ss("median_building_value_sb")))
 
@@ -326,12 +327,24 @@ cl_donut_n_counties <- jsonlite::fromJSON(file.path(cl_dir,
     "continental-donut-50mi-20261019", "manifest.json"))$donut$excluded_counties
 cl_size_common <- fread(file.path(cl_dir, "prices", "size_common_sample_coefficients.csv"))
 size_common_pc <- function(k, z) {
+    # Column 6 is the DDD, whose MH estimate is Zone x post x MH.
     b <- cl_size_common[specification == paste0("common_sample_", k) &
-        grepl(paste0("z", z, "$"), term), estimate]
+        term == paste0(if (k == 6L) "post_mh_z" else "post_z", z), estimate]
     stopifnot(length(b) == 1L)
     pctc_fmt(b)
 }
+# Sale and construction windows, as recorded by the estimation runs.
+cl_man_p <- jsonlite::fromJSON(file.path(cl_dir, "prices", "manifest.json"))
+cl_man_q <- jsonlite::fromJSON(file.path(cl_dir, "quantities", "manifest.json"))
+cl_sale_y0 <- cl_man_p$sale_window[1];  cl_sale_y1 <- cl_man_p$sale_window[2]
+cl_p_y0 <- cl_man_p$construction_window[1]; cl_p_y1 <- cl_man_p$construction_window[2]
+cl_q_y0 <- cl_man_q$static_construction_window[1]; cl_q_y1 <- cl_man_q$static_construction_window[2]
+cl_qes_y0 <- cl_man_q$construction_window[1]; cl_qes_y1 <- cl_man_q$construction_window[2]
 cl_sales <- fread(file.path(cl_dir, "prices", "sample_by_vintage.csv"))
+# The manifest windows must match the samples actually written.
+stopifnot(identical(range(cl_sales$year_constr), as.integer(c(cl_p_y0, cl_p_y1))),
+          identical(range(fread(file.path(cl_dir, "prices", "sample_by_sale_year.csv"))$year_sale),
+                    as.integer(c(cl_sale_y0, cl_sale_y1))))
 cl_n_mh_sales <- format(cl_sales[mh == 1, sum(sales)], big.mark = ",")
 cl_n_sb_sales <- format(cl_sales[mh == 0, sum(sales)], big.mark = ",")
 cl_support <- fread(file.path(cl_dir, "quantities", "mh_static_ladder_support.csv"))
@@ -343,11 +356,12 @@ cl_n_cty_q <- format(cl_support[mh == 1, sum(counties[post == 0])], big.mark = "
 lad_min <- function(o, z) pctc_fmt(min(cl_lad[outcome == o & zone == z & !size_adjusted, estimate]))
 lad_max <- function(o, z) pctc_fmt(max(cl_lad[outcome == o & zone == z & !size_adjusted, estimate]))
 # Plotted state x vintage count event study: range of the Zone III coefficients for
-# construction years 1995-1999, quoted in the quantity results paragraph.
+# construction years from 1995, quoted in the quantity results paragraph.
 cl_es_q <- fread(file.path(cl_dir, "quantities", "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_es_q[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
-stopifnot(nrow(cl_es_q) == 26L,
-          setequal(cl_es_q$vintage, setdiff(1986:1999, 1991L)))
+cl_q_years <- seq.int(cl_man_q$construction_window[1], cl_man_q$construction_window[2])
+stopifnot(nrow(cl_es_q) == 2L * (length(cl_q_years) - 1L),
+          setequal(cl_es_q$vintage, setdiff(cl_q_years, cl_man_q$reference_vintage)))
 cl_q_z3_late <- cl_es_q[grepl(":z3$", term) & vintage >= 1995, range(estimate)]
 cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
 cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)
@@ -360,7 +374,7 @@ hud_fc_z2 <- formatC(hud_fc[wind_zone == 2, forecast], format = "f", digits = 3)
 hud_fc_z3 <- formatC(hud_fc[wind_zone == 3, forecast], format = "f", digits = 3)
 cl_es_p <- fread(file.path(cl_dir, "prices", "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_es_p[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
-stopifnot(nrow(cl_es_p) == 20L)
+stopifnot(nrow(cl_es_p) == 2L * (cl_p_y1 - cl_p_y0))
 # The cost-results text states that every post-1994 interval in both zones
 # contains the forecast, and counts the Zone III intervals that contain zero.
 stopifnot(cl_es_p[vintage >= 1994, all(ci_low < hud_fc[match(as.integer(sub(".*:z", "", term)), wind_zone), forecast] &
@@ -400,7 +414,11 @@ cl_hud_resource <- cl_d("hud_resource_cost")
 cl_hud_public <- cl_d("hud_public")
 cl_premium_ci_lo <- cl_d("premium_ci_lo_1")
 cl_premium_ci_hi <- cl_d("premium_ci_hi_1")
+cl_premium_1 <- fmt_d(get_cl("price_base") * expm1(get_lad("price", 1, 3)) / 1000)
 cl_premium_2 <- cl_d("premium_2")
+cl_premium_2_pct <- fmt_pct(100 * expm1(get_lad("price", 2, 3)), 1)
+# Share of Zone III present-value avoided flood damage that is reduced NFIP payments.
+cl_public_share <- fmt_pct(100 * get_cl("public_pv") / get_cl("gross_pv"))
 # Signed: the column (2) interval may extend below zero.
 cl_premium_2_ci_lo <- paste0(if (get_cl("premium_ci_lo_2") < 0) "$-$" else "", cl_d("premium_ci_lo_2"))
 cl_premium_2_ci_hi <- cl_d("premium_ci_hi_2")
