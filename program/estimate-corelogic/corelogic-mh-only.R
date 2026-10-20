@@ -86,8 +86,8 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
 }
 
 # MH and site-built counts by county x vintage over the MH-support counties of cl_mh_count_panel.
-cl_type_count_panel <- function(cells) {
-    mh <- cl_mh_count_panel(cells)
+cl_type_count_panel <- function(cells, years = 1989:1999) {
+    mh <- cl_mh_count_panel(cells, years)
     keys <- c("countyfp", "year_constr", "wind_zone", "statefp", "z2", "z3")
     sb <- merge(mh[, ..keys], cells[, .(sb_homes = sum(homes - mh_homes)), by = .(countyfp, year_constr)],
         by = c("countyfp", "year_constr"), all.x = TRUE)
@@ -213,18 +213,21 @@ cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
         p, width = 9, height = 5, dpi = 150)
 }
 
-# Levels event studies on the winsorized dollar price, reference 1993. ddd = FALSE
-# is the dynamic version of static column 2 (MH only); ddd = TRUE is column 5.
-cl_level_es_formula <- function(ddd = FALSE, reference = 1993L) {
+# Zone x vintage event studies with state x vintage FE. outcome is price_level_w
+# (winsorized dollars), log_price, or homes (PPML counts). ddd = FALSE is the MH-only
+# DiD (dynamic static column 2); ddd = TRUE adds site-built homes with mh_z terms and
+# type-specific FE (dynamic price column 5; for counts, the analogous count DDD).
+cl_type_es_formula <- function(outcome, ddd = FALSE, reference = 1993L) {
     terms <- c("z2", "z3", if (ddd) c("mh_z2", "mh_z3"))
     rhs <- paste(sprintf("i(year_constr, %s, ref = %d)", terms, reference), collapse = " + ")
-    fe <- if (ddd) "countyfp^year_sale^mh + statefp^year_constr^mh" else "countyfp^year_sale + statefp^year_constr"
-    as.formula(paste("price_level_w ~", rhs, "|", fe))
+    place <- if (outcome == "homes") "countyfp" else "countyfp^year_sale"
+    fe <- if (ddd) paste0(place, "^mh + statefp^year_constr^mh") else paste(place, "+ statefp^year_constr")
+    as.formula(paste(outcome, "~", rhs, "|", fe))
 }
 
 # One row per zone x vintage x series. In the DDD, "Site-built" is the z terms,
 # "MH minus site-built" the mh_z terms, and "MH" their sum (SE from the joint vcov).
-cl_level_es_coefficients <- function(model, id, ddd = FALSE, years = 1989:1999, reference = 1993L) {
+cl_type_es_coefficients <- function(model, id, ddd = FALSE, years = 1989:1999, reference = 1993L) {
     b <- coef(model); V <- vcov(model)
     grid <- CJ(zone = c("z2", "z3"), vintage = setdiff(years, reference))
     key <- function(prefix, z, v) sprintf("year_constr::%d:%s%s", v, prefix, z)
@@ -238,26 +241,34 @@ cl_level_es_coefficients <- function(model, id, ddd = FALSE, years = 1989:1999, 
         one("MH minus site-built", function(z, v) key("mh_", z, v)),
         one("MH", function(z, v) c(key("", z, v), key("mh_", z, v))))
     tab[, `:=`(ci_low = estimate - 1.96 * se, ci_high = estimate + 1.96 * se,
-        specification = id, n = nobs(model))]
+        specification = id, n = nobs(model), reference = reference)]
     stopifnot(!anyDuplicated(tab, by = c("zone", "vintage", "series")))
     tab
 }
 
-cl_level_es_plot <- function(tab, out_dir, filename, keep = unique(tab$series)) {
+cl_type_es_plot <- function(tab, out_dir, filename, outcome, keep = unique(tab$series)) {
+    reference <- unique(tab$reference)
+    stopifnot(length(reference) == 1L)
+    quantity <- outcome == "homes"
+    scale <- if (outcome == "price_level_w") 1e3 else 1
     x <- tab[series %in% keep]
     x <- rbind(x, CJ(zone = c("z2", "z3"), series = keep)[,
-        `:=`(vintage = 1993L, estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
+        `:=`(vintage = reference, estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
     x[, comparison := factor(fifelse(zone == "z2", "Zone II minus Zone I", "Zone III minus Zone I"))]
     x[, series := factor(series, levels = keep)]
     pal <- c("#0072B2", "#D55E00", "#009E73")[seq_along(keep)]
-    p <- ggplot(x, aes(vintage, estimate / 1e3, color = series, fill = series)) +
+    ylab <- switch(outcome,
+        price_level_w = "Sale price (thousands of 2000 dollars), relative to 1993",
+        log_price = "Log sale price, relative to 1993",
+        homes = sprintf("Log count, relative to %d", reference))
+    p <- ggplot(x, aes(vintage, estimate / scale, color = series, fill = series)) +
         geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
-        cl_mh_timing_lines() +
-        geom_ribbon(aes(ymin = ci_low / 1e3, ymax = ci_high / 1e3), alpha = .15, color = NA) +
+        cl_mh_timing_lines(quantity) +
+        geom_ribbon(aes(ymin = ci_low / scale, ymax = ci_high / scale), alpha = .15, color = NA) +
         geom_line() + geom_point(size = 2) + facet_wrap(~comparison, ncol = 2) +
         scale_color_manual(values = pal, name = NULL) + scale_fill_manual(values = pal, name = NULL) +
-        scale_x_continuous(breaks = seq(1989, 1999, 2)) +
-        labs(x = "Construction year", y = "Sale price (thousands of 2000 dollars), relative to 1993") +
+        scale_x_continuous(breaks = if (quantity) seq(1986, 1998, 2) else seq(1989, 1999, 2)) +
+        labs(x = "Construction year", y = ylab) +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (length(keep) > 1) "bottom" else "none",
             panel.grid.major.y = element_line(color = "gray85", linewidth = .4))

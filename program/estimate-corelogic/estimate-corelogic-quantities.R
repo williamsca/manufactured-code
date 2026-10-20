@@ -58,6 +58,18 @@ fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)),
 fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)), by = .(wind_zone, mh, post)],
     file.path(out_dir, "mh_static_ladder_support.csv"))
 models[paste0("mh_static_ladder_", 1:4)] <- ladder$fits
+# Count DDD event study: MH and site-built counts over 1986-1999 with county x type
+# and state x vintage x type FE; mh_z terms are the MH-specific zone x vintage change.
+type_dynamic <- cl_type_count_panel(cells, years = dynamic_years)
+type_dynamic[, `:=`(mh_z2 = mh * z2, mh_z3 = mh * z3)]
+count_ddd <- fepois(cl_type_es_formula("homes", ddd = TRUE, reference = reference), type_dynamic,
+    vcov = ~countyfp, mem.clean = TRUE)
+count_ddd_tab <- cl_type_es_coefficients(count_ddd, "count_es_ddd", ddd = TRUE,
+    years = dynamic_years, reference = reference)[, outcome := "homes"]
+fwrite(count_ddd_tab, file.path(out_dir, "type_es_coefficients.csv"))
+cl_type_es_plot(count_ddd_tab, out_dir, "count_es_ddd", "homes",
+    keep = c("MH minus site-built", "Site-built", "MH"))
+models[["count_es_ddd"]] <- summary(count_ddd, lean = TRUE)
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
 files <- file.path(cl_dir, c("estimate-corelogic-quantities.R", "corelogic-setup.R",
