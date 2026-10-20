@@ -35,12 +35,10 @@ MAX_YEAR_CONSTR <- 1999L
 MIN_YEAR_CONSTR_NFIP <- 1985L
 MAX_YEAR_CONSTR_NFIP <- 2002L
 
-# Construction-vintage window for the CoreLogic transfer build. It matches the
-# claim-level window and, like it, does not depend on the Census 2000 stock.
-# The estimators' CL_VINTAGES (program/estimate-corelogic/corelogic-mh-only.R)
-# must lie inside it.
-MIN_YEAR_CONSTR_CL <- 1985L
-MAX_YEAR_CONSTR_CL <- 2002L
+# Construction-vintage window for the CoreLogic transfer build. The estimators'
+# CL_VINTAGES (program/estimate-corelogic/corelogic-mh-only.R) must lie inside it.
+MIN_YEAR_CONSTR_CL <- 1984L
+MAX_YEAR_CONSTR_CL <- 1999L
 
 # Single-family-residential restriction on occupancy_type, shared by every
 # NFIP claim and policy query (databuild-nfip.R, databuild-nfip-policy.R) so

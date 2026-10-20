@@ -14,7 +14,7 @@ geo_file <- file.path(ref, "geo_county.parquet")
 wz <- cl_windzone_counties(read_corelogic(paste("SELECT countyfp,statefp,name FROM read_parquet(", quote_path(geo_file), ")")))
 # Match the price dwelling universe using snapshot fields; no sale eligibility screen.
 glob <- quote_path(file.path(input, "properties", "*.parquet"))
-dynamic_years <- CL_VINTAGES
+dynamic_years <- CL_QUANTITY_VINTAGES
 reference <- 1991L
 cells <- cl_inventory_cells(glob, years = dynamic_years)
 cells <- cells[, .(homes = sum(homes), mh_homes = sum(mh_homes), parcels = sum(parcels)),
@@ -58,7 +58,7 @@ fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)),
 fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)), by = .(wind_zone, mh, post)],
     file.path(out_dir, "mh_static_ladder_support.csv"))
 models[paste0("mh_static_ladder_", 1:4)] <- ladder$fits
-# Count DDD event study: MH and site-built counts over CL_VINTAGES with county x type
+# Count DDD event study: MH and site-built counts over CL_QUANTITY_VINTAGES with county x type
 # and state x vintage x type FE; mh_z terms are the MH-specific zone x vintage change.
 type_dynamic <- cl_type_count_panel(cells, years = dynamic_years)
 type_dynamic[, `:=`(mh_z2 = mh * z2, mh_z3 = mh * z3)]

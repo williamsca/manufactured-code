@@ -1,6 +1,12 @@
-# Construction years in every CoreLogic price and count sample.
-CL_VINTAGES <- 1985:2002
-CL_BREAKS <- seq(min(CL_VINTAGES), max(CL_VINTAGES), 2)
+# Construction years in the price samples and static count ladder; the count
+# event study starts earlier to separate Hurricane Andrew from the reform.
+CL_VINTAGES <- 1989:1999
+CL_QUANTITY_VINTAGES <- 1986:1999
+cl_years <- function(quantity = FALSE) if (quantity) CL_QUANTITY_VINTAGES else CL_VINTAGES
+cl_breaks <- function(quantity = FALSE) {
+    y <- cl_years(quantity)
+    seq(min(y), max(y), 2)
+}
 
 # MH-only county comparisons: price DiD and count PPML, with no site-built term.
 # state = TRUE replaces vintage FE with state x vintage FE: zone contrasts are then within state.
@@ -48,7 +54,7 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
     reference <- if (quantity) 1991L else 1993L
-    years <- CL_VINTAGES
+    years <- cl_years(quantity)
     stopifnot(nrow(x) == 2L * (length(years) - 1L),
         setequal(x$vintage, setdiff(years, reference)),
         !anyDuplicated(x, by = c("comparison", "vintage")))
@@ -78,7 +84,7 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
             list(geom_line(data = f, linewidth = .6),
                  guides(color = guide_legend(override.aes = list(shape = c(16, NA)))))
         }) +
-        scale_x_continuous(breaks = CL_BREAKS) +
+        scale_x_continuous(breaks = cl_breaks(quantity)) +
         labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993") +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (is.null(forecast)) "none" else "bottom",
@@ -207,7 +213,7 @@ cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
         scale_fill_manual(values = c("#0072B2", "#D55E00")) +
         scale_shape_manual(values = c(16, 17)) +
         scale_linetype_manual(values = c("solid", "dashed")) +
-        scale_x_continuous(breaks = CL_BREAKS) +
+        scale_x_continuous(breaks = cl_breaks(quantity)) +
         labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993",
             color = NULL, fill = NULL, shape = NULL, linetype = NULL) +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
@@ -271,7 +277,7 @@ cl_type_es_plot <- function(tab, out_dir, filename, outcome, keep = unique(tab$s
         geom_ribbon(aes(ymin = ci_low / scale, ymax = ci_high / scale), alpha = .15, color = NA) +
         geom_line() + geom_point(size = 2) + facet_wrap(~comparison, ncol = 2) +
         scale_color_manual(values = pal, name = NULL) + scale_fill_manual(values = pal, name = NULL) +
-        scale_x_continuous(breaks = CL_BREAKS) +
+        scale_x_continuous(breaks = cl_breaks(quantity)) +
         labs(x = "Construction year", y = ylab) +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (length(keep) > 1) "bottom" else "none",
