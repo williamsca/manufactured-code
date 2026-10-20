@@ -101,8 +101,9 @@ cl_type_count_panel <- function(cells) {
     x
 }
 
-# Price columns 3-4 retain the housing-type triple difference. Quantity columns
-# 3-4 instead replicate columns 1-2 on site-built counts, allowing substitution.
+# Price columns 3-4 add the housing-type triple difference. Zone x post is kept as a
+# regressor (the site-built change), so no county x vintage effect is included.
+# Quantity columns 3-4 instead replicate columns 1-2 on site-built counts, allowing substitution.
 cl_mh_static_formula <- function(column, quantity = FALSE, size = FALSE) {
     stopifnot(column %in% 1:4)
     stopifnot(!size || !quantity)
@@ -112,14 +113,14 @@ cl_mh_static_formula <- function(column, quantity = FALSE, size = FALSE) {
     }
     outcome <- if (quantity) "homes" else "log_price"
     place <- if (quantity) "countyfp" else "countyfp^year_sale"
-    rhs <- if (column <= 2) "post_z2 + post_z3" else "post_mh_z2 + post_mh_z3"
+    rhs <- if (column <= 2) "post_z2 + post_z3" else "post_z2 + post_z3 + post_mh_z2 + post_mh_z3"
     if (size) rhs <- paste(rhs, if (column <= 2) "+ log_living_area + log_lot_size" else
         "+ log_living_area + log_lot_size + mh:log_living_area + mh:log_lot_size")
     fe <- switch(column,
         paste(place, "+ year_constr"),
         paste(place, "+ statefp^year_constr"),
-        paste0(place, "^mh + countyfp^year_constr + mh^year_constr"),
-        paste0(place, "^mh + countyfp^year_constr + statefp^year_constr^mh"))
+        paste0(place, "^mh + mh^year_constr"),
+        paste0(place, "^mh + statefp^year_constr^mh"))
     as.formula(paste(outcome, "~", rhs, "|", fe))
 }
 
@@ -169,12 +170,12 @@ cl_mh_static_table <- function(res, file, quantity = FALSE) {
         keep = "%post_", style.tex = style.tex(tablefoot = FALSE), depvar = FALSE,
         headers = if (quantity) list("Outcome:" = list("MH" = 2, "Site-built" = 2)) else
             list("Sample:" = list("MH" = n_models / 2, "MH and site-built" = n_models / 2)),
-        dict = c(post_z2 = "Zone II $\\times$ post", post_mh_z2 = "Zone II $\\times$ post",
-            post_z3 = "Zone III $\\times$ post", post_mh_z3 = "Zone III $\\times$ post",
+        dict = c(post_z2 = "Zone II $\\times$ post", post_z3 = "Zone III $\\times$ post",
+            post_mh_z2 = "Zone II $\\times$ post $\\times$ MH", post_mh_z3 = "Zone III $\\times$ post $\\times$ MH",
             countyfp = "County", "countyfp^year_sale" = place, year_constr = "Vintage",
             "statefp^year_constr" = "State $\\times$ vintage",
             "countyfp^mh" = "County $\\times$ type", "countyfp^year_sale^mh" = paste(place, "$\\times$ type"),
-            "countyfp^year_constr" = "County $\\times$ vintage", "mh^year_constr" = "Type $\\times$ vintage",
+            "mh^year_constr" = "Type $\\times$ vintage",
             "statefp^year_constr^mh" = "State $\\times$ vintage $\\times$ type"),
         extralines = c(list("Counties" = format(res$counties, big.mark = ",")),
             if (n_models == 6L) list("Size controls" = c("No", "No", "Yes", "No", "No", "Yes"))),

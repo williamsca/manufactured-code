@@ -21,8 +21,9 @@ get_b <- function(nm) {
 }
 base <- means[wind_zone == 3 & post == 0, mean_2000]
 stopifnot(length(base) == 1L, base > 0)
-price <- prices[grepl("z3$", term) &
-    specification %in% paste0("ladder_", c(1L, 2L, 4L, 5L))][order(specification)]
+# Columns 1-2 report Zone III x post; columns 4-5 report Zone III x post x MH.
+price <- prices[(specification %in% c("ladder_1", "ladder_2") & term == "post_z3") |
+    (specification %in% c("ladder_4", "ladder_5") & term == "post_mh_z3")][order(specification)]
 stopifnot(nrow(price) == 4L, all(price$estimate > 0))
 premium <- base * expm1(price$estimate)
 premium_lo <- base * expm1(price$ci_low)

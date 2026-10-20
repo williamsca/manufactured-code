@@ -292,8 +292,12 @@ fl_all_bcr <- formatC(get_hud("flood_bcr_all"), format = "f", digits = 2)
 # outputs of program/estimate-corelogic/estimate-corelogic-{prices,quantities}.R.
 cl_dir <- here("output", "corelogic")
 cl_lad <- rbindlist(list(
+    # Columns 1-3 report Zone x post; columns 4-6 report Zone x post x MH.
+    # The Zone x post rows of columns 4-6 are the site-built change, not the MH estimate.
     fread(file.path(cl_dir, "prices", "mh_static_ladder.csv"))[
-        grepl("z[23]$", term)][, outcome := "price"],
+        (specification %in% paste0("ladder_", 1:3) & grepl("^post_z[23]$", term)) |
+        (specification %in% paste0("ladder_", 4:6) & grepl("^post_mh_z[23]$", term))][
+        , outcome := "price"],
     fread(file.path(cl_dir, "quantities", "mh_static_ladder.csv"))[
         , outcome := fifelse(housing_type == "MH", "count", "count_sb")]), fill = TRUE)
 cl_lad[, `:=`(col = as.integer(sub("ladder_", "", specification)),

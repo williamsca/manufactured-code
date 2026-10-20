@@ -1550,8 +1550,12 @@ figure (`price_eff`, abstract/intro/discussion/conclusion, HUD table, BCR) is
 |---|---|---|---|
 | 1 | MH | `post_z2 + post_z3` | `countyfp^year_sale + year_constr` |
 | 2 | MH | `post_z2 + post_z3` | `countyfp^year_sale + statefp^year_constr` |
-| 3 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + countyfp^year_constr + mh^year_constr` |
-| 4 | MH + SB | `post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + countyfp^year_constr + statefp^year_constr^mh` |
+| 3 | MH + SB | `post_z2 + post_z3 + post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + mh^year_constr` |
+| 4 | MH + SB | `post_z2 + post_z3 + post_mh_z2 + post_mh_z3` | `countyfp^year_sale^mh + statefp^year_constr^mh` |
+
+(Updated October 20: the DDD designs drop `countyfp^year_constr`, so `post_z*` is
+estimated and is the site-built change; `post_mh_z*` is the MH change beyond it.
+Downstream readers take `post_z*` for columns 1-3 and `post_mh_z*` for 4-6.)
 
 The price table now inserts a size-adjusted third variant for each design:
 columns 1--3 are MH-only DiDs, and columns 4--6 are MH/SB DDDs. The first two
@@ -1587,11 +1591,11 @@ substitution into site-built housing:
 Quantity: PPML on the relevant type rows of `cl_type_count_panel` (MH and SB =
 `homes - mh_homes`, using the same MH-support counties, with zero cohorts
 retained; all-zero SB counties can be removed by PPML). Clustering by county. Outputs:
-`mh_static_ladder.{tex,csv}` in each output folder; the paper table stacks the
-two `.tex` files as Panels A and B. Known-truth test
+`mh_static_ladder.{tex,csv}` in each output folder; the paper reports the
+two `.tex` files as Tables 1 (`tab:cost-static`) and 2 (`tab:cost-static-quantity`). Known-truth test
 (`check-corelogic-mh-only.R`): for prices, a county x vintage shock common to both types
-biases only columns 1-2; an MH-specific state x vintage shock biases only
-columns 1 and 3; column 4 absorbs both. Separate count checks recover large MH
+biases only columns 1-2 (the DDD differences it out via `post_z*`); an MH-specific
+state x vintage shock biases only columns 1 and 3; column 4 absorbs both. Separate count checks recover large MH
 declines and small SB increases, and verify that columns 2 and 4 absorb
 type-specific state x vintage shocks. Quantity CSVs now include `housing_type`;
 `type_counts_by_vintage.csv` exports counts by zone, type, and vintage.

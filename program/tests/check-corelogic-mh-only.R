@@ -62,7 +62,8 @@ for (key in c("z2", "z3")) {
     stopifnot(length(b) == 10, max(abs(b - c(z2 = .2, z3 = -.1)[[key]] * (v >= 1994))) < 1e-8)
 }
 # Price ladder: a county x vintage shock common to both types biases only columns 1-2;
-# a state x vintage shock specific to MH biases only columns 1 and 3. Column 4 absorbs both.
+# the DDD columns difference it out through the site-built Zone x post terms. A state x
+# vintage shock specific to MH biases only columns 1 and 3. Column 4 absorbs both.
 ladder <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = 1989:1999, mh = 0:1)
 ladder <- ladder[!(state == 3 & wind_zone == 1)]
 ladder[, `:=`(countyfp = sprintf("%02d%d%02d", state, wind_zone, county), statefp = sprintf("%02d", state),
@@ -81,7 +82,8 @@ ladder_check <- function(common, state_mh) {
     vapply(1:4, function(k) {
         sub <- function(x) if (k <= 2) x[mh == 1] else x
         p <- coef(feols(cl_mh_static_formula(k), sub(d2), notes = FALSE))
-        max(abs(p - truth))
+        target <- p[if (k <= 2) c("post_z2", "post_z3") else c("post_mh_z2", "post_mh_z3")]
+        max(abs(target - truth))
     }, numeric(1))
 }
 err <- ladder_check(0, 0); stopifnot(all(err < 1e-6))
@@ -146,7 +148,8 @@ size_fixture[seq_len(10), `:=`(valid_size = FALSE, log_lot_size = NA_real_)]
 size_fits <- cl_price_static_fits(size_fixture)
 for (k in c(3L, 6L)) {
     b <- coef(size_fits$fits[[k]])
-    stopifnot(max(abs(b[grepl("^post_", names(b))] - c(.2, -.1))) < 1e-7,
+    target <- b[if (k == 3L) c("post_z2", "post_z3") else c("post_mh_z2", "post_mh_z3")]
+    stopifnot(max(abs(target - c(.2, -.1))) < 1e-7,
         nobs(size_fits$fits[[k]]) == nobs(size_fits$common_sample[[paste0("common_sample_", k)]]))
 }
 stopifnot(nobs(size_fits$fits[[2]]) > nobs(size_fits$fits[[3]]),
@@ -154,7 +157,11 @@ stopifnot(nobs(size_fits$fits[[2]]) > nobs(size_fits$fits[[3]]),
     abs(coef(size_fits$fits[[2]])[["post_z3"]] + .1) > .05)
 size_tex <- tempfile(fileext = ".tex")
 cl_mh_static_table(size_fits, size_tex)
-stopifnot(any(grepl("Size controls", readLines(size_tex), fixed = TRUE)))
+size_lines <- readLines(size_tex)
+stopifnot(any(grepl("Size controls", size_lines, fixed = TRUE)),
+    sum(grepl("^ *Zone II \\$\\\\times\\$ post *&", size_lines)) == 1L,
+    sum(grepl("^ *Zone III \\$\\\\times\\$ post \\$\\\\times\\$ MH *&", size_lines)) == 1L,
+    !any(grepl("County $\\times$ vintage", size_lines, fixed = TRUE)))
 cat("Six-column price table recovers size-adjusted premiums and compares identical retained samples.\n")
 
 # Expanded timing study: early cohorts and a pre-Andrew reference must recover
