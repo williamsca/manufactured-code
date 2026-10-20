@@ -63,6 +63,13 @@ fwrite(rbindlist(lapply(names(ladder$common_sample), function(id)
     cl_coeftable(ladder$common_sample[[id]], id))), file.path(out_dir, "size_common_sample_coefficients.csv"))
 models[paste0("mh_static_ladder_", 1:6)] <- ladder$fits
 models[names(ladder$common_sample)] <- ladder$common_sample
+# Same ladder with the price in 2000 dollars, winsorized within housing type.
+fwrite(cl_price_level_winsor(dt), file.path(out_dir, "price_level_winsor.csv"))
+ladder_level <- cl_price_static_fits(dt, outcome = "price_level_w")
+cl_mh_static_table(ladder_level, file.path(out_dir, "mh_static_ladder_level.tex"), digits = "r0")
+fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder_level$fits[[k]], paste0("ladder_level_", k))[,
+    counties := ladder_level$counties[k]])), file.path(out_dir, "mh_static_ladder_level.csv"))
+models[paste0("mh_static_ladder_level_", 1:6)] <- ladder_level$fits
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
 files <- file.path(cl_dir, c("estimate-corelogic-prices.R", "corelogic-setup.R",
@@ -76,6 +83,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
     size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values only, no upper trimming or imputation; adjusted columns only",
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
+    mh_static_ladder_level = "Same six columns as mh_static_ladder with the 2000-dollar sale price in levels, winsorized at the 1st and 99th percentiles within housing type on the matched sale sample",
     sale_window = c(2000L, 2023L), construction_window = c(1989L, 1999L), reference_vintage = 1993L,
     vintage_1994 = "Own annual coefficient; included in static post (1994-1999)",
     treatment = "Zone II and zone III contrasts relative to zone I",

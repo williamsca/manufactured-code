@@ -104,14 +104,13 @@ cl_type_count_panel <- function(cells) {
 # Price columns 3-4 add the housing-type triple difference. Zone x post is kept as a
 # regressor (the site-built change), so no county x vintage effect is included.
 # Quantity columns 3-4 instead replicate columns 1-2 on site-built counts, allowing substitution.
-cl_mh_static_formula <- function(column, quantity = FALSE, size = FALSE) {
+cl_mh_static_formula <- function(column, quantity = FALSE, size = FALSE, outcome = "log_price") {
     stopifnot(column %in% 1:4)
     stopifnot(!size || !quantity)
     if (quantity) {
         vintage <- if (column %in% c(2L, 4L)) "statefp^year_constr" else "year_constr"
         return(as.formula(paste("homes ~ post_z2 + post_z3 | countyfp +", vintage)))
     }
-    outcome <- if (quantity) "homes" else "log_price"
     place <- if (quantity) "countyfp" else "countyfp^year_sale"
     rhs <- if (column <= 2) "post_z2 + post_z3" else "post_z2 + post_z3 + post_mh_z2 + post_mh_z3"
     if (size) rhs <- paste(rhs, if (column <= 2) "+ log_living_area + log_lot_size" else
@@ -139,7 +138,8 @@ cl_mh_static_fits <- function(x, quantity = FALSE) {
 
 # Three price variants per design: common vintage, state x vintage, and
 # state x vintage plus size. Keep full samples for unadjusted columns.
-cl_price_static_fits <- function(x) {
+# `outcome` is log_price for the main table or price_level_w for the levels table.
+cl_price_static_fits <- function(x, outcome = "log_price") {
     original <- c(1L, 2L, 2L, 3L, 4L, 4L)
     fits <- list(); counties <- integer(6)
     common <- list()
@@ -147,13 +147,13 @@ cl_price_static_fits <- function(x) {
         d <- if (k <= 3) x[mh == 1] else x
         adjusted <- k %in% c(3L, 6L)
         if (adjusted) d <- d[valid_size == TRUE]
-        m <- feols(cl_mh_static_formula(original[k], size = adjusted), d,
+        m <- feols(cl_mh_static_formula(original[k], size = adjusted, outcome = outcome), d,
             vcov = ~countyfp, mem.clean = TRUE)
         counties[k] <- uniqueN(d$countyfp[obs(m)])
         if (adjusted) {
             # Same retained observations and FEs isolate controls from coverage.
             common[[paste0("common_sample_", k)]] <- summary(feols(
-                cl_mh_static_formula(original[k]), d[obs(m)], vcov = ~countyfp,
+                cl_mh_static_formula(original[k], outcome = outcome), d[obs(m)], vcov = ~countyfp,
                 mem.clean = TRUE), lean = TRUE)
         }
         fits[[k]] <- summary(m, lean = TRUE)
@@ -161,11 +161,11 @@ cl_price_static_fits <- function(x) {
     list(fits = fits, counties = counties, common_sample = common)
 }
 
-cl_mh_static_table <- function(res, file, quantity = FALSE) {
+cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3") {
     n_models <- length(res$fits)
     stopifnot(n_models == 4L || (!quantity && n_models == 6L))
     place <- if (quantity) "County" else "County $\\times$ sale year"
-    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = "r3",
+    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = digits,
         fitstat = c("n", if (quantity) "pr2" else "r2"),
         keep = "%post_", style.tex = style.tex(tablefoot = FALSE), depvar = FALSE,
         headers = if (quantity) list("Outcome:" = list("MH" = 2, "Site-built" = 2)) else

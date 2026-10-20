@@ -12,6 +12,18 @@ cl_price_sample <- function() {
     dt
 }
 
+# Real price in levels, winsorized at the 1st and 99th percentiles within each
+# housing type; used only by the levels table. Returns the caps for export.
+cl_price_level_winsor <- function(dt, probs = c(.01, .99)) {
+    caps <- dt[, .(sales = .N, p_low = quantile(sale_price_2000, probs[1], names = FALSE),
+        p_high = quantile(sale_price_2000, probs[2], names = FALSE)), by = mh]
+    stopifnot(!anyDuplicated(caps$mh), nrow(caps) == 2L, all(caps$p_low < caps$p_high))
+    dt[caps, price_level_w := pmin(pmax(sale_price_2000, i.p_low), i.p_high), on = "mh"]
+    stopifnot(!anyNA(dt$price_level_w))
+    caps[dt[, .(capped_low = sum(price_level_w > sale_price_2000), capped_high = sum(price_level_w < sale_price_2000),
+        mean_raw = mean(sale_price_2000), mean_w = mean(price_level_w)), by = mh], on = "mh"]
+}
+
 # Dedicated living area and lot area from the pinned snapshot, not universal
 # building area. Join only the sale keys, with county agreement and no expansion.
 cl_price_size_controls <- function(dt) {

@@ -164,6 +164,30 @@ stopifnot(any(grepl("Size controls", size_lines, fixed = TRUE)),
     !any(grepl("County $\\times$ vintage", size_lines, fixed = TRUE)))
 cat("Six-column price table recovers size-adjusted premiums and compares identical retained samples.\n")
 
+# Levels table: caps are type-specific percentiles, and the ladder recovers
+# known dollar premiums from the winsorized outcome.
+source("program/estimate-corelogic/corelogic-price-sample.R")
+level_fixture <- copy(size_fixture)
+level_fixture[, sale_price_2000 := exp(11 + rnorm(.N)) + 5e4 * mh]
+caps <- cl_price_level_winsor(level_fixture)
+for (m in 0:1) {
+    p <- level_fixture[mh == m, sale_price_2000]
+    q <- quantile(p, c(.01, .99), names = FALSE)
+    stopifnot(isTRUE(all.equal(level_fixture[mh == m, price_level_w], pmin(pmax(p, q[1]), q[2]))),
+        isTRUE(all.equal(unlist(caps[mh == m, .(p_low, p_high)], use.names = FALSE), q)))
+}
+stopifnot(sum(caps$capped_low) > 0, sum(caps$capped_high) > 0)
+level_fixture[, price_level_w := 1e5 + 1e3 * county + 2e4 * mh + 500 * year_sale +
+    300 * year_constr * (1 + mh) + 4e3 * post_z3 + 6e3 * post_mh_z2 - 3e3 * post_mh_z3 +
+    (1e3 + 500 * mh) * log_living_area + (800 - 200 * mh) * log_lot_size]
+level_fits <- cl_price_static_fits(level_fixture, outcome = "price_level_w")
+stopifnot(max(abs(coef(level_fits$fits[[3]])[c("post_z2", "post_z3")] - c(6e3, 1e3))) < 1e-4,
+    max(abs(coef(level_fits$fits[[6]])[c("post_z2", "post_z3", "post_mh_z2", "post_mh_z3")] -
+    c(0, 4e3, 6e3, -3e3))) < 1e-4)
+level_tex <- tempfile(fileext = ".tex")
+cl_mh_static_table(level_fits, level_tex, digits = "r0")
+cat("Levels table winsorizes within housing type and recovers known dollar premiums.\n")
+
 # Expanded timing study: early cohorts and a pre-Andrew reference must recover
 # both a 1993 information shock and an additional 1994 regulatory shock.
 timing <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = 1986:1999)
