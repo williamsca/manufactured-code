@@ -150,7 +150,7 @@ panels$vacadj <- build_panel(tn_va)
 # Estimation
 # ---------------------------------------------------------------------------
 ladders <- lapply(panels, function(x) {
-    res <- lapply(1:4, function(k) fit_k(ladder_formula, k, x))
+    res <- lapply(1:2, function(k) fit_k(ladder_formula, k, x))
     list(fits = lapply(res, `[[`, "fit"), counties = sapply(res, `[[`, "counties"))
 })
 
@@ -169,7 +169,7 @@ dyn[, `:=`(pct = 100 * expm1(estimate), pct_low = 100 * expm1(ci_low), pct_high 
 stopifnot(all(dyn$bin %in% BINS), all(dyn$zone %in% c("2", "3")))
 fwrite(dyn, file.path(out_dir, "census-dynamic-coefficients.csv"))
 
-stat <- rbindlist(lapply(names(ladders), function(s) rbindlist(lapply(1:4, function(k) {
+stat <- rbindlist(lapply(names(ladders), function(s) rbindlist(lapply(1:2, function(k) {
     f <- ladders[[s]]$fits[[k]]
     tab <- as.data.table(coeftable(f), keep.rownames = "term")
     setnames(tab, names(tab)[2:5], c("estimate", "se", "t", "p"))
@@ -182,19 +182,6 @@ fwrite(stat, file.path(out_dir, "census-static-coefficients.csv"))
 # ---------------------------------------------------------------------------
 # Tables and figure
 # ---------------------------------------------------------------------------
-static_table <- function(res, file) {
-    etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = "r3", fitstat = "n",
-        keep = "%post_", style.tex = style.tex(tablefoot = FALSE), depvar = FALSE,
-        headers = list("Sample:" = list("MH" = 2, "MH and site-built" = 2)),
-        dict = c(post_z2 = "Zone II $\\times$ post", post_mh_z2 = "Zone II $\\times$ post",
-            post_z3 = "Zone III $\\times$ post", post_mh_z3 = "Zone III $\\times$ post",
-            countyfp = "County", bin = "Vintage", "statefp^bin" = "State $\\times$ vintage",
-            "countyfp^mh" = "County $\\times$ type", "countyfp^bin" = "County $\\times$ vintage",
-            "mh^bin" = "Type $\\times$ vintage",
-            "statefp^bin^mh" = "State $\\times$ vintage $\\times$ type"),
-        extralines = list("Counties" = format(res$counties, big.mark = ",")),
-        notes = NULL)
-}
 # Paper table: same layout as the CoreLogic quantity ladder. Columns 1-2 MH,
 # 3-4 site-built as its own outcome (same two specifications), 5-6 owner- and
 # renter-occupied MH with the column-2 specification.
@@ -223,8 +210,6 @@ six_tab <- rbindlist(lapply(1:6, function(j) {
 }))
 stopifnot(nrow(six_tab) == 12, all(six_tab$zone %in% c("2", "3")))
 fwrite(six_tab, file.path(out_dir, "census-static-paper-coefficients.csv"))
-
-for (s in names(ladders)) static_table(ladders[[s]], file.path(out_dir, sprintf("census-static-%s.tex", s)))
 
 plot_dynamic <- function(s, k) {
     x <- dyn[sample == s & column == k]
@@ -264,5 +249,5 @@ fwrite(sc, file.path(out_dir, "census-scalars.csv"))
 fwrite(rbindlist(checks), file.path(out_dir, "census-sanity-checks.csv"))
 
 print(rbindlist(checks), nrows = 100)
-print(stat[column %in% 1:4, .(sample, column, zone, estimate = round(estimate, 3), se = round(se, 3), counties)], nrows = 100)
+print(stat[ .(sample, column, zone, estimate = round(estimate, 3), se = round(se, 3), counties)], nrows = 100)
 print(dcast(dyn[sample == "all"], column + zone ~ bin, value.var = "estimate"))
