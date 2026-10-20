@@ -1,5 +1,5 @@
 # Eligible surviving dwelling inventory by county, tract and construction year.
-cl_inventory_cells <- function(glob, years = 1989:1999) {
+cl_inventory_cells <- function(glob, years = CL_VINTAGES) {
     stopifnot(identical(as.integer(years), seq.int(min(years), max(years))))
     pb_source <- Sys.getenv("CORELOGIC_PB_SOURCE")
     if (!nzchar(pb_source) || basename(pb_source) != manifest$pb_version)

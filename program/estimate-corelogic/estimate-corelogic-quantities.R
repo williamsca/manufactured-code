@@ -14,7 +14,7 @@ geo_file <- file.path(ref, "geo_county.parquet")
 wz <- cl_windzone_counties(read_corelogic(paste("SELECT countyfp,statefp,name FROM read_parquet(", quote_path(geo_file), ")")))
 # Match the price dwelling universe using snapshot fields; no sale eligibility screen.
 glob <- quote_path(file.path(input, "properties", "*.parquet"))
-dynamic_years <- 1986:1999
+dynamic_years <- CL_VINTAGES
 reference <- 1991L
 cells <- cl_inventory_cells(glob, years = dynamic_years)
 cells <- cells[, .(homes = sum(homes), mh_homes = sum(mh_homes), parcels = sum(parcels)),
@@ -46,7 +46,7 @@ cl_mh_only_paper_plot(quantity_state_tab, out_dir, quantity = TRUE)
 cl_mh_only_compare_plot(quantity_tab, quantity_state_tab, out_dir, quantity = TRUE)
 # Static counts: (1)-(2) MH, (3)-(4) site-built on the same MH-support county universe.
 # SB is an outcome, not a comparison type: substitution can change its cohort counts.
-type_counts <- cl_type_count_panel(cells[year_constr >= 1989L])
+type_counts <- cl_type_count_panel(cells)
 ladder <- cl_mh_static_fits(type_counts, quantity = TRUE)
 cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"), quantity = TRUE)
 fwrite(rbindlist(lapply(1:4, function(k) cl_coeftable(ladder$fits[[k]], paste0("ladder_", k))[,
@@ -58,7 +58,7 @@ fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)),
 fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)), by = .(wind_zone, mh, post)],
     file.path(out_dir, "mh_static_ladder_support.csv"))
 models[paste0("mh_static_ladder_", 1:4)] <- ladder$fits
-# Count DDD event study: MH and site-built counts over 1986-1999 with county x type
+# Count DDD event study: MH and site-built counts over CL_VINTAGES with county x type
 # and state x vintage x type FE; mh_z terms are the MH-specific zone x vintage change.
 type_dynamic <- cl_type_count_panel(cells, years = dynamic_years)
 type_dynamic[, `:=`(mh_z2 = mh * z2, mh_z3 = mh * z3)]
@@ -83,7 +83,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_static_ladder = "Static PPML post x zone II/III: (1) MH counts, county + vintage FE; (2) MH counts, county + state x vintage FE; (3) SB counts, county + vintage FE; (4) SB counts, county + state x vintage FE; all on the MH-support county universe with zero cohorts retained",
     pb_source_manifest_md5 = unname(tools::md5sum(file.path(Sys.getenv("CORELOGIC_PB_SOURCE"), "_meta.json"))),
     construction_window = range(dynamic_years), reference_vintage = reference,
-    static_construction_window = c(1989L, 1999L), post_from = 1994L,
+    static_construction_window = range(CL_VINTAGES), post_from = 1994L,
     outcome = "Counts of surviving 2023 dwelling parcels by county, vintage and type; effects in log points",
     code_reference_md5 = as.list(tools::md5sum(c(files, geo_file))),
     session = capture.output(sessionInfo())), file.path(out_dir, "manifest.json"), pretty = TRUE, auto_unbox = TRUE)

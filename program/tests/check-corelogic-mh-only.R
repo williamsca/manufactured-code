@@ -2,7 +2,7 @@
 library(data.table)
 library(fixest)
 source("program/estimate-corelogic/corelogic-mh-only.R")
-mh_fixture <- CJ(wind_zone = 1:3, county = 1:6, year_constr = 1989:1999)
+mh_fixture <- CJ(wind_zone = 1:3, county = 1:6, year_constr = CL_VINTAGES)
 mh_fixture[, countyfp := sprintf("%02d%03d", wind_zone, county)]
 mh_fixture[, `:=`(z2 = as.integer(wind_zone == 2), z3 = as.integer(wind_zone == 3),
     post = as.integer(year_constr >= 1994))]
@@ -13,7 +13,7 @@ mh_count_fit <- fepois(cl_mh_only_formula(quantity = TRUE), mh_counts, vcov = ~c
 for (key in c("z2", "z3")) {
     b <- coef(mh_count_fit)[grepl(paste0(":", key, "$"), names(coef(mh_count_fit)))]
     v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
-    stopifnot(length(b) == 10, max(abs(b - c(z2 = log(2), z3 = log(.5))[[key]] * (v >= 1994))) < 1e-7)
+    stopifnot(length(b) == length(CL_VINTAGES) - 1L, max(abs(b - c(z2 = log(2), z3 = log(.5))[[key]] * (v >= 1994))) < 1e-7)
 }
 # Missing cohorts become zeros; counties with no MH over the whole window add no count information.
 mh_sparse <- rbind(mh_fixture[!(countyfp == "01001" & year_constr == 1990)],
@@ -22,9 +22,9 @@ mh_balanced <- cl_mh_count_panel(mh_sparse)
 stopifnot(mh_balanced[countyfp == "01001" & year_constr == 1990, mh_homes] == 0,
     !"99999" %in% mh_balanced$countyfp, nrow(mh_balanced) == nrow(mh_counts))
 mh_zero_fit <- fepois(cl_mh_only_formula(quantity = TRUE), mh_balanced, vcov = ~countyfp, notes = FALSE)
-stopifnot(length(coef(mh_zero_fit)) == 20, all(is.finite(coef(mh_zero_fit))))
+stopifnot(length(coef(mh_zero_fit)) == 2L * (length(CL_VINTAGES) - 1L), all(is.finite(coef(mh_zero_fit))))
 # State x vintage FE absorb state-specific vintage shocks that load on zone composition.
-mh_states <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = 1989:1999)
+mh_states <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = CL_VINTAGES)
 mh_states[, countyfp := sprintf("%02d%d%02d", state, wind_zone, county)]
 mh_states[, `:=`(z2 = as.integer(wind_zone == 2), z3 = as.integer(wind_zone == 3), post = as.integer(year_constr >= 1994))]
 mh_states <- mh_states[!(state == 3 & wind_zone == 1)]
@@ -37,7 +37,7 @@ mh_pooled_fit <- fepois(cl_mh_only_formula(quantity = TRUE), mh_state_panel, vco
 for (key in c("z2", "z3")) {
     b <- coef(mh_state_fit)[grepl(paste0(":", key, "$"), names(coef(mh_state_fit)))]
     v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
-    stopifnot(length(b) == 10, max(abs(b - c(z2 = log(2), z3 = log(.5))[[key]] * (v >= 1994))) < 1e-6)
+    stopifnot(length(b) == length(CL_VINTAGES) - 1L, max(abs(b - c(z2 = log(2), z3 = log(.5))[[key]] * (v >= 1994))) < 1e-6)
 }
 stopifnot(abs(coef(mh_pooled_fit)[["year_constr::1989:z3"]]) > .05)
 
@@ -49,7 +49,7 @@ mh_price_fit <- feols(cl_mh_only_formula(), mh_prices, vcov = ~countyfp, notes =
 for (key in c("z2", "z3")) {
     b <- coef(mh_price_fit)[grepl(paste0(":", key, "$"), names(coef(mh_price_fit)))]
     v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
-    stopifnot(length(b) == 10, max(abs(b - c(z2 = .2, z3 = -.1)[[key]] * (v >= 1994))) < 1e-8)
+    stopifnot(length(b) == length(CL_VINTAGES) - 1L, max(abs(b - c(z2 = .2, z3 = -.1)[[key]] * (v >= 1994))) < 1e-8)
 }
 mh_state_prices <- mh_states[rep(seq_len(.N), each = 4)][, statefp := substr(countyfp, 1, 2)]
 mh_state_prices[, year_sale := rep(2000:2003, times = .N / 4)]
@@ -59,12 +59,12 @@ mh_state_price_fit <- feols(cl_mh_only_formula(state = TRUE), mh_state_prices, v
 for (key in c("z2", "z3")) {
     b <- coef(mh_state_price_fit)[grepl(paste0(":", key, "$"), names(coef(mh_state_price_fit)))]
     v <- as.integer(sub("year_constr::([0-9]+):.*", "\\1", names(b)))
-    stopifnot(length(b) == 10, max(abs(b - c(z2 = .2, z3 = -.1)[[key]] * (v >= 1994))) < 1e-8)
+    stopifnot(length(b) == length(CL_VINTAGES) - 1L, max(abs(b - c(z2 = .2, z3 = -.1)[[key]] * (v >= 1994))) < 1e-8)
 }
 # Price ladder: a county x vintage shock common to both types biases only columns 1-2;
 # the DDD columns difference it out through the site-built Zone x post terms. A state x
 # vintage shock specific to MH biases only columns 1 and 3. Column 4 absorbs both.
-ladder <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = 1989:1999, mh = 0:1)
+ladder <- CJ(state = 1:3, wind_zone = 1:3, county = 1:4, year_constr = CL_VINTAGES, mh = 0:1)
 ladder <- ladder[!(state == 3 & wind_zone == 1)]
 ladder[, `:=`(countyfp = sprintf("%02d%d%02d", state, wind_zone, county), statefp = sprintf("%02d", state),
     post = as.integer(year_constr >= 1994), z2 = as.integer(wind_zone == 2), z3 = as.integer(wind_zone == 3))]

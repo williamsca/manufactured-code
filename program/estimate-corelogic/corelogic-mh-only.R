@@ -1,3 +1,7 @@
+# Construction years in every CoreLogic price and count sample.
+CL_VINTAGES <- 1985:2002
+CL_BREAKS <- seq(min(CL_VINTAGES), max(CL_VINTAGES), 2)
+
 # MH-only county comparisons: price DiD and count PPML, with no site-built term.
 # state = TRUE replaces vintage FE with state x vintage FE: zone contrasts are then within state.
 cl_mh_only_formula <- function(quantity = FALSE, state = FALSE, reference = 1993L) {
@@ -9,7 +13,7 @@ cl_mh_only_formula <- function(quantity = FALSE, state = FALSE, reference = 1993
 }
 
 # Balance every county with any eligible MH over all vintages; retain zero cohorts.
-cl_mh_count_panel <- function(cells, years = 1989:1999) {
+cl_mh_count_panel <- function(cells, years = CL_VINTAGES) {
     cells <- cells[year_constr %in% years]
     support <- cells[, .(mh_total = sum(mh_homes)), by = .(countyfp, wind_zone)][mh_total > 0]
     stopifnot(!anyDuplicated(support$countyfp))
@@ -23,7 +27,7 @@ cl_mh_count_panel <- function(cells, years = 1989:1999) {
     x
 }
 
-cl_mh_only_coefficients <- function(model, id, years = 1989:1999, reference = 1993L) {
+cl_mh_only_coefficients <- function(model, id, years = CL_VINTAGES, reference = 1993L) {
     tab <- cl_coeftable(model, id)
     expected <- setdiff(years, reference)
     for (key in c("z2", "z3")) {
@@ -44,7 +48,7 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
     reference <- if (quantity) 1991L else 1993L
-    years <- if (quantity) 1986:1999 else 1989:1999
+    years <- CL_VINTAGES
     stopifnot(nrow(x) == 2L * (length(years) - 1L),
         setequal(x$vintage, setdiff(years, reference)),
         !anyDuplicated(x, by = c("comparison", "vintage")))
@@ -66,7 +70,7 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
         scale_color_manual(values = setNames(c("#0072B2", "#D55E00"), series), name = NULL) +
         scale_linetype_manual(values = setNames(c("solid", "dashed"), series), name = NULL) +
         (if (!is.null(forecast)) {
-            f <- forecast[, .(vintage = c(1993.5, 1994, 1999), estimate = c(0, forecast, forecast)),
+            f <- forecast[, .(vintage = c(1993.5, 1994, max(CL_VINTAGES)), estimate = c(0, forecast, forecast)),
                 by = comparison][, comparison := factor(comparison, levels = labels)]
             stopifnot(setequal(f$comparison, labels))
             f[, series := factor(series[2], levels = series)]
@@ -74,7 +78,7 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
             list(geom_line(data = f, linewidth = .6),
                  guides(color = guide_legend(override.aes = list(shape = c(16, NA)))))
         }) +
-        scale_x_continuous(breaks = if (quantity) seq(1986, 1998, 2) else seq(1989, 1999, 2)) +
+        scale_x_continuous(breaks = CL_BREAKS) +
         labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993") +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (is.null(forecast)) "none" else "bottom",
@@ -86,7 +90,7 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
 }
 
 # MH and site-built counts by county x vintage over the MH-support counties of cl_mh_count_panel.
-cl_type_count_panel <- function(cells, years = 1989:1999) {
+cl_type_count_panel <- function(cells, years = CL_VINTAGES) {
     mh <- cl_mh_count_panel(cells, years)
     keys <- c("countyfp", "year_constr", "wind_zone", "statefp", "z2", "z3")
     sb <- merge(mh[, ..keys], cells[, .(sb_homes = sum(homes - mh_homes)), by = .(countyfp, year_constr)],
@@ -203,7 +207,7 @@ cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
         scale_fill_manual(values = c("#0072B2", "#D55E00")) +
         scale_shape_manual(values = c(16, 17)) +
         scale_linetype_manual(values = c("solid", "dashed")) +
-        scale_x_continuous(breaks = if (quantity) seq(1986, 1998, 2) else seq(1989, 1999, 2)) +
+        scale_x_continuous(breaks = CL_BREAKS) +
         labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993",
             color = NULL, fill = NULL, shape = NULL, linetype = NULL) +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
@@ -227,7 +231,7 @@ cl_type_es_formula <- function(outcome, ddd = FALSE, reference = 1993L) {
 
 # One row per zone x vintage x series. In the DDD, "Site-built" is the z terms,
 # "MH minus site-built" the mh_z terms, and "MH" their sum (SE from the joint vcov).
-cl_type_es_coefficients <- function(model, id, ddd = FALSE, years = 1989:1999, reference = 1993L) {
+cl_type_es_coefficients <- function(model, id, ddd = FALSE, years = CL_VINTAGES, reference = 1993L) {
     b <- coef(model); V <- vcov(model)
     grid <- CJ(zone = c("z2", "z3"), vintage = setdiff(years, reference))
     key <- function(prefix, z, v) sprintf("year_constr::%d:%s%s", v, prefix, z)
@@ -258,7 +262,7 @@ cl_type_es_plot <- function(tab, out_dir, filename, outcome, keep = unique(tab$s
     x[, series := factor(series, levels = keep)]
     pal <- c("#0072B2", "#D55E00", "#009E73")[seq_along(keep)]
     ylab <- switch(outcome,
-        price_level_w = "Sale price (thousands of 2000 dollars), relative to 1993",
+        price_level_w = "Sale price ($000s, 2000), rel. to 1993",
         log_price = "Log sale price, relative to 1993",
         homes = sprintf("Log count, relative to %d", reference))
     p <- ggplot(x, aes(vintage, estimate / scale, color = series, fill = series)) +
@@ -267,7 +271,7 @@ cl_type_es_plot <- function(tab, out_dir, filename, outcome, keep = unique(tab$s
         geom_ribbon(aes(ymin = ci_low / scale, ymax = ci_high / scale), alpha = .15, color = NA) +
         geom_line() + geom_point(size = 2) + facet_wrap(~comparison, ncol = 2) +
         scale_color_manual(values = pal, name = NULL) + scale_fill_manual(values = pal, name = NULL) +
-        scale_x_continuous(breaks = if (quantity) seq(1986, 1998, 2) else seq(1989, 1999, 2)) +
+        scale_x_continuous(breaks = CL_BREAKS) +
         labs(x = "Construction year", y = ylab) +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (length(keep) > 1) "bottom" else "none",

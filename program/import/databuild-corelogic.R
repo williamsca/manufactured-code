@@ -143,7 +143,7 @@ main <- function() {
         donut = list(enabled = !is.null(donut_miles), miles = donut_miles,
             excluded_counties = nrow(excluded), geometry = "Census 2020 cartographic counties, 5m (historical Connecticut counties)",
             method = "Zone I polygon minimum spherical distance to any Zone II/III polygon; corrected CoreLogic HUD zones; entire county excluded from all artifacts"),
-        min_vintage = MIN_YEAR_CONSTR, max_vintage = MAX_YEAR_CONSTR,
+        min_vintage = MIN_YEAR_CONSTR_CL, max_vintage = MAX_YEAR_CONSTR_CL,
         min_sale_year = CORELOGIC_MIN_SALE_YEAR, max_sale_year = CORELOGIC_MAX_SALE_YEAR,
         mh_definition = "mobile_home_indicator = Y (transfer-time for historical records)",
         current_snapshot_is_historical_fallback = FALSE,
@@ -204,22 +204,22 @@ main <- function() {
             COUNT(*) FILTER (WHERE countyfp IS NULL) AS missing_county,
             COUNT(*) FILTER (WHERE countyfp IS NOT NULL AND LEFT(countyfp,2) <> %s) AS different_state_county
             FROM %s", cl_sql_string(fips), pb_scan(ot_file)), state)
-        audit("property_indicator", "SELECT mobile_home_indicator, land_use_code, property_indicator_code,
-            COUNT(*) AS properties, COUNT(*) FILTER (WHERE year_built BETWEEN 1984 AND 1999) AS vintage_properties
-            FROM pb GROUP BY ALL", state)
-        audit("transfer_indicator", "SELECT mobile_home_indicator, land_use_code_static, property_indicator_code_static,
-            COUNT(*) AS transfers, COUNT(*) FILTER (WHERE actual_year_built_static BETWEEN 1984 AND 1999) AS vintage_transfers
-            FROM ot GROUP BY ALL", state)
+        audit("property_indicator", sprintf("SELECT mobile_home_indicator, land_use_code, property_indicator_code,
+            COUNT(*) AS properties, COUNT(*) FILTER (WHERE year_built BETWEEN %d AND %d) AS vintage_properties
+            FROM pb GROUP BY ALL", MIN_YEAR_CONSTR_CL, MAX_YEAR_CONSTR_CL), state)
+        audit("transfer_indicator", sprintf("SELECT mobile_home_indicator, land_use_code_static, property_indicator_code_static,
+            COUNT(*) AS transfers, COUNT(*) FILTER (WHERE actual_year_built_static BETWEEN %d AND %d) AS vintage_transfers
+            FROM ot GROUP BY ALL", MIN_YEAR_CONSTR_CL, MAX_YEAR_CONSTR_CL), state)
         audit("original_vintage", "SELECT mobile_home_indicator, actual_year_built_static,
             COUNT(*) AS transfers FROM ot WHERE mobile_home_indicator = 'Y'
             OR property_indicator_code_static = '10' GROUP BY ALL", state)
-        cl_build_transfers(con, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR, CORELOGIC_MIN_SALE_YEAR, CORELOGIC_MAX_SALE_YEAR)
+        cl_build_transfers(con, MIN_YEAR_CONSTR_CL, MAX_YEAR_CONSTR_CL, CORELOGIC_MIN_SALE_YEAR, CORELOGIC_MAX_SALE_YEAR)
         n <- dbGetQuery(con, "SELECT COUNT(*) AS n, COUNT(DISTINCT owner_transfer_composite_transaction_id) AS ids FROM transfers")
         if (n$n != n$ids) stop("Transfer key duplicated in ", state)
         invalid <- dbGetQuery(con, "SELECT COUNT(*) AS n FROM transfers
             WHERE eligible_sale AND cpi_ratio IS NULL")$n
         if (invalid) stop("Missing CPI on eligible sales: ", invalid)
-        cl_build_pairs(con, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR, CORELOGIC_MIN_SALE_YEAR, CORELOGIC_MAX_SALE_YEAR)
+        cl_build_pairs(con, MIN_YEAR_CONSTR_CL, MAX_YEAR_CONSTR_CL, CORELOGIC_MIN_SALE_YEAR, CORELOGIC_MAX_SALE_YEAR)
         copy(sprintf("SELECT p.*, %s AS mh, w.wind_zone FROM pb p LEFT JOIN wind_zone w USING (countyfp)
             WHERE mobile_home_indicator = 'Y' OR property_indicator_code = '10'",
             cl_type_sql("mobile_home_indicator", "property_indicator_code", "land_use_code")), "properties", state)
