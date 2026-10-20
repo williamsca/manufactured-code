@@ -70,6 +70,18 @@ cl_mh_static_table(ladder_level, file.path(out_dir, "mh_static_ladder_level.tex"
 fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder_level$fits[[k]], paste0("ladder_level_", k))[,
     counties := ladder_level$counties[k]])), file.path(out_dir, "mh_static_ladder_level.csv"))
 models[paste0("mh_static_ladder_level_", 1:6)] <- ladder_level$fits
+# Levels event studies: dynamic versions of static columns 2 (MH DiD) and 5 (DDD).
+dt[, `:=`(mh_z2 = mh * z2, mh_z3 = mh * z3)]
+level_es <- list(
+    did = feols(cl_level_es_formula(), dt[mh == 1], vcov = ~countyfp, mem.clean = TRUE),
+    ddd = feols(cl_level_es_formula(ddd = TRUE), dt, vcov = ~countyfp, mem.clean = TRUE))
+level_es_tab <- rbind(cl_level_es_coefficients(level_es$did, "level_es_did_state_vintage_fe"),
+    cl_level_es_coefficients(level_es$ddd, "level_es_ddd_state_vintage_fe", ddd = TRUE))
+fwrite(level_es_tab, file.path(out_dir, "level_es_coefficients.csv"))
+cl_level_es_plot(level_es_tab[specification == "level_es_did_state_vintage_fe"], out_dir, "level_es_did")
+cl_level_es_plot(level_es_tab[specification == "level_es_ddd_state_vintage_fe"], out_dir, "level_es_ddd",
+    keep = c("MH minus site-built", "Site-built", "MH"))
+models[c("level_es_did", "level_es_ddd")] <- lapply(level_es, summary, lean = TRUE)
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
 files <- file.path(cl_dir, c("estimate-corelogic-prices.R", "corelogic-setup.R",

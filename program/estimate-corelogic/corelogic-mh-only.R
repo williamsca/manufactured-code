@@ -213,6 +213,58 @@ cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
         p, width = 9, height = 5, dpi = 150)
 }
 
+# Levels event studies on the winsorized dollar price, reference 1993. ddd = FALSE
+# is the dynamic version of static column 2 (MH only); ddd = TRUE is column 5.
+cl_level_es_formula <- function(ddd = FALSE, reference = 1993L) {
+    terms <- c("z2", "z3", if (ddd) c("mh_z2", "mh_z3"))
+    rhs <- paste(sprintf("i(year_constr, %s, ref = %d)", terms, reference), collapse = " + ")
+    fe <- if (ddd) "countyfp^year_sale^mh + statefp^year_constr^mh" else "countyfp^year_sale + statefp^year_constr"
+    as.formula(paste("price_level_w ~", rhs, "|", fe))
+}
+
+# One row per zone x vintage x series. In the DDD, "Site-built" is the z terms,
+# "MH minus site-built" the mh_z terms, and "MH" their sum (SE from the joint vcov).
+cl_level_es_coefficients <- function(model, id, ddd = FALSE, years = 1989:1999, reference = 1993L) {
+    b <- coef(model); V <- vcov(model)
+    grid <- CJ(zone = c("z2", "z3"), vintage = setdiff(years, reference))
+    key <- function(prefix, z, v) sprintf("year_constr::%d:%s%s", v, prefix, z)
+    one <- function(series, keys) grid[, {
+        k <- keys(zone, vintage)
+        stopifnot(all(k %in% names(b)))
+        .(series = series, estimate = sum(b[k]), se = sqrt(sum(V[k, k])))
+    }, by = .(zone, vintage)]
+    tab <- if (!ddd) one("MH", function(z, v) key("", z, v)) else rbind(
+        one("Site-built", function(z, v) key("", z, v)),
+        one("MH minus site-built", function(z, v) key("mh_", z, v)),
+        one("MH", function(z, v) c(key("", z, v), key("mh_", z, v))))
+    tab[, `:=`(ci_low = estimate - 1.96 * se, ci_high = estimate + 1.96 * se,
+        specification = id, n = nobs(model))]
+    stopifnot(!anyDuplicated(tab, by = c("zone", "vintage", "series")))
+    tab
+}
+
+cl_level_es_plot <- function(tab, out_dir, filename, keep = unique(tab$series)) {
+    x <- tab[series %in% keep]
+    x <- rbind(x, CJ(zone = c("z2", "z3"), series = keep)[,
+        `:=`(vintage = 1993L, estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
+    x[, comparison := factor(fifelse(zone == "z2", "Zone II minus Zone I", "Zone III minus Zone I"))]
+    x[, series := factor(series, levels = keep)]
+    pal <- c("#0072B2", "#D55E00", "#009E73")[seq_along(keep)]
+    p <- ggplot(x, aes(vintage, estimate / 1e3, color = series, fill = series)) +
+        geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+        cl_mh_timing_lines() +
+        geom_ribbon(aes(ymin = ci_low / 1e3, ymax = ci_high / 1e3), alpha = .15, color = NA) +
+        geom_line() + geom_point(size = 2) + facet_wrap(~comparison, ncol = 2) +
+        scale_color_manual(values = pal, name = NULL) + scale_fill_manual(values = pal, name = NULL) +
+        scale_x_continuous(breaks = seq(1989, 1999, 2)) +
+        labs(x = "Construction year", y = "Sale price (thousands of 2000 dollars), relative to 1993") +
+        theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
+            legend.position = if (length(keep) > 1) "bottom" else "none",
+            panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
+    for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0(filename, ".", ext)),
+        p, width = 9, height = 5, dpi = 150)
+}
+
 # Fractional calendar dates mark the events within annual construction cohorts.
 cl_mh_timing_lines <- function(quantity = FALSE) {
     if (!quantity) return(geom_vline(xintercept = 1993.5, linetype = "dotted", color = "black"))
