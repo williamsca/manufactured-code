@@ -23,6 +23,7 @@ agg_geo <- "countyfp"
 source(here("program", "import", "project-params.R"))
 source(here("program", "import", "rd-client.R"))
 source(here("program", "import", "geo-coverage-checks.R"))
+source(here("program", "lib", "nfip-windzone-sample.R"))
 
 geo_label <- "County"
 out_dir <- here("output", "nfip")

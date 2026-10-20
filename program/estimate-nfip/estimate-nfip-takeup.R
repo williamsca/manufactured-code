@@ -26,6 +26,7 @@ N_YEARS_PERIOD <- 5L
 
 # --- balanced panel ---
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
+dt <- nfip_windzone_sample(dt)
 dt <- dt[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 
 # period_loss bins must be N_YEARS_PERIOD years wide and the last one complete,
@@ -42,6 +43,7 @@ stopifnot(
 # the policy panel, so a Census denominator change does not require an NFIP
 # rebuild.
 dt_stock <- readRDS(here("derived", "stock-county-vintage.Rds"))
+dt_stock <- nfip_windzone_sample(dt_stock)
 dt_stock <- dt_stock[between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR)]
 
 # Take-up per housing-unit stock (Chunk E; Chunk N moves it to PPML). The three

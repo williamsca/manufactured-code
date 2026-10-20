@@ -60,7 +60,6 @@ us_states <- merge(
 # Same contiguous-US state extent and pinned crosswalk as the treatment
 # definitions in databuild-mhs.R; state outlines drawn on top.
 source(here("program", "estimate-corelogic", "corelogic-windzone.R"))
-source(here("program", "lib", "corelogic-donut.R"))
 us_counties <- counties(cb = TRUE, resolution = "5m", year = 2024, class = "sf")
 us_counties <- us_counties[us_counties$STATEFP %in% us_states$STATEFP, ]
 us_counties <- merge(
@@ -92,23 +91,3 @@ ggsave(
     width = 10,
     height = 6
 )
-
-# CoreLogic spillover design: same geography, HUD classification and distance
-# function used by databuild-corelogic.R --donut-miles. Keep the original map.
-donut_miles <- as.numeric(Sys.getenv("CORELOGIC_DONUT_MILES", "50"))
-donut_map <- cl_donut_counties(cl_donut_geometry(), donut_miles)
-donut_map$design <- ifelse(donut_map$donut_excluded, "Excluded Zone I",
-    paste("Zone", c("I", "II", "III")[donut_map$wind_zone]))
-donut_map$design <- factor(donut_map$design,
-    levels = c("Zone I", "Excluded Zone I", "Zone II", "Zone III"))
-p_donut <- ggplot(donut_map) +
-    geom_sf(aes(fill = design), color = "white", linewidth = 0.05) +
-    geom_sf(data = us_states, fill = NA, color = "white", linewidth = 0.2) +
-    scale_fill_manual(values = c("Zone I" = "#0072B2", "Excluded Zone I" = "#BDBDBD",
-        "Zone II" = "#E6A099", "Zone III" = "#C0392B"), drop = FALSE) +
-    labs(caption = sprintf("Exclude Zone I counties within %g miles of a Zone II/III county boundary.", donut_miles)) +
-    coord_sf(datum = NA) + theme_map()
-ggsave(here("output", "descriptives", "map-corelogic-windzone-donut.pdf"),
-    p_donut, width = 10, height = 6)
-fwrite(as.data.table(st_drop_geometry(donut_map)),
-    here("output", "descriptives", "map-corelogic-windzone-donut-counties.csv"))

@@ -21,6 +21,9 @@ library(here)
 library(data.table)
 
 source(here("program", "import", "project-params.R"))
+source(here("program", "import", "rd-client.R"))
+source(here("program", "import", "geo-coverage-checks.R"))
+source(here("program", "lib", "nfip-windzone-sample.R"))
 source(here("program", "cost-benefit", "welfare-lib.R"))
 
 # ---------------------------------------------------------------------------
@@ -121,7 +124,7 @@ YEARS_COVERED <- 20L
 # 1. Load and aggregate to national vintage-level totals ----
 # ---------------------------------------------------------------------------
 
-dt <- readRDS(here("derived", "welfare-county-vintage.Rds"))
+dt <- nfip_windzone_sample(readRDS(here("derived", "welfare-county-vintage.Rds")))
 
 nat <- dt[!is.na(claim_rate_insured) & !is.na(policies_n), .(
     policies_n        = sum(policies_n),

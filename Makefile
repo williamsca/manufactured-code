@@ -1,44 +1,39 @@
-# CoreLogic results (output/ is gitignored) come from Rivanna. Each remote-run.txt
-# is stamped by run_remote.sh, so a result directory is stale when any script
-# in program/estimate-corelogic/ is newer than its stamp. `make paper.pdf` stops
-# with that diagnosis instead of a missing-file or missing-column error;
-# `make corelogic` (push first) refreshes both. Needs SSH to Rivanna.
-CL_DIR  = program/estimate-corelogic
-CL_SRC  = $(wildcard $(CL_DIR)/*.R)
-CL_RUNS = output/corelogic/prices/remote-run.txt output/corelogic/quantities/remote-run.txt
-
+# Build the paper from local output files. Run CoreLogic estimation explicitly.
+.DEFAULT_GOAL := paper.pdf
 .PHONY: corelogic
 corelogic:
 	./run_remote.sh estimate-corelogic
 
-$(CL_RUNS): $(CL_SRC)
-	@echo "ERROR: $@ is missing or older than $(CL_DIR)/*.R."; \
-	echo "       Push your commits, then run: make corelogic"; exit 1
-
 # Citations seem good enough for now, but can change formatting with CSL
 # CSL = chicago-author-date
 
+CL_PAPER = output/corelogic
+CL_PAPER_INPUTS = $(wildcard $(CL_PAPER)/prices/*.csv $(CL_PAPER)/quantities/*.csv) \
+	$(CL_PAPER)/prices/manifest.json $(CL_PAPER)/quantities/manifest.json
+
 paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
-	$(CL_RUNS) \
-	output/corelogic/donut-comparison-20261019/static-appendix.tex \
-	output/corelogic/donut-comparison-20261019/static-appendix.csv \
+	$(CL_PAPER_INPUTS) \
+	program/estimate-corelogic/replot-corelogic.R program/estimate-corelogic/corelogic-mh-only.R \
+	output/descriptives/sumstats-corelogic.tex \
+	$(wildcard output/nfip/*.csv output/nfip/*.tex output/nfip/*.pdf) \
+	output/descriptives/sumstats-nfip-scalars.csv output/descriptives/sumstats-nfip.tex \
+	output/cost-benefit/hud-benefit-forecast.csv \
 	output/census/census-scalars.csv output/census/census-static-paper.tex \
 	output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex
+	Rscript program/estimate-corelogic/replot-corelogic.R
 	Rscript -e "rmarkdown::render('$<')"
 
-CL_DONUT = output/corelogic/donut-comparison-20261019
-CL_DONUT_INPUTS = $(foreach sample,baseline donut,$(foreach analysis,prices quantities,\
-	$(CL_DONUT)/$(sample)/$(analysis)/mh_static_ladder.csv \
-	$(CL_DONUT)/$(sample)/$(analysis)/manifest.json))
+output/descriptives/sumstats-corelogic.tex: program/descriptives/sumstats-corelogic.R \
+	$(CL_PAPER_INPUTS)
+	Rscript program/descriptives/sumstats-corelogic.R
 
-$(CL_DONUT)/static-appendix.tex $(CL_DONUT)/static-appendix.csv &: \
-	program/descriptives/table-corelogic-donut.R $(CL_DONUT_INPUTS) \
-	output/corelogic/continental-donut-50mi-20261019/manifest.json \
-	output/corelogic/prices/mh_static_ladder.csv output/corelogic/quantities/mh_static_ladder.csv
-	Rscript program/descriptives/table-corelogic-donut.R
+output/cost-benefit/hud-benefit-forecast.csv: program/cost-benefit/hud-benefit-forecast.R \
+	$(CL_PAPER_INPUTS) \
+	output/cost-benefit/hud-comparison-scalars.csv
+	Rscript program/cost-benefit/hud-benefit-forecast.R
 
 output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex &: \
-	program/cost-benefit/estimate-corelogic-comparison.R $(CL_RUNS) \
+	program/cost-benefit/estimate-corelogic-comparison.R $(CL_PAPER_INPUTS) \
 	output/cost-benefit/hud-comparison-scalars.csv output/mhs/mhs-scalars.csv notes/hud-wind-forecasts.csv
 	Rscript program/cost-benefit/estimate-corelogic-comparison.R
 
@@ -122,6 +117,7 @@ data:
 
 estimates:
 	Rscript program/descriptives/map.R
+	Rscript program/descriptives/sumstats-corelogic.R
 	Rscript program/descriptives/sumstats-nfip.R
 	Rscript program/descriptives/windzone-intensity.R
 	Rscript program/estimate-mhs/estimate-mhs.R

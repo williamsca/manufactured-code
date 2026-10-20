@@ -33,7 +33,7 @@ cd "$REPO"
 # Pinned inputs. Override any of them by exporting it before sbatch (or
 # locally before run_remote.sh, which forwards them).
 CL_ROOT="/scratch/$USER/manufactured-code"
-export CORELOGIC_BUILD="${CORELOGIC_BUILD:-$CL_ROOT/corelogic/continental-v2-20261008}"
+export CORELOGIC_BUILD="${CORELOGIC_BUILD:-$CL_ROOT/corelogic/continental-v3-20261020}"
 export CORELOGIC_REFERENCE="${CORELOGIC_REFERENCE:-$CL_ROOT/public-reference}"
 export CORELOGIC_PB_SOURCE="${CORELOGIC_PB_SOURCE:-/scratch/$USER/research-database/licensed/curated/cl_property_basic/v2026-10-07}"
 CORELOGIC_RESULTS_ROOT="${CORELOGIC_RESULTS_ROOT:-$CL_ROOT/corelogic-results}"

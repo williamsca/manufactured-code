@@ -1,16 +1,20 @@
-# Shared sale sample: eligible 2000-2023 sales of homes built in CL_VINTAGES.
+# Shared sale sample: existing homes only, sold after the vintage window ends.
+CL_SALE_YEARS <- 2000L:2023L
 cl_price_sample <- function() {
+    stopifnot(min(CL_SALE_YEARS) > max(CL_VINTAGES))
     if (manifest$min_vintage > min(CL_VINTAGES) || manifest$max_vintage < max(CL_VINTAGES))
         stop("Build vintages ", manifest$min_vintage, "-", manifest$max_vintage,
              " do not cover CL_VINTAGES")
     sales <- quote_path(file.path(input, "sales", "*.parquet"))
     dt <- read_corelogic(sprintf("SELECT s.countyfp, s.clip, s.mh, s.year_constr, s.year_sale,
         s.sale_price_2000 FROM read_parquet(%s) s
-        WHERE s.eligible_sale AND s.countyfp IS NOT NULL AND s.year_sale BETWEEN 2000 AND 2023
+        WHERE s.eligible_sale AND s.countyfp IS NOT NULL AND s.year_sale BETWEEN %d AND %d
         AND s.year_constr BETWEEN %d AND %d AND s.date_sale >= MAKE_DATE(s.year_constr,1,1)",
-        sales, min(CL_VINTAGES), max(CL_VINTAGES)))
+        sales, min(CL_SALE_YEARS), max(CL_SALE_YEARS), min(CL_VINTAGES), max(CL_VINTAGES)))
     stopifnot(setequal(unique(dt$year_constr), CL_VINTAGES))
     stopifnot(!anyNA(dt$mh), !anyNA(dt$sale_price_2000), all(dt$sale_price_2000 > 0))
+    stopifnot(all(dt$year_sale > dt$year_constr),
+        all(dt$year_sale %in% CL_SALE_YEARS))
     dt[, `:=`(log_price = log(sale_price_2000), post_mh = mh * as.integer(year_constr >= 1994),
         statefp = substr(countyfp, 1, 2))]
     dt

@@ -2,7 +2,8 @@
 library(here)
 library(data.table)
 
-root <- here("output", "corelogic", "donut-comparison-20261019")
+source(here("program", "estimate-corelogic", "paper-results.R"))
+root <- CL_PAPER_COMPARISON
 columns <- data.table(column = 1:4,
     analysis = c("prices", "prices", "quantities", "quantities"),
     outcome = c("price", "price", "count", "count"),
@@ -12,9 +13,14 @@ read_column <- function(k) {
     spec <- columns[k]
     path <- file.path(root, spec$sample, spec$analysis)
     manifest <- jsonlite::fromJSON(file.path(path, "manifest.json"))
-    expected_build <- if (spec$sample == "baseline") "continental-v2-20261008" else
-        "continental-donut-50mi-20261019"
+    expected_build <- if (spec$sample == "baseline") "continental-v3-20261020" else
+        "continental-donut-50mi-20261020"
     stopifnot(manifest$status == "complete", basename(manifest$build) == expected_build)
+    if (spec$analysis == "prices") {
+        stopifnot(identical(manifest$sale_window, c(2000L, 2023L)),
+            isTRUE(manifest$existing_homes_only),
+            identical(manifest$construction_window, c(1985L, 1999L)))
+    }
     x <- fread(file.path(path, "mh_static_ladder.csv"))[
         specification == "ladder_2" & term %in% c("post_z2", "post_z3")]
     stopifnot(nrow(x) == 2L, !anyDuplicated(x$term),
@@ -22,7 +28,7 @@ read_column <- function(k) {
         uniqueN(x$n) == 1L, uniqueN(x$counties) == 1L)
     # The baseline appendix columns must reproduce the main paper's column (2).
     if (spec$sample == "baseline") {
-        main <- fread(here("output", "corelogic", spec$analysis, "mh_static_ladder.csv"))[
+        main <- fread(file.path(CL_PAPER_RESULTS, spec$analysis, "mh_static_ladder.csv"))[
             specification == "ladder_2" & term %in% x$term]
         setorder(main, term)
         setorder(x, term)
@@ -44,7 +50,7 @@ for (analysis in c("prices", "quantities")) {
     stopifnot(identical(hashes[[1]], hashes[[2]]))
 }
 build <- jsonlite::fromJSON(here("output", "corelogic",
-    "continental-donut-50mi-20261019", "manifest.json"))
+    "continental-donut-50mi-20261020", "manifest.json"))
 stopifnot(build$status == "complete", isTRUE(build$donut$enabled), build$donut$miles == 50)
 
 estimates <- rbindlist(lapply(columns$column, read_column))

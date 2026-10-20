@@ -15,6 +15,7 @@
 rm(list = ls())
 library(here)
 source(here("program", "estimate-nfip", "nfip-setup.R"))
+NFIP_SAMPLE_ZONES <- 1:3
 source(here("program", "estimate-nfip", "nfip-claims-sample.R"))
 
 dt <- dt_claims_est
@@ -63,11 +64,10 @@ etable(est_wz_did, fitstat = c("n", "pr2"))
 etable(est_wz_ddd, est_wz_ddd_tr, fitstat = c("n", "pr2"))
 etable(summary(est_wz_ddd, cluster = ~statefp), fitstat = "n")
 
-# Paper robustness table, building damage only: the baseline DiD on all
-# counties beside the binary and zone-by-zone triple differences.
+# The baseline column uses only II/III; the triple differences restore Zone I.
 est_bd_static <- list(
     fepois(building_damage ~ post_mh | geo^year_loss + mh + post1994,
-           data = dt, cluster = ~countyfp),
+           data = dt[wind_zone %in% NFIP_BASELINE_ZONES], cluster = ~countyfp),
     est_wz_ddd_tr[lhs = "^building_damage$"][[1]],
     est_wz_ddd[lhs = "^building_damage$"][[1]])
 etable(

@@ -20,18 +20,14 @@ main <- function() {
     rd_load_client(file.path(rd_home, "client", "r"))
 
     args <- commandArgs(trailingOnly = TRUE)
-    if (any(!grepl("^--(states|run-id|reference-dir|donut-miles)=", args)))
-        stop("Options: --states=FL,NC --run-id=<unique-name> --reference-dir=<public-reference-bundle> --donut-miles=50")
+    if (any(!grepl("^--(states|run-id|reference-dir)=", args)))
+        stop("Options: --states=FL,NC --run-id=<unique-name> --reference-dir=<public-reference-bundle>")
     option <- function(key, default) {
         x <- args[startsWith(args, paste0("--", key, "="))]
         if (length(x) > 1) stop("Repeated option: ", key)
         if (length(x)) sub("^[^=]+=", "", x) else default
     }
     run_id <- option("run-id", format(Sys.time(), "%Y%m%dT%H%M%S"))
-    donut_option <- option("donut-miles", "")
-    donut_miles <- if (nzchar(donut_option)) suppressWarnings(as.numeric(donut_option)) else NULL
-    if (!is.null(donut_miles) && (length(donut_miles) != 1L ||
-        !is.finite(donut_miles) || donut_miles < 0)) stop("Invalid donut-miles")
     if (!grepl("^[A-Za-z0-9_-]+$", run_id)) stop("Invalid run-id")
     output_root <- Sys.getenv("CORELOGIC_OUTPUT_ROOT", here("derived", "corelogic"))
     out <- file.path(output_root, run_id)
@@ -86,42 +82,12 @@ main <- function() {
         reference_metadata$cpi_version <- cpi_version
     }
     if (anyDuplicated(wz$countyfp)) stop("Duplicate county in wind-zone crosswalk")
-    donut <- NULL
-    excluded <- data.table(countyfp = character())
-    if (!is.null(donut_miles)) {
-        source(here("program", "estimate-corelogic", "corelogic-windzone.R"))
-        source(here("program", "lib", "corelogic-donut.R"))
-        # Estimators reconstruct HUD zones (including historical Dade) rather
-        # than using the legacy reference CSV. Use that classification here too.
-        if (nzchar(reference_dir)) {
-            county_file <- file.path(reference_dir, "geo_county.parquet")
-            ref_con <- rd_con()
-            county_geo <- dbGetQuery(ref_con, sprintf(
-                "SELECT countyfp,statefp,name FROM read_parquet(%s)", cl_sql_string(county_file)))
-            dbDisconnect(ref_con, shutdown = TRUE)
-            reference_metadata$county_geo_md5 <- unname(tools::md5sum(county_file))
-        } else {
-            county_geo <- rd_read("geo_county", version = "v2026-09-02",
-                cols = c("countyfp", "statefp", "name"))
-            reference_metadata$county_geo_version <- "v2026-09-02"
-        }
-        wz <- cl_windzone_counties(county_geo)[, .(countyfp, wind_zone)]
-        reference_metadata$donut_wind_zones <- "CoreLogic corrected HUD named lists"
-        donut <- cl_donut_counties(cl_donut_geometry(), donut_miles)
-        excluded <- as.data.table(sf::st_drop_geometry(donut))[
-            donut_excluded == TRUE, .(countyfp = GEOID)]
-        message("Excluding ", nrow(excluded), " Zone I counties within ", donut_miles,
-                " miles of Zone II/III counties")
-    }
     cpi <- cpi[!is.na(cpi_u_nsa_1982_84), .(cpi = mean(cpi_u_nsa_1982_84)), by = year]
     cpi[, cpi_ratio := cpi / cpi[year == DISCOUNT_YEAR]]
     if (length(cpi$cpi[cpi$year == DISCOUNT_YEAR]) != 1 || anyNA(cpi$cpi_ratio)) stop("Invalid CPI base")
 
     dir.create(out, recursive = TRUE)
     for (d in c("properties", "transfers", "sales", "pairs", "audit")) dir.create(file.path(out, d))
-    if (!is.null(donut)) fwrite(as.data.table(sf::st_drop_geometry(donut)),
-        file.path(out, "audit", "donut_counties.csv"))
-    if (!is.null(donut)) fwrite(wz, file.path(out, "audit", "windzone_crosswalk.csv"))
     temp_dir <- file.path(out, "duckdb-tmp")
     dir.create(temp_dir)
     con <- rd_con()
@@ -132,7 +98,6 @@ main <- function() {
     dbExecute(con, paste0("SET temp_directory=", cl_sql_string(temp_dir)))
     dbExecute(con, "SET preserve_insertion_order=false")
     dbWriteTable(con, "wind_zone", as.data.frame(wz))
-    dbWriteTable(con, "donut_exclusions", as.data.frame(excluded))
     dbWriteTable(con, "cpi", as.data.frame(cpi[, .(year, cpi_ratio)]))
 
     manifest <- list(status = "running", run_id = run_id, started = format(Sys.time(), tz = "UTC"),
@@ -140,9 +105,6 @@ main <- function() {
         pb_version = CORELOGIC_PB_VERSION, ot_version = CORELOGIC_OT_VERSION,
         delivery = "20230817", pb_source_rows = pb_meta$n_rows, ot_source_rows = ot_meta$n_rows,
         references = reference_metadata, cpi_base_year = DISCOUNT_YEAR,
-        donut = list(enabled = !is.null(donut_miles), miles = donut_miles,
-            excluded_counties = nrow(excluded), geometry = "Census 2020 cartographic counties, 5m (historical Connecticut counties)",
-            method = "Zone I polygon minimum spherical distance to any Zone II/III polygon; corrected CoreLogic HUD zones; entire county excluded from all artifacts"),
         min_vintage = MIN_YEAR_CONSTR_CL, max_vintage = MAX_YEAR_CONSTR_CL,
         min_sale_year = CORELOGIC_MIN_SALE_YEAR, max_sale_year = CORELOGIC_MAX_SALE_YEAR,
         mh_definition = "mobile_home_indicator = Y (transfer-time for historical records)",
@@ -150,7 +112,6 @@ main <- function() {
         sale_screen = cl_market_sql(), dwelling_screen = cl_dwelling_sql(),
         code_md5 = as.list(tools::md5sum(c(here("program", "lib", "corelogic-sample.R"),
             here("program", "import", "databuild-corelogic.R"), here("program", "import", "project-params.R"),
-            here("program", "lib", "corelogic-donut.R"),
             here("program", "estimate-corelogic", "corelogic-windzone.R")))),
         source_manifests = list(property_basic = pb_meta, owner_transfer = ot_meta))
     write_json(manifest, file.path(out, "manifest.json"), pretty = TRUE, auto_unbox = TRUE)
@@ -189,15 +150,13 @@ main <- function() {
         fips <- geo[stusab == state, statefp]
         pb_file <- file.path(dirname(pb_glob), pb_meta$parts$file[pb_meta$parts$part == state])
         ot_file <- file.path(dirname(ot_glob), ot_meta$parts$file[ot_meta$parts$part == state])
-        dbExecute(con, sprintf("CREATE OR REPLACE TEMP VIEW pb AS SELECT %s FROM %s
-            WHERE countyfp NOT IN (SELECT countyfp FROM donut_exclusions) OR countyfp IS NULL",
+        dbExecute(con, sprintf("CREATE OR REPLACE TEMP VIEW pb AS SELECT %s FROM %s",
             paste(pb_fields, collapse = ","), pb_scan(pb_file)))
         # The NULL archive can contain usable mainland county IDs. Include those
         # by county, while auditing cross-state/missing county IDs in regular files.
         dbExecute(con, sprintf("CREATE OR REPLACE TEMP VIEW ot AS SELECT * FROM (
             SELECT %s FROM %s WHERE LEFT(countyfp,2) = %s
-            UNION ALL SELECT %s FROM %s WHERE LEFT(countyfp,2) = %s)
-            WHERE countyfp NOT IN (SELECT countyfp FROM donut_exclusions)",
+            UNION ALL SELECT %s FROM %s WHERE LEFT(countyfp,2) = %s)",
             paste(ot_fields, collapse = ","), pb_scan(ot_file), cl_sql_string(fips),
             paste(ot_fields, collapse = ","), pb_scan(ot_null), cl_sql_string(fips)))
         audit("source_geography", sprintf("SELECT COUNT(*) AS records,

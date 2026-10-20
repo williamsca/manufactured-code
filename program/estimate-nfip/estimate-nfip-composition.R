@@ -27,6 +27,7 @@ dt_pol_micro <- as.data.table(arrow::read_parquet(
                    "repl_cost", "building_policy_covg", "contents_policy_covg",
                    "elevated_policy", "sfha_policy")))
 dt_pol_micro <- dt_pol_micro[between(year_constr, MIN_YEAR_CONSTR_NFIP, MAX_YEAR_CONSTR_NFIP)]
+dt_pol_micro <- nfip_windzone_sample(dt_pol_micro)
 dt_pol_micro[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 
 # All five composition outcomes are estimated by PPML (fepois), on the same
@@ -97,6 +98,21 @@ etable(
     digits = 3, digits.stats = 2, replace = TRUE
 )
 
+# Equal-weight average of the post-reform log coefficients. Its standard
+# error uses the joint covariance, rather than treating cohorts as independent.
+post_average <- function(outcome) {
+    model <- est_comp_pol[lhs = paste0("^", outcome, "$")][[1]]
+    terms <- paste0("period_constr::",
+        seq.int(1994L, MAX_YEAR_CONSTR_NFIP, by = BIN_CONSTR_YEAR), ":mh")
+    stopifnot(all(terms %in% names(coef(model))))
+    c(avg = mean(coef(model)[terms]), se = sqrt(sum(vcov(model)[terms, terms])) / length(terms))
+}
+repl_avg <- post_average("repl_cost_pol")
+bldg_avg <- post_average("building_policy_covg")
 write_nfip_scalars(list(
-    repl_cost_zero_share = n_repl_zero
+    repl_cost_zero_share = n_repl_zero,
+    composition_repl_cost_post_avg = unname(repl_avg["avg"]),
+    composition_repl_cost_post_avg_se = unname(repl_avg["se"]),
+    composition_building_covg_post_avg = unname(bldg_avg["avg"]),
+    composition_building_covg_post_avg_se = unname(bldg_avg["se"])
 ), "composition")

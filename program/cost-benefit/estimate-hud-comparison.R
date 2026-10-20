@@ -126,7 +126,7 @@ print(round(do.call(rbind, cost), 1))
 
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
 dt_claims <- dt_claims[
-    between(year_constr, MIN_YEAR_CONSTR, MAX_YEAR_CONSTR) &
+    between(year_constr, MIN_YEAR_CONSTR_NFIP, MAX_YEAR_CONSTR_NFIP) &
     between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)]
 dt_claims[, (V_LOSS) := lapply(.SD, pmin, MAX_CLAIM_LOSS), .SDcols = V_LOSS]
 # Same estimation sample as estimate-nfip.R: Poisson excludes negative payments.

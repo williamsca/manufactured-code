@@ -10,8 +10,8 @@ library(here)
 library(data.table)
 library(kableExtra)
 
-prices <- fread(here("output/corelogic/prices/mh_static_ladder.csv"))
-means <- fread(here("output/corelogic/prices/mh_price_summary.csv"))
+prices <- fread(file.path(here("output", "corelogic"), "prices", "mh_static_ladder.csv"))
+means <- fread(file.path(here("output", "corelogic"), "prices", "mh_price_summary.csv"))
 benefits <- fread(here("output/cost-benefit/hud-comparison-scalars.csv"))
 mhs <- fread(here("output/mhs/mhs-scalars.csv"))
 get_b <- function(nm) {
@@ -28,7 +28,7 @@ stopifnot(nrow(price) == 4L, all(price$estimate > 0))
 premium <- base * expm1(price$estimate)
 premium_lo <- base * expm1(price$ci_low)
 premium_hi <- base * expm1(price$ci_high)
-count <- fread(here("output/corelogic/quantities/mh_static_ladder.csv"))[
+count <- fread(file.path(here("output", "corelogic"), "quantities", "mh_static_ladder.csv"))[
     term == "post_z3" & specification == "ladder_2" & housing_type == "MH"]
 stopifnot(nrow(count) == 1L)
 gross <- 1000 * get_b("flood_private_pv_z3") # avoided damage, before NFIP payments

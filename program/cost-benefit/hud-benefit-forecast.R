@@ -35,7 +35,7 @@ hud <- fread(here("notes", "hud-wind-forecasts.csv"))
 mhs <- fread(here("output", "mhs", "mhs-scalars.csv"))
 cpi <- fread(here("output", "cost-benefit", "hud-comparison-scalars.csv"))[
     statistic == "hud_cpi_factor", value]
-means <- fread(here("output", "corelogic", "prices", "mh_price_summary.csv"))
+means <- fread(file.path(here("output", "corelogic"), "prices", "mh_price_summary.csv"))
 weights <- mhs[match(c("base_wt_single", "base_wt_double"), statistic), value]
 stopifnot(length(cpi) == 1L, length(weights) == 2L, abs(sum(weights) - 1) < 1e-10,
     !anyDuplicated(means, by = c("wind_zone", "post")))

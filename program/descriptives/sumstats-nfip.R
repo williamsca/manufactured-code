@@ -8,6 +8,9 @@ library(here)
 library(data.table)
 library(kableExtra)
 source(here("program", "import", "project-params.R"))
+source(here("program", "import", "rd-client.R"))
+source(here("program", "import", "geo-coverage-checks.R"))
+source(here("program", "lib", "nfip-windzone-sample.R"))
 
 # Policy panel and stock are defined for 1984-1999 vintages only (Census 2000
 # stock); the claim panel uses the window of the claim-level event studies.
@@ -27,12 +30,14 @@ tag_groups <- function(d) {
 # Sum stock from its county-level source, never from the tract-level panel
 # where the same county stock is repeated across tracts and calendar periods.
 stock <- readRDS(here("derived", "stock-county-vintage.Rds"))
+stock <- nfip_windzone_sample(stock)
 stopifnot(uniqueN(stock, by = c("countyfp", "year_constr", "mh")) == nrow(stock),
           !anyNA(stock$homes_n), all(stock$homes_n >= 0))
 stock <- tag_groups(stock[in_window(year_constr)])
 stock_stats <- stock[, .(homes_tot = sum(homes_n)), by = group]
 
 dt <- readRDS(here("derived", "nfip-balanced.Rds"))
+dt <- nfip_windzone_sample(dt)
 dt <- tag_groups(dt[in_window(year_constr) & period_loss %in% c(2009L, 2014L, 2019L)])
 policy_summary <- function(d, groups) {
     ans <- d[, .(
@@ -54,6 +59,7 @@ stopifnot(!anyNA(pol_stats$homes_tot), all(pol_stats$homes_tot > 0))
 pol_stats[, policies_per_1k_homes := 1000 * policies_tot / (15 * homes_tot)]
 
 dt_claims <- readRDS(here("derived", "nfip-claims.Rds"))
+dt_claims <- nfip_windzone_sample(dt_claims)
 dt_claims <- tag_groups(dt_claims[
     in_window_claims(year_constr) & between(year_loss, MIN_YEAR_LOSS, MAX_YEAR_LOSS)
 ])

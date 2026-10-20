@@ -33,6 +33,11 @@ dt_claims[, period_constr := bin_constr(
 dt_claims[, post1994      := as.integer(year_constr >= 1994L)]
 dt_claims[, post_mh       := post1994 * mh]
 
+# Apply geography before constructing any means, caps, or sample diagnostics.
+# Only the wind-zone appendix overrides this to restore Zone I.
+zones <- if (exists("NFIP_SAMPLE_ZONES")) NFIP_SAMPLE_ZONES else NFIP_BASELINE_ZONES
+dt_claims <- nfip_windzone_sample(dt_claims, zones)
+
 # Winsorize the claim-level loss and payment outcomes at MAX_CLAIM_LOSS before
 # anything downstream is built from them, so the damage shares, the cell-level
 # per-claim averages, the dependent-variable means reported in the tables, and
@@ -128,23 +133,6 @@ v_claim <- c(
     "contents_damage_share", "net_contents_pmt_share"
 )
 s_claim <- paste0("c(", paste0(v_claim, collapse = ", "), ")")
-
-# --- wind-zone exposure ---
-# Reuse the same eCFR crosswalk as the cost-side wind-zone treatment
-# (`ecfr_wind_zone`, research-database) rather than an independently defined
-# coastal/hurricane county list, so the benefit-side split lines up with the
-# cost-side treatment definition. No NYC-borough fallback needed: verified
-# 2026-08-24 that every countyfp in nfip-claims.Rds, including all five NYC
-# boroughs, matches directly once ecfr_wind_zone covers geo_county's
-# historical rows as well as current ones (see research-database's
-# program/ecfr/wind-zones/import.R) -- the old fallback predates that fix
-# and was for a gap that no longer exists.
-dt_wz <- rd_read("ecfr_wind_zone", version = ECFR_WIND_ZONE_VERSION)
-# Update join rather than merge() so the claim row order is unchanged.
-dt_claims[dt_wz, wind_zone := i.wind_zone, on = "countyfp"]
-assert_geo_coverage(
-    dt_claims, "wind_zone", "countyfp",
-    "nfip-claims-sample.R: claims x ecfr_wind_zone")
 
 # Standardized estimation sample for claim-level OLS and Poisson. Net payments
 # can be negative when recoveries exceed gross payouts; Poisson does not admit

@@ -14,30 +14,27 @@ HUD_LIFESPAN      <- 33L
 # dollars. Rationale in estimate-nfip.R.
 MAX_CLAIM_LOSS <- 1000
 
-# Construction-vintage window for the NFIP claim and policy designs. 1984-2004
-# (extended from 1984-1999; 1983-1999 before Chunk I). The 1984 start makes every
-# two-year bin full with 1992-1993 as the last pre-treatment bin (a 1983 start
-# left a bin holding one construction year), and the take-up denominator homes_n
-# (program/import/impute-stock.R) is only defined from 1984 on, since no source
-# separates 1980-1983 inside the Census 1980_1989 vintage bin. The Census 2000
-# stock ends with the 1999 vintage, so the take-up designs (build_takeup_panel)
-# stay on 1984-1999 automatically: they are built from the stock grid, and
-# 2000-2004 cells have no homes_n. The 2004 bin holds one construction year.
+# The Census-anchored take-up designs use 1984-1999: two-year bins are
+# anchored on 1993, and the imputed stock ends with the 1999 vintage.
 MIN_YEAR_CONSTR <- 1984L
 MAX_YEAR_CONSTR <- 1999L
 
 # Construction-vintage window for the claim-level and policy-composition event
 # studies, which bin construction years in threes anchored on 1993: 1985-1987,
-# 1988-1990, 1991-1993 (reference), 1994-1996, 1997-1999, 2000-2002. The window
-# ends before the 2001 Florida Building Code took effect (March 2002) and does
-# not depend on the Census 2000 stock, so it extends past MAX_YEAR_CONSTR, which
-# keeps bounding the take-up designs and the balanced policy panel.
+# 1988-1990, 1991-1993 (reference), 1994-1996, 1997-1999. The endpoint
+# excludes the 2002 Florida Building Code,
+# though it does not fully exclude Florida installation changes in 1999.
+# Unlike take-up, these designs do not require the Census stock denominator.
 MIN_YEAR_CONSTR_NFIP <- 1985L
-MAX_YEAR_CONSTR_NFIP <- 2002L
+MAX_YEAR_CONSTR_NFIP <- 1999L
+
+# Baseline NFIP results use the counties subject to the 1994 wind reform.
+# The wind-zone triple difference explicitly restores Zone I as a comparison.
+NFIP_BASELINE_ZONES <- c(2L, 3L)
 
 # Construction-vintage window for the CoreLogic transfer build. The estimators'
 # CL_VINTAGES (program/estimate-corelogic/corelogic-mh-only.R) must lie inside it.
-MIN_YEAR_CONSTR_CL <- 1984L
+MIN_YEAR_CONSTR_CL <- 1985L
 MAX_YEAR_CONSTR_CL <- 1999L
 
 # Single-family-residential restriction on occupancy_type, shared by every
