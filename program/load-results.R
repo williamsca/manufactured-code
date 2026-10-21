@@ -112,6 +112,12 @@ net_bldg_pct   <- fmt_pct(abs(100 * (exp(get_nfip("pois_net_building_pmt_static"
 net_cont_pct   <- fmt_pct(abs(100 * (exp(get_nfip("pois_net_contents_pmt_static")) - 1)), 1)
 bldg_dmg_lp    <- lp_fmt(get_nfip("pois_building_damage_static"))
 bldg_dmg_se    <- se_fmt(get_nfip("pois_building_damage_static_se"))
+bldg_dmg_reduction_ci_lo <- fmt_pct(100 * (1 - exp(
+    get_nfip("pois_building_damage_static") +
+    1.96 * get_nfip("pois_building_damage_static_se"))), 1)
+bldg_dmg_reduction_ci_hi <- fmt_pct(100 * (1 - exp(
+    get_nfip("pois_building_damage_static") -
+    1.96 * get_nfip("pois_building_damage_static_se"))), 1)
 cont_dmg_lp    <- lp_fmt(get_nfip("pois_contents_damage_static"))
 cont_dmg_se    <- se_fmt(get_nfip("pois_contents_damage_static_se"))
 bldg_dmg_evt_avg <- fmt_pct(abs(100 * (exp(get_nfip("pois_building_damage_avg")) - 1)), 1)
