@@ -77,3 +77,4 @@ rsconnect/
 *.toc
 *.bbl
 *.blg
+/abstract.md
