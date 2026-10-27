@@ -28,6 +28,7 @@ output/descriptives/sumstats-corelogic.tex: program/descriptives/sumstats-corelo
 	Rscript program/descriptives/sumstats-corelogic.R
 
 output/cost-benefit/hud-benefit-forecast.csv: program/cost-benefit/hud-benefit-forecast.R \
+	notes/hud-wind-forecasts.csv output/mhs/mhs-scalars.csv \
 	$(CL_PAPER_INPUTS) \
 	output/cost-benefit/hud-comparison-scalars.csv
 	Rscript program/cost-benefit/hud-benefit-forecast.R
@@ -43,11 +44,29 @@ two-pager.pdf: two-pager.Rmd program/load-results.R program/estimate-nfip/nfip-s
 
 # slides.pdf refreshes the quoted numbers first: every estimate on a slide is a
 # macro from output/slide-numbers.tex, never typed in by hand.
-slides.pdf: slides.tex manufactured-code.bib output/slide-numbers.tex
+slides.pdf: slides.tex manufactured-code.bib output/slide-numbers.tex \
+	output/corelogic/quantities/mh_raw_counts_by_zone.pdf \
+	output/descriptives/map-mhs-windzone-counties.pdf \
+	output/corelogic/prices/mh_only_vintage_prices_slides.pdf \
+	output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf
 	pdflatex slides
 	bibtex slides
 	pdflatex slides
 	pdflatex slides
+
+output/corelogic/prices/mh_only_vintage_prices_slides.pdf output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf &: \
+	program/estimate-corelogic/replot-corelogic.R program/estimate-corelogic/corelogic-mh-only.R \
+	$(CL_PAPER_INPUTS) output/cost-benefit/hud-benefit-forecast.csv
+	Rscript program/estimate-corelogic/replot-corelogic.R --slides-only
+
+output/descriptives/map-mhs-windzone-counties.pdf: program/descriptives/map.R \
+	program/import/project-params.R program/import/rd-client.R \
+	derived/mhs-state-treatment.Rds
+	Rscript program/descriptives/map.R
+
+output/corelogic/quantities/mh_raw_counts_by_zone.pdf: program/descriptives/plot-corelogic-quantity-counts.R \
+	output/corelogic/quantities/mh_counts_by_vintage.csv
+	Rscript program/descriptives/plot-corelogic-quantity-counts.R
 
 .PHONY: output/slide-numbers.tex
 output/slide-numbers.tex:

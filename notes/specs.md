@@ -1661,3 +1661,17 @@ columns 1-2; the same with `z2 * mh`, `z3 * mh` in 3-4. Clustering: county.
 occupant, not land tenure); excluding Miami-Dade (12086) and Monroe (12087),
 the Hurricane Andrew counties; vacancy-adjusted pooled counts
 (`census2000-takeup-county-vintage.Rds`).
+
+
+### Presentation plotting note (2026-10-27)
+
+CoreLogic presentation figures use the same exported state-by-vintage-FE
+coefficients and confidence intervals as the paper plotting routine, with only
+canvas size and typography changed. The plotting reference is read from each
+`output/corelogic/{prices,quantities}/manifest.json`; currently both exports
+omit 1993. This overrides the local helper's newer quantity default of 1991
+when redrawing existing exports. No re-normalization or estimation is performed.
+The price benchmark is `log1p(HUD_private_benefit_2000 / zone_pre_price_mean)`,
+where HUD private benefits combine the single-/multi-section weighted private
+loss-benefit PV and mortality/injury-benefit PV. Production costs and fiscal
+benefits are excluded. See `program/cost-benefit/hud-benefit-forecast.R`.

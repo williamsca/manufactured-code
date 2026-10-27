@@ -5,6 +5,7 @@ library(here)
 library(data.table)
 library(ggplot2)
 source(here("program", "estimate-corelogic", "corelogic-mh-only.R"))
+slides_only <- "--slides-only" %in% commandArgs(trailingOnly = TRUE)
 for (analysis in c("prices", "quantities")) {
     out_dir <- file.path(here("output", "corelogic"), analysis)
     quantity <- analysis == "quantities"
@@ -12,11 +13,17 @@ for (analysis in c("prices", "quantities")) {
     tab_state <- fread(file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
     # Redraw whichever local results are present, independently of the current
     # estimation script's vintage window.
-    reference <- if (quantity) 1991L else 1993L
+    manifest <- jsonlite::read_json(file.path(out_dir, "manifest.json"))
+    reference <- as.integer(manifest$reference_vintage)
+    stopifnot(length(reference) == 1L, !is.na(reference))
     years <- sort(unique(c(reference,
         as.integer(sub("year_constr::([0-9]+):.*", "\\1", tab_state$term)))))
     if (quantity) CL_QUANTITY_VINTAGES <- years else CL_VINTAGES <- years
     forecast <- if (quantity) NULL else fread(here("output", "cost-benefit", "hud-benefit-forecast.csv"))
-    cl_mh_only_paper_plot(tab_state, out_dir, quantity = quantity, forecast = forecast)
-    cl_mh_only_compare_plot(tab, tab_state, out_dir, quantity = quantity)
+    cl_mh_only_paper_plot(tab_state, out_dir, quantity = quantity,
+                          forecast = forecast, slides = TRUE, reference = reference)
+    if (!slides_only) {
+        cl_mh_only_paper_plot(tab_state, out_dir, quantity = quantity, forecast = forecast, reference = reference)
+        cl_mh_only_compare_plot(tab, tab_state, out_dir, quantity = quantity, reference = reference)
+    }
 }

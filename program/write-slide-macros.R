@@ -285,6 +285,9 @@ mac("vClaimRateSbPct", fmt_f(get_ss("claim_rate_sb") * 100, 1))
 # Write
 # ---------------------------------------------------------------------------
 
+cl_sc <- fread(here("output", "cost-benefit", "corelogic-comparison-scalars.csv"))
+mac("vClFloodPV", fmt_draw(get_one(cl_sc, "gross_pv")))
+
 out_path <- here("output", "slide-numbers.tex")
 
 header <- c(

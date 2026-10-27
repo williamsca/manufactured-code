@@ -47,12 +47,13 @@ cl_mh_only_coefficients <- function(model, id, years = CL_VINTAGES, reference = 
 # `forecast` (optional): one row per comparison with a forecast log price gap
 # (`forecast`) and a common legend `label`, drawn as a dashed path rising from 0
 # at 1993.5 to the forecast in 1994, with a common legend below the panels.
-cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NULL) {
+cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NULL,
+                                  slides = FALSE,
+                                  reference = if (quantity) 1991L else 1993L) {
     stopifnot(all(grepl("_state_vintage_fe$", tab$specification)))
     x <- copy(tab)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]
     x[, comparison := fifelse(grepl(":z2$", term), "Zone II minus Zone I", "Zone III minus Zone I")]
-    reference <- if (quantity) 1991L else 1993L
     years <- cl_years(quantity)
     stopifnot(nrow(x) == 2L * (length(years) - 1L),
         setequal(x$vintage, setdiff(years, reference)),
@@ -84,14 +85,27 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
                  guides(color = guide_legend(override.aes = list(shape = c(16, NA)))))
         }) +
         scale_x_continuous(breaks = cl_breaks(quantity)) +
-        labs(x = "Construction year", y = if (quantity) "Log MH count, relative to 1991" else "Log MH sale price, relative to 1993") +
+        labs(x = "Construction year", y = if (quantity) sprintf("Log MH count, relative to %d", reference) else "Log MH sale price, relative to 1993") +
         theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
             legend.position = if (is.null(forecast)) "none" else "bottom",
             legend.key.width = unit(2, "lines"),
             panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
     filename <- if (quantity) "mh_only_vintage_quantities_paper" else "mh_only_vintage_prices_paper"
+    if (slides) {
+        # Wide slide content area, with labels readable at presentation size.
+        filename <- sub("_paper$", "_slides", filename)
+        p <- p + theme(text = element_text(family = "sans", size = 20),
+            axis.text = element_text(size = 17),
+            axis.title = element_text(size = 19),
+            strip.text = element_text(size = 20),
+            legend.text = element_text(size = 18),
+            legend.key.width = unit(2.2, "lines"),
+            panel.spacing = unit(1.2, "lines"))
+    }
     for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0(filename, ".", ext)),
-        p, width = 9, height = 5, dpi = 150)
+        p, width = if (slides) 12 else 9,
+        height = if (slides) 5.2 else 5, dpi = 180)
+    invisible(p)
 }
 
 # MH and site-built counts by county x vintage over the MH-support counties of cl_mh_count_panel.
@@ -192,8 +206,8 @@ cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3") {
 }
 
 # Overlay vintage and state x vintage specifications, both in log points.
-cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE) {
-    reference <- if (quantity) 1991L else 1993L
+cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE,
+                                    reference = if (quantity) 1991L else 1993L) {
     x <- rbindlist(list(copy(tab)[, specification := "Vintage FE"],
         copy(tab_state)[, specification := "State x vintage FE"]), use.names = TRUE, fill = TRUE)
     x[, vintage := as.integer(sub("year_constr::([0-9]+):.*", "\\1", term))]

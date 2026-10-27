@@ -2294,3 +2294,84 @@ the next check-in**, to rule out similar staleness in the import layer.
    flagging, did not touch.
 5. `make data` (raw import layer) needs to be verified on a machine with
    `$DATA_PATH` set — I could not do this in this sandbox.
+
+
+## 2026-10-27 — Chunk R: slides introduction and quantity sequence
+
+Reframed `slides.tex` around whether the private benefits of the 1994 wind
+standard exceeded its costs. Retained both NYT images and the existing
+costs-close-to-private-benefits quotation, with its citation and an explicit
+benchmark. Added raw surviving MH counts in separate wind-zone panels, the
+county-by-vintage PPML specification, and the existing quantity results figure.
+Resale prices and flood-damage benefits are supporting evidence; public
+benefits enter as a scope qualification in the literature slide. Detailed NFIP
+coverage, selection, frequency, robustness, and fiscal slides moved to the
+appendix. The conclusion follows the new private-return framing.
+
+Added a reproducible raw-count plotting script and Makefile dependency; the
+flood present-value number is generated from the existing CoreLogic comparison
+scalar CSV. No estimation specifications or paper text changed.
+
+Verified: slide build succeeds; diff whitespace check passes. Existing
+appendix layout warnings remain. Raw counts describe surviving homes observed
+in 2023, not original placements, and are labeled accordingly.
+
+
+## 2026-10-27 — Early wind-zone map and mandated-benefit exercise
+
+Replaced the early “This paper” body with the existing vector county wind-zone
+map enlarged to fill the frame under the title, and removed its later duplicate.
+Added a four-stage TikZ walkthrough: original equilibrium, compliance-cost
+supply shift, equal private-valuation demand shift, and the HUD benchmark.
+The original costs-close-to-private-benefits quotation and citation now appear
+in that walkthrough. A second slide compares private WTP below, equal to, and
+above cost, with the corresponding quantity responses. Diagram coordinates
+are illustrative rather than empirical estimates.
+
+Verified by rebuilding slides.pdf and visually inspecting the early map, HUD
+benchmark diagram, and three-case comparison. No estimation or paper changes.
+
+
+## 2026-10-27 — Two-column introductory map frame
+
+Adapted the early “This paper” frame to context on the left and the county
+wind-zone map on the right. Included the existing 97% Andrew statistic with
+its “in its path in Dade County” qualification, Zone II/III wind speeds, and
+the existing forecast quotation and citation. Rebuilt slides.pdf and visually
+checked the two-column layout; whitespace checks pass.
+
+
+## 2026-10-27 — Larger map legend
+
+Set wind-zone legend text to 24 pt and keys to 0.8 cm in
+`program/descriptives/map.R`, so it remains readable in the two-column slide.
+Added the map target and its script/input dependencies to the slide Makefile
+rule. Regenerated from the pinned wind-zone crosswalk and Census geometries;
+Census boundary downloads required network access. Rebuilt slides.pdf and
+checked the rendered introductory map.
+
+
+## 2026-10-27 — Slide-sized CoreLogic event studies and HUD private benefits
+
+Added separate `_slides.pdf`/PNG versions of the CoreLogic quantity and resale
+price event studies, using a 12 x 5.2 inch canvas and larger sans-serif labels.
+The deck now uses the vector slide PDFs. The standard paper plotting interface
+remains available; `replot-corelogic.R --slides-only` builds presentation assets
+without overwriting paper figures. Makefile dependencies regenerate both slide
+figures and the HUD forecast from source inputs.
+
+The HUD forecast script already computes private benefits (size-weighted
+private wind-loss PV plus mortality/injury benefits, converted to 2000 dollars),
+not production costs. Its output CSV was absent; regenerated it and the plotted
+benchmark. Forecast log price gaps are 0.03010 (II) and 0.03193 (III), labeled
+“HUD forecast of private benefits.” No fiscal benefits enter the benchmark.
+
+Found a pre-existing mismatch: exported quantity coefficients and manifest use
+1993 as the reference, while local plotting defaults and the slide equation
+assumed 1991. Replotting now reads `reference_vintage` from each export manifest;
+updated the slide equation and reference bullet to 1993. No coefficients were
+changed or re-estimated. The planned 1991-reference design requires new exports
+before it can be presented as such.
+
+Verified: slides build, whitespace check passes, forecast input/formula checked,
+and inspected the rendered price figure and its benchmark legend.

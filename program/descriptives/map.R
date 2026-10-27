@@ -23,7 +23,11 @@ theme_map <- function(base_size = 14) {
         theme(
             text = element_text(family = "serif"),
             legend.position = "bottom",
-            legend.title = element_blank()
+            legend.title = element_blank(),
+            # Readable when the full map is scaled into a slide column.
+            legend.text = element_text(size = 24),
+            legend.key.size = grid::unit(0.8, "cm"),
+            legend.spacing.x = grid::unit(0.3, "cm")
         )
 }
 

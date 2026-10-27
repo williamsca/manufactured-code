@@ -9,6 +9,7 @@
 \documentclass[11pt,xcolor={dvipsnames},hyperref={pdftex,pdfpagemode=UseNone,hidelinks,pdfdisplaydoctitle=true},usepdftitle=false,aspectratio=169]{beamer}
 \usepackage{tikz}
 \usetikzlibrary{positioning}
+\definecolor{mandateCost}{HTML}{D55E00}
 
 \usepackage{presentation}
 
@@ -48,53 +49,40 @@
     \includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio]{motivation/nyt_mh_hurricanes_20241014.png}
 \end{frame}
 
-\begin{frame}[t]
-    \frametitle{(How) are mobile homes at risk from climate change?}
+\begin{frame}
+    \frametitle{Should policymakers address climate risks in manufactured housing?}
+    Manufactured homes provide \al{cheap housing}, but are vulnerable to extreme weather
 
-    \vspace{0.8em}
-
-    Three sources of risk:
-
+    \vspace{2em}
+    Building standards can
     \begin{enumerate}
-        \item Physical characteristics: elevation, anchoring, fastening, etc.
-        \item Location (location, location...)
-        \item Policy: some disaster relief targeted at \al{landowner}, not resident
+    \item reduce physical vulnerability and climate risk
+    \item increase construction costs
     \end{enumerate}
 
-    \vspace{0.6em}
+    \vspace{2em}
     \pause
-
-    This paper evaluates \#1: How does HUD code affect the cost and resilience of mobile homes?
-
+    \begin{large}\textbf{Do buyers value the additional protection enough to cover its cost?}\end{large}
 \end{frame}
 
 \begin{frame}
-    \frametitle{Why now?}
+    \frametitle{This paper: the 1994 HUD wind standard}
+    \begin{columns}[c]
+    \begin{column}{.40\textwidth}
+        \small
+        HUD revises the federal code for MH after Hurricane Andrew (1992) destroyed \al{97\%} of MH in its path in Dade County. \gc{Florida MH Ass'n v.\ Cisneros (\citeyear{noauthor_florida_1995})}
 
-    \textbf{The ROAD to Housing Act (2025)} removes the \al{permanent steel chassis} requirement
+        \vspace{2em}
+        Additional wind standards applied to \al{Zone II (100 mph winds)} and \al{Zone III (110 mph)}.
 
-    \begin{itemize}
-        \item Few manufactured homes (MH) moved after installation
-        \item Chassis adds \$5-10k cost for little benefit
-    \end{itemize}
-
-    \vspace{1em}
-    \pause
-
-    \textbf{MH wind standards, dating to 1994, assume a chassis}
-    \begin{itemize}
-        \item anchoring and stabilization tie to the steel frame; piers bear on the main rails \gc{(24 CFR \S 3280.306; installation standards at Part 3285)}
-        \item HUD is about to rewrite the wind standards
-    \end{itemize}
-
-    \vspace{1em}
-    \pause
-
-    \begin{large}
-    How effective are current HUD wind standards?
-    \end{large}
-
-    % TODO: verify the enacted text and section numbering before circulating.
+        \vspace{2em}
+        Standards ``set to increase marginal production costs by amounts close to expected private benefits'' \gc{\citep{dacquisto_housing_2006}}
+    \end{column}
+    \begin{column}{.58\textwidth}
+        \centering
+        \includegraphics[width=\linewidth,keepaspectratio]{output/descriptives/map-mhs-windzone-counties.pdf}
+    \end{column}
+    \end{columns}
 \end{frame}
 
 \begin{comment}
@@ -117,29 +105,102 @@
 \end{frame}
 \end{comment}
 
+% Stylized competitive market: S_0(Q)=1+Q/2, D_0(Q)=5-Q/2.
+% Compliance cost c=1.2 and private WTP v shift the curves vertically.
+% These are illustrative diagram coordinates, not empirical estimates.
 \begin{frame}
-    \frametitle{This paper}
+    \frametitle{``Simple Economics of Mandated Benefits'' \citep{summers_simple_1989}}
+    \begin{columns}[T]
+    \begin{column}{.56\textwidth}
+    \centering
+    \begin{tikzpicture}[x=.73cm,y=.66cm,>=stealth,font=\small]
+        \draw[->] (0,0) -- (8.1,0) node[below] {$Q$};
+        \draw[->] (0,0) -- (0,7.2) node[left] {$P$};
+        \draw[thick,gray] (.3,1.15) -- (7.5,4.75) node[right] {$S_0$};
+        \draw[thick,gray] (.3,4.85) -- (7.5,1.25) node[right] {$D_0$};
+        \draw[densely dotted,gray] (4,0) node[below] {$Q_0$} -- (4,3) -- (0,3) node[left] {$P_0$};
+        \fill[gray] (4,3) circle (2pt);
+        \uncover<2->{
+            \draw[very thick,mandateCost] (.3,2.35) -- (7.5,5.95) node[right] {$S_1$};
+            \draw[->,mandateCost,thick] (6,4) -- (6,5.2) node[midway,right] {$c$};
+        }
+        \only<2>{
+            \draw[densely dotted,mandateCost] (2.8,0) node[below] {$Q_c$} -- (2.8,3.6);
+            \fill[mandateCost] (2.8,3.6) circle (2.5pt);
+        }
+        \uncover<3->{
+            \draw[very thick,RoyalBlue] (.3,6.05) -- (7.5,2.45) node[right] {$D_1$};
+            \draw[->,RoyalBlue,thick] (6,2) -- (6,3.2) node[midway,right] {$v$};
+            \draw[densely dotted,RoyalBlue] (4,0) -- (4,4.2) -- (0,4.2) node[left] {$P_1$};
+            \fill[RoyalBlue] (4,4.2) circle (2.5pt);
+        }
+    \end{tikzpicture}
+    \end{column}
+    \begin{column}{.42\textwidth}
+    \small
+    \only<1>{\textbf{Before the reform}\par\medskip
+    Buyers and producers choose quantity $Q_0$ at price $P_0$.}
+    \only<2>{\textbf{The mandate raises costs}\par\medskip
+    Compliance costs $c$ per home shift supply up. Holding demand fixed, quantity falls.}
+    \only<3>{\textbf{Buyers also value the protection}\par\medskip
+    Private willingness to pay $v$ shifts demand up.\par\medskip
+    If $v=c$, both curves shift by the same amount: \al{$Q_1=Q_0$}. The price rises by $c$.}
+    \only<4>{\textbf{The HUD benchmark: $v\approx c$}\par\medskip
+    ``set to increase marginal production costs by amounts close to expected private benefits'' \gc{\citep{dacquisto_housing_2006}}\par\medskip
+    \al{Prediction: approximately no quantity change.}}
+    \end{column}
+    \end{columns}
+    \vfill
+    \gc{Stylized competitive market; parallel per-home cost and valuation shifts. Mandated-benefit logic: \citep{summers_simple_1989}.}
+\end{frame}
 
-    \begin{enumerate}\setlength{\itemsep}{1.0em}
-        \item \begin{large}\textbf{Cost.} The 1994 wind standard raised MH prices by \al{\$\vPriceEff} (\vPriceEffPct\%) in treated states\end{large}
+% Same supply shift in all three panels; only private valuation varies.
+\newcommand{\mandatecase}[3]{%
+    \begin{tikzpicture}[x=.40cm,y=.38cm,>=stealth,font=\scriptsize]
+        \draw[->] (0,0) -- (8.4,0) node[below] {$Q$};
+        \draw[->] (0,0) -- (0,7.4) node[left] {$P$};
+        \draw[gray,thin] (.3,1.15) -- (7.5,4.75);
+        \draw[gray,thin] (.3,4.85) -- (7.5,1.25);
+        \draw[very thick,mandateCost] (.3,2.35) -- (7.5,5.95) node[right] {$S_1$};
+        \draw[very thick,RoyalBlue] (.3,{4.85+#1}) -- (7.5,{1.25+#1}) node[right] {$D_1$};
+        \draw[densely dotted,gray] (4,0) node[below] {$Q_0$} -- (4,3);
+        \fill[gray] (4,3) circle (2pt);
+        \draw[densely dotted,RoyalBlue] ({2.8+#1},0) -- ({2.8+#1},{3.6+.5*#1});
+        \fill[RoyalBlue] ({2.8+#1},{3.6+.5*#1}) circle (2.5pt);
+        \node[anchor=north] at (4,-1.1) {\normalsize #2};
+        \node[anchor=north] at (4,-2.1) {\small #3};
+    \end{tikzpicture}%
+}
 
-        \item \begin{large}\textbf{Benefit.} Post-1994 MH sustain \al{\vBldgDmgPct\%} less building damage per flood claim \gc{(s.e.\ \vBldgDmgSELP\ log points)}\end{large}
-        \begin{itemize}
-            \item \$\vBldgDmgDol\ against a \$\vBldgDmgBase\ pre-1994 MH mean
-            \item measured on flood losses (not wind) \so\ resilience spills across hazards
-        \end{itemize}
+\begin{frame}
+    \frametitle{The quantity response reveals private value relative to cost}
+    \centering
+    \mandatecase{.4}{$v<c$}{$Q_1<Q_0$}
+    \hfill
+    \mandatecase{1.2}{$v=c$}{$Q_1=Q_0$}
+    \hfill
+    \mandatecase{2}{$v>c$}{$Q_1>Q_0$}
 
-        \item \begin{large}\textbf{Margin.} The reform changed \al{severity}, not \al{frequency}\end{large}
-        \begin{itemize}
-            \item damage per claim falls; claims per policy-year and take-up do not move
-            \item and post-1994 MH policies sit \emph{more} often in floodplains
-        \end{itemize}
-    \end{enumerate}
+    \vspace{1em}
+    \small Gray: original curves and equilibrium. \textcolor{mandateCost}{Orange: supply including compliance cost.} \textcolor{RoyalBlue}{Blue: demand including private value.}
 
-    \vspace{1.0em}
+    \vspace{1em}
+    \al{A quantity decline indicates that buyers at the margin value the mandated benefit less than its cost.}
+\end{frame}
 
-    \so\ Flood alone returns \al{\vBCRPct\%} of the price increase. The reform targeted wind.
+\begin{frame}
+    \frametitle{did the mandated protection pay for itself?}
+    If buyers value the additional protection less than its cost, the reform should \al{reduce new placements}.
 
+    \vspace{0.8em}
+    I find a large decline in manufactured-home quantities in the highest-wind counties, indicating \al{negative net private benefits at the margin}.
+
+    \vspace{0.8em}
+    Two supporting analyses point toward small benefits:
+    \begin{itemize}
+        \item resale prices provide little evidence of substantial willingness to pay
+        \item flood-damage reductions imply small expected dollar benefits
+    \end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -163,7 +224,7 @@
         \item designs relying on across-vintage or across-location comparisons \gc{\citep{jacobsen_are_2013, levinson_how_2016}}
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} a \al{double difference in vintage $\times$ housing type} --- same county, same flood, same construction year
+    \hspace{1em} \so \textbf{New:} compare vintages across wind zones, with site-built homes as an additional comparison
 
     \vspace{0.7em}
 
@@ -173,33 +234,13 @@
         \item fiscal spillovers of disasters and relief \gc{\citep{deryugina_fiscal_2017, baylis_moral_2019, solomon_optimal_2026}}
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} a mandated-adaptation \al{cost and benefit measured on the same reform}
+    \hspace{1em} \so \textbf{New:} \al{private returns} to mandated adaptation in inexpensive housing
+
+    \vspace{0.5em}
+    \textbf{Scope:} reduced disaster assistance and spillovers to neighboring properties could justify intervention even when net private benefits are negative.
 
 \end{frame}
 
-\begin{frame}
-    % disclaimer -- get ahead of the "so was it worth it?" question
-    \frametitle{Missing: most of the benefits}
-
-    \begin{large}This paper does \al{not} evaluate the 1994 reform.\end{large}
-
-    \vspace{1.2em}
-
-    I measure \al{one} benefit channel, and it is not the targeted one:
-
-    \begin{itemize}\setlength{\itemsep}{0.4em}
-        \item \textbf{wind damage} --- what the standard was written for \gc{(not measured)}
-        \item \textbf{uninsured losses} --- most MH carry no flood policy \gc{(not measured)}
-        \item \textbf{displacement, lost income, injury} \gc{(not measured)}
-        \item \textbf{insurance value} to risk-averse, credit-constrained households \gc{(not measured)}
-        \item \textbf{\emph{ex post} relief spillovers} --- FEMA IA, SBA \gc{(not measured)}
-    \end{itemize}
-
-    \vspace{1.2em}
-
-    \so\ What I deliver: a credible \al{cost}, a credible \al{lower bound} on benefits in an untargeted hazard, and evidence that structural standards have \al{cross-hazard} spillovers.
-
-\end{frame}
 
 %% ============================================================
 %% INSTITUTIONS & DATA
@@ -211,6 +252,7 @@
 
 \begin{frame}
     \frametitle{Manufactured housing and the HUD Code}
+    \small
 
     \textbf{$\sim$6\% of the housing stock}; over 15\% in parts of the rural Southeast
     \begin{itemize}
@@ -226,7 +268,6 @@
         \item three \al{wind zones}; structural upgrades required in Zones II and III
         \item stronger anchoring and strapping, upgraded sheathing and fastening, component and cladding wind-pressure requirements
         \item effective \al{July 1994}
-        \item ``set to increase marginal production costs by amounts close to expected private benefits'' \gc{\citep{dacquisto_housing_2006}}
     \end{itemize}
 
     \vspace{0.8em}
@@ -238,85 +279,81 @@
 
 \end{frame}
 
-\begin{frame}
-    \frametitle{HUD wind zones by county}
-    \centering
-    \includegraphics[width=\linewidth,height=0.80\textheight,keepaspectratio]{output/descriptives/map-mhs-windzone-counties.pdf}
 
-    \vspace{-0.3em}
 
-    \footnotesize{Treated states have any Zone II or III county; control states are Zone I. Treatment is coarse: only about a third of the treated states' MH stock actually sits in a Zone II/III county.} \hfill \hyperlink{frame:windzone-intensity}{\beamerbutton{intensity}}
-\end{frame}
 
-\begin{frame}
-    \frametitle{Flood insurance and manufactured homes}
-
-    \textbf{The NFIP} insures flood risk in participating communities; purchase is \al{mandatory} for federally backed mortgages in Special Flood Hazard Areas.
-
-    \vspace{0.8em}
-    \pause
-
-    \textbf{But MH mostly fall outside that mandate.}
-    \begin{itemize}
-        \item frequently financed with \al{chattel loans} --- secured by the home, not the land --- much of which is not federally related lending
-        \item take-up: \al{\vPolMhPre} policies per 1,000 MH per year vs.\ \al{\vPolSbPre} per 1,000 site-built
-    \end{itemize}
-
-    \vspace{0.8em}
-    \pause
-
-    \textbf{Consequence for this paper.} MH are \al{\vMhClaimSharePct\%} of claims (\vNMhClaims\ of \vNAllClaims) and \vMhPolicySharePct\% of policies, against $\sim$6\% of the stock.
-
-    \vspace{0.4em}
-
-    \gc{Everything I estimate is measured on the \emph{insured} minority --- more selected and more financially connected than the population the motivation highlights. I return to this.}
-
-\end{frame}
 
 \begin{frame}
     \frametitle{Data}
-
-    \textbf{Cost side: Census \al{Manufactured Housing Survey}}, state $\times$ year, 1988--2004
+    \textbf{Primary analysis: CoreLogic property and transaction records}
     \begin{itemize}
-        \item average sales price by home size (single- vs.\ multi-section) and placement counts
-        \item treated = states containing HUD wind Zone II or III; control = Zone I
-        \item \al{\vNIndex} of \vNRaw\ state-years where both size-specific prices are published
+        \item surviving manufactured homes by county and construction year, observed in 2023
+        \item resale transactions for the willingness-to-pay analysis
+        \item property records may omit homes on rented sites; Census 2000 provides a quantity check
     \end{itemize}
 
-    \vspace{0.7em}
-    \pause
-
-    \textbf{Benefit side: FEMA \al{OpenFEMA} NFIP claims and policies}
+    \vspace{0.8em}
+    \textbf{Supporting analysis: OpenFEMA flood claims and policies}
     \begin{itemize}
-        \item claims: loss date, construction year, building and contents damage, payments, tract
-        \item policies: coverage, premium, flood zone, elevation \gc{(records begin 2009)}
-        \item both flag manufactured homes
+        \item construction vintage, housing type, flood damage, and insurance coverage
+        \item compare manufactured and site-built homes exposed to floods in the same county and period
+        \item estimates describe insured homes
     \end{itemize}
-
-    \vspace{0.7em}
-    \pause
-
-    \textbf{Sample.} Construction years \al{1984--1999}, losses from 1994; detached single-family residential only; continental US; deflated to \al{2000 dollars}.
-    \begin{itemize}
-        \item construction years binned in 2s, loss years in 5s \gc{(MH claims are rare)}
-        \item reference bin: \al{1992--1993}
-    \end{itemize}
-
 \end{frame}
 
-\begin{frame}\label{frame:sumstats}
-    \frametitle{Summary statistics: NFIP}
 
-    \footnotesize{
-        \begin{table}
-        \centering
-        \input{output/descriptives/sumstats-nfip.tex}
-        \end{table}
-    }
+\begin{frame}
+    \heading{Quantities: the private-benefit test}
+\end{frame}
 
-    \vspace{0.3em}
+\begin{frame}
+    \frametitle{Raw manufactured-home counts by construction year and wind zone}
+    \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{output/corelogic/quantities/mh_raw_counts_by_zone.pdf}
 
-    \tiny{Note: Policy panel 2009--2023; claims 1994--2023. Both restricted to construction years 1984--1999 and single-family residential. Shares and claim rate are policy-weighted. Damage in thousands of 2000 dollars.}
+    \gc{CoreLogic: surviving manufactured homes observed in 2023. Separate vertical scales; counts, not shares or original placements. Dashed line: July 1994 reform.}
+\end{frame}
+
+\begin{frame}
+    \frametitle{A vintage design across wind zones}
+    \small
+    \[
+    \mathrm{E}[N_{c\nu}] = \exp\!\left(\alpha_c + \lambda_{s(c),\nu}
+      + \sum_{k\ne1993}\left(\beta^{II}_k Z^{II}_c + \beta^{III}_k Z^{III}_c\right)
+      \mathbf{1}[\nu=k]\right)
+    \]
+    \begin{itemize}
+        \item $N_{c\nu}$: surviving MH in county $c$, construction year $\nu$
+        \item county effects and state $\times$ construction-year effects
+        \item Zone I comparison; 1993 reference (the omitted vintage in the exported estimates)
+        \item PPML retains zero counts; standard errors clustered by county
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Identification:} absent the reform, vintage profiles would evolve similarly across wind zones within a state.
+
+    \gc{Greater survival of resilient post-reform homes would work against finding a decline.}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Manufactured-home quantities fall in the highest-wind counties}
+    \includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf}
+\end{frame}
+
+\begin{frame}
+    \frametitle{What the quantity decline tells us}
+    The mandate reduced purchases of manufactured homes in the highest-wind counties.
+
+    \vspace{1em}
+    Under the identifying assumptions, buyers at the margin valued the additional resilience \al{less than its cost}.
+
+    \vspace{1em}
+    \textbf{Two supporting checks:} willingness to pay in resale prices, and expected flood-damage reductions.
+\end{frame}
+
+\begin{frame}
+    \frametitle{Resale prices: little evidence of substantial willingness to pay}
+    \includegraphics[width=\linewidth,height=0.74\textheight,keepaspectratio]{output/corelogic/prices/mh_only_vintage_prices_slides.pdf}
+
+    \gc{Capitalized private valuation across benefit channels; estimates are imprecise and sensitive to specification.}
 \end{frame}
 
 %% ============================================================
@@ -324,59 +361,9 @@
 %% ============================================================
 
 \begin{frame}
-    \heading{Empirical Strategy}
+    \heading{Supporting evidence: flood damage}
 \end{frame}
 
-\begin{frame}
-    \frametitle{Cost: a difference-in-differences across \al{wind zones}}
-
-    $$P_{st} = \alpha_s + \gamma_t + \sum_{k \neq 1993} \beta_k \left(\mathbf{1}[\text{year} = k] \times \al{\text{Treated}_s}\right) + \varepsilon_{st}$$
-
-    \vspace{0.5em}
-
-    \begin{itemize}\setlength{\itemsep}{0.35em}
-        \item $P_{st}$: fixed-weight MH price index in state $s$, year $t$ \gc{(next slide)}
-        \item $\text{Treated}_s$: state contains a Zone II or III county
-        \item 1993 omitted; $\alpha_s$, $\gamma_t$ state and year fixed effects
-        \item weighted by mean 1988--1993 placements; SEs clustered by state
-    \end{itemize}
-
-    \vspace{1em}
-    \pause
-
-    The same specification, same sample, and same weights are used for \al{log placements}, so the price and quantity effects describe \al{one panel} rather than two.
-
-\end{frame}
-
-\begin{frame}
-    \frametitle{Why a \al{fixed-weight} price index}
-
-    The survey publishes an average price for single-section homes, for multi-section homes, and \al{across all homes placed}.
-
-    \vspace{0.5em}
-
-    \gc{Multi-section homes cost \$\vAvgPriceDouble\ against \$\vAvgPriceSingle\ for single-section --- a ratio of \vPriceRatio\ to 1.}
-
-    \vspace{0.8em}
-    \pause
-
-    \so\ The all-homes average rises when \al{prices} rise \emph{or} when the \al{mix} shifts toward multi-section. A mix shift would enter the DiD as a price effect.
-
-    \vspace{1em}
-
-    $$P_{st} = \omega^{S} p^{S}_{st} + \omega^{D} p^{D}_{st}, \qquad \omega^{S} = \vWtSingle,\ \ \omega^{D} = \vWtDouble$$
-
-    \vspace{0.5em}
-    \pause
-
-    Weights are \al{national 1988--1993 shares}, held fixed across all states and years.
-
-    \begin{itemize}
-        \item the index is the cost of a \al{fixed basket}: no variation in the size mix can enter it
-        \item and the mix genuinely does not drive the result \hfill \hyperlink{frame:composition-decomp}{\beamerbutton{decomposition}}
-    \end{itemize}
-
-\end{frame}
 
 \begin{frame}
     \frametitle{Benefit: a \al{double difference} in vintage $\times$ housing type}
@@ -433,91 +420,17 @@
 \end{frame}
 
 %% ============================================================
-%% RESULTS: COST
+%% CoreLogic quantity analysis to be added after introduction copy is agreed.
+%% RESULTS: COST (state-level MHS analysis removed)
 %% ============================================================
 
-\begin{frame}
-    \heading{Results: Cost}
-\end{frame}
-
-\begin{frame}
-    \frametitle{Prices rise \al{\$\vPriceEff} in treated states}
-    \vspace{0.3em}
-    \includegraphics[width=.92\textwidth,height=0.80\textheight,keepaspectratio]{output/mhs/es-mhs-avg_sales_price_fw_idx.pdf}
-\end{frame}
-
-\begin{frame}[t]
-    \frametitle{Reading the price effect}
-
-    \textbf{\$\vPriceEff\ on a pre-reform base of \$\vPriceBase\ \so\ \al{\vPriceEffPct\%}}
-
-    \vspace{0.8em}
-    \pause
-
-    \begin{itemize}\setlength{\itemsep}{0.5em}
-        \item \textbf{Timing matches the rule.} 1994 is small; separation appears from 1995. The standard took effect in \al{July} 1994, and production-installation lags push compliance later.
-
-        \item \textbf{Not a spike, not just credit.} The premium peaks with the late-1990s \al{chattel-lending boom} but stays elevated through 2004, after the bust and amid repossessions \so\ headline is the \al{2000--2004} average.
-
-        \item \textbf{Not composition.} Valuing each state-year's actual size mix at fixed national prices gives \al{\$\vPriceEffComp} --- essentially nothing. \hfill \hyperlink{frame:composition-decomp}{\beamerbutton{decomposition}}
-
-        \item \textbf{It scales with size.} \$\vPriceEffSingle\ for single-section, \al{\$\vPriceEffDouble} for multi-section \so\ part of the cost varies with the structure, not a fixed charge per home. \hfill \hyperlink{frame:section-type}{\beamerbutton{by size}}
-    \end{itemize}
-
-    \vspace{0.6em}
-
-    \gc{What the price path alone does \emph{not} pin down: marginal cost vs.\ amortized redesign vs.\ demand-side valuation of the upgrade.}
-
-\end{frame}
-
-\begin{frame}
-    \frametitle{Placements: \al{no} detectable decline}
-    \vspace{0.3em}
-    \includegraphics[width=.92\textwidth,height=0.80\textheight,keepaspectratio]{output/mhs/es-mhs-placements_ln.pdf}
-\end{frame}
-
-\begin{frame}[t]\label{frame:quantity-null}
-    \frametitle{The quantity null does \al{not} identify demand}
-
-    Collapsing the post-period: \al{\vPlcEff} log points, s.e.\ \vPlcSE, CI $[\vPlcCILo,\ \vPlcCIHi]$.
-
-    \vspace{0.8em}
-    \pause
-
-    It is tempting to read this as ``prices rose \vPriceEffPct\% and quantities did not fall, so either demand is inelastic or buyers valued the upgrade at cost.''
-
-    \vspace{0.8em}
-    \pause
-
-    \textbf{The interval will not support that.} The price effect is \vDlnPricePct\ log points, so
-
-    $$\widehat{\varepsilon} = \frac{\widehat{\Delta \ln q}}{\widehat{\Delta \ln p}} \approx \vElastPt, \qquad \text{CI } [\al{\vElastLo},\ \al{\vElastHi}]$$
-
-    \vspace{0.5em}
-    \pause
-
-    \begin{itemize}
-        \item the lower bound is a \al{\vPlcCILoLP\ log point decline} --- an elastic demand response
-        \item the upper bound is positive and large
-    \end{itemize}
-
-    \vspace{0.8em}
-    \pause
-
-    \begin{large}\so\ The data \al{cannot separate} inelastic demand from buyers valuing the upgrade.\end{large}
-
-    \vspace{0.4em}
-
-    \gc{This is the estimate worth improving, and it is the one the policy question below turns on.}
-
-\end{frame}
 
 %% ============================================================
 %% RESULTS: BENEFIT
 %% ============================================================
 
 \begin{frame}
-    \heading{Results: Benefit}
+    \heading{Flood-damage results}
 \end{frame}
 
 \begin{frame}
@@ -572,6 +485,100 @@
     \tiny{\emph{Note:} Poisson; coefficients are \al{log points}, so $e^{\beta}-1$ is the proportional change. County $\times$ loss-year FE. SEs clustered by county. $N$ differs by column because Poisson drops cells whose outcome is zero throughout. All outcomes winsorized at \$\vWinsorCap, which binds for \vWinsorNBldg\ building-damage and \vWinsorNCont\ contents-damage records --- and \al{no manufactured home}.} \hfill \hyperlink{frame:levels-logs}{\beamerbutton{why proportional}}
 \end{frame}
 
+
+
+
+
+
+
+%% ============================================================
+%% COST-BENEFIT
+%% ============================================================
+
+
+\begin{frame}
+    \frametitle{Flood-damage reductions imply small expected dollar benefits}
+    Lower damage per flood claim translates into a small expected benefit because claims are infrequent and manufactured homes have low baseline values.
+
+    \vspace{1em}
+    The estimated present value of avoided flood damage is approximately \al{\$\vClFloodPV} per insured manufactured home.
+
+    \vspace{1em}
+    \gc{Flood is one benefit channel. Resale prices separately measure capitalized private valuation across channels; these measures are not additive.}
+\end{frame}
+
+
+
+%% ============================================================
+%% BACK TO POLICY
+%% ============================================================
+
+
+\begin{frame}
+    \frametitle{Private returns to mandated adaptation}
+    \begin{enumerate}\setlength{\itemsep}{1em}
+        \item The quantity decline indicates \al{negative net private benefits at the margin} from the 1994 wind standard.
+        \item Resale valuations and expected flood-damage reductions point toward \al{small private benefits}.
+        \item The social case also depends on disaster assistance and spillovers to others. Private returns alone do not settle that question.
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}
+    \heading{thank you!}
+
+    \vspace{3em}
+
+    \normalsize{Comments welcome:} \url{chv7bg@virginia.edu}
+\end{frame}
+
+\begin{frame}[allowframebreaks=0.8]
+    \frametitle{References}
+    \tiny{
+    \bibliography{manufactured-code}
+    \bibliographystyle{chicago}
+    }
+\end{frame}
+
+%% ============================================================
+%% APPENDIX
+%% ============================================================
+
+\appendix
+
+\begin{frame}
+    \heading{Appendix}
+\end{frame}
+
+\begin{frame}[t]
+    \frametitle{Social returns exceed private returns}
+
+    \textbf{Measured fiscal spillover.} Applying the payment reductions to the \vNPostClaims\ claims on MH built 1994--1999:
+
+    $$\approx \al{\$\vNfipSavingsM\ \text{million}} \text{ in direct NFIP payment savings}$$
+
+    \gc{Conservative: conditions on filing a claim, and does not scale to the full post-reform stock.}
+
+    \vspace{0.4em}
+
+    \gc{\scriptsize The per-claim figures here (\$\vNetBldgPmtDol\ building, \$\vNetContPmtDol\ contents) apply the proportional estimates to the \emph{observed post-1994} MH means, since this counts claims those homes actually filed. The private calculation applies the \emph{pre-1994} means instead --- different counterfactual, different baseline.}
+
+    \vspace{1.2em}
+    \pause
+
+    \textbf{Unmeasured, and probably larger: \emph{ex post} disaster relief.}
+    \begin{itemize}
+        \item FEMA Individual Assistance, SBA disaster loans, state emergency grants
+        \item these serve the \al{largely uninsured} MH population --- precisely the households missing from my sample
+        \item \cite{solomon_optimal_2026}: an additional 1\% of houses insured lowers \emph{ex post} government spending by \$175--\$203 per house-flood
+    \end{itemize}
+
+    \vspace{1.0em}
+    \pause
+
+    \so\ This is the \al{fiscal externality} from the motivation, and it is the second-best case for the mandate that survives even if location moral hazard is zero.
+
+\end{frame}
+
 \begin{frame}[t]\label{frame:severity}
     \frametitle{\al{Severity}, not \al{frequency}}
 
@@ -604,6 +611,31 @@
     \pause
 
     \begin{large}\so\ Back to the two headlines: the code changed \al{how bad a flood is}, not \al{how often one comes}.\end{large}
+
+\end{frame}
+
+\begin{frame}
+    \frametitle{Flood insurance and manufactured homes}
+
+    \textbf{The NFIP} insures flood risk in participating communities; purchase is \al{mandatory} for federally backed mortgages in Special Flood Hazard Areas.
+
+    \vspace{0.8em}
+    \pause
+
+    \textbf{But MH mostly fall outside that mandate.}
+    \begin{itemize}
+        \item frequently financed with \al{chattel loans} --- secured by the home, not the land --- much of which is not federally related lending
+        \item take-up: \al{\vPolMhPre} policies per 1,000 MH per year vs.\ \al{\vPolSbPre} per 1,000 site-built
+    \end{itemize}
+
+    \vspace{0.8em}
+    \pause
+
+    \textbf{Consequence for this paper.} MH are \al{\vMhClaimSharePct\%} of claims (\vNMhClaims\ of \vNAllClaims) and \vMhPolicySharePct\% of policies, against $\sim$6\% of the stock.
+
+    \vspace{0.4em}
+
+    \gc{Everything I estimate is measured on the \emph{insured} minority --- more selected and more financially connected than the population the motivation highlights. I return to this.}
 
 \end{frame}
 
@@ -648,308 +680,9 @@
         \item take-up, claim frequency, and claims per home \hfill \hyperlink{frame:take-up}{\beamerbutton{take-up}}
     \end{itemize}
 
-    \vspace{1.0em}
-
-    \textbf{Cost side}
-    \begin{itemize}
-        \item fixed-weight index vs.\ all-homes average vs.\ mix-only counterfactual \hfill \hyperlink{frame:composition-decomp}{\beamerbutton{decomposition}}
-        \item single- vs.\ multi-section \hfill \hyperlink{frame:section-type}{\beamerbutton{by size}}
-        \item weighting and the \vNDroppedStates\ dropped no-shipment states
-    \end{itemize}
 
 \end{frame}
 
-%% ============================================================
-%% COST-BENEFIT
-%% ============================================================
-
-\begin{frame}
-    \heading{Cost-Benefit}
-\end{frame}
-
-\begin{frame}[t]\label{frame:cba}
-    \frametitle{A back-of-envelope private return}
-
-    \textbf{Cost:} \al{\$\vCost} once, at purchase.
-
-    \vspace{0.8em}
-    \pause
-
-    \textbf{Benefit per flood event:} \$\vDeltaBldg\ building $+$ \$\vDeltaCont\ contents $=$ \al{\$\vDeltaTotal}.
-
-    \vspace{0.8em}
-    \pause
-
-    \textbf{Probability of a flood:} the pre-1994 MH claim rate is \al{\vClaimRatePrePct\%} per year --- and it does not move with the reform.
-
-    $$\text{\vClaimRatePrePct\%} \times \text{\$\vDeltaTotal} = \text{\$\vAnnBenefit} \text{ per year} \quad \xrightarrow{\ \vDiscRate\%,\ \vLifespan\text{ yrs}\ } \quad \al{\text{\$\vNPV}}$$
-
-    \vspace{0.8em}
-    \pause
-
-    $$\boxed{\ \frac{\text{\$\vNPV}}{\text{\$\vCost}} = \al{\text{\vBCRPct\%}}\ }$$
-
-    \vspace{0.5em}
-
-    \so\ Among insured MH, the flood channel alone \al{does not} recover the cost.
-
-\end{frame}
-
-\begin{frame}[t]
-    \frametitle{What the \al{\vBCRPct\%} does and does not mean}
-
-    \textbf{It is a lower bound on the private return.} The reform targeted \al{wind}; NFIP claims are triggered only by \al{flood}.
-
-    \vspace{0.8em}
-    \pause
-
-    \begin{large}
-    \so\ Untargeted channels would need to be \al{\vWindMultiple$\times$} the measured flood benefit for the reform to break even privately.
-    \end{large}
-
-    \vspace{0.4em}
-
-    \gc{Plausible --- wind is the targeted hazard --- but unproven. I do not estimate it.}
-
-    \vspace{1.0em}
-    \pause
-
-    \textbf{Two ways the estimate could be wrong in either direction:}
-    \begin{itemize}\setlength{\itemsep}{0.3em}
-        \item \al{Adverse selection}: insured MH face higher flood risk than the average MH \so\ \vClaimRatePrePct\% overstates the typical hazard \so\ benefit \emph{too high}
-        \item \al{Income selection}: take-up rises with income, and low-income MH residents occupy worse sites \so\ benefit \emph{too low} \gc{\citep{landry_flood_2011}}
-    \end{itemize}
-
-    \vspace{0.8em}
-    \pause
-
-    \textbf{And the denominator is the wrong population.} Everything here is measured on NFIP claimants. Most MH households never appear in these data.
-
-\end{frame}
-
-\begin{frame}[t]
-    \frametitle{Social returns exceed private returns}
-
-    \textbf{Measured fiscal spillover.} Applying the payment reductions to the \vNPostClaims\ claims on MH built 1994--1999:
-
-    $$\approx \al{\$\vNfipSavingsM\ \text{million}} \text{ in direct NFIP payment savings}$$
-
-    \gc{Conservative: conditions on filing a claim, and does not scale to the full post-reform stock.}
-
-    \vspace{0.4em}
-
-    \gc{\scriptsize The per-claim figures here (\$\vNetBldgPmtDol\ building, \$\vNetContPmtDol\ contents) apply the proportional estimates to the \emph{observed post-1994} MH means, since this counts claims those homes actually filed. The private calculation applies the \emph{pre-1994} means instead --- different counterfactual, different baseline.}
-
-    \vspace{1.2em}
-    \pause
-
-    \textbf{Unmeasured, and probably larger: \emph{ex post} disaster relief.}
-    \begin{itemize}
-        \item FEMA Individual Assistance, SBA disaster loans, state emergency grants
-        \item these serve the \al{largely uninsured} MH population --- precisely the households missing from my sample
-        \item \cite{solomon_optimal_2026}: an additional 1\% of houses insured lowers \emph{ex post} government spending by \$175--\$203 per house-flood
-    \end{itemize}
-
-    \vspace{1.0em}
-    \pause
-
-    \so\ This is the \al{fiscal externality} from the motivation, and it is the second-best case for the mandate that survives even if location moral hazard is zero.
-
-\end{frame}
-
-%% ============================================================
-%% BACK TO POLICY
-%% ============================================================
-
-\begin{frame}
-    \heading{Back to the Chassis}
-\end{frame}
-
-\begin{frame}[t]
-    \frametitle{What \al{transfers} to the chassis reform}
-
-    \textbf{1. The order of magnitude of a HUD Code structural provision.}
-    \begin{itemize}
-        \item a substantial anchoring, sheathing, and fastening package moved unit price \al{\vPriceEffPct\%}
-        \item \so\ a benchmark for anyone projecting the cost side of \emph{removing} one
-    \end{itemize}
-
-    \vspace{0.9em}
-    \pause
-
-    \textbf{2. It scales with sections.} \$\vPriceEffSingle\ single-section vs.\ \al{\$\vPriceEffDouble} multi-section.
-    \begin{itemize}
-        \item the chassis is \emph{per section} too \so\ savings concentrate in multi-section homes
-        \item which are exactly the units being positioned as site-built substitutes
-    \end{itemize}
-
-    \vspace{0.9em}
-    \pause
-
-    \textbf{3. Codes have \al{cross-hazard} spillovers.} A wind standard produced a measurable \al{flood} benefit.
-    \begin{itemize}
-        \item so the chassis reform's effects will not stay in the lane HUD writes them for
-        \item \al{wind:} the chassis-on-piers-and-straps system is arguably the \emph{weak} link --- Andrew's 97\% was substantially an anchorage failure. A permanent engineered foundation could outperform.
-        \item \al{flood:} piers deliver 2--4 feet of \emph{de facto} freeboard that slab-on-grade loses --- biting hardest \al{outside} SFHAs, where NFIP elevation rules do not reach
-    \end{itemize}
-
-\end{frame}
-
-\begin{frame}[t]
-    \frametitle{What does \al{not} transfer}
-
-    \textbf{1. The quantity response.} The placement CI spans $[\vElastLo,\ \vElastHi]$ in elasticity units. \hfill \hyperlink{frame:quantity-null}{\beamerbutton{back}}
-
-    \vspace{0.4em}
-    \gc{And the 1988--2004 window spans the chattel-lending boom and bust, so the quantity series is doing other work.}
-
-    \vspace{1.0em}
-    \pause
-
-    \textbf{2. Symmetry.} The two reforms are not mirror images.
-    \begin{itemize}
-        \item 1994 bundled a cost \emph{increase} with a quality \emph{increase}
-        \item dropping the chassis bundles a cost \emph{decrease} with a quality change of \al{ambiguous sign} --- worse load path, but a more house-like home
-    \end{itemize}
-
-    \vspace{1.0em}
-    \pause
-
-    \textbf{3. The margin that may actually bind is not price at all.}
-    \begin{itemize}
-        \item a permanent chassis pushes the home toward \al{personal-property titling}
-        \item \so\ chattel financing, higher rates, no mortgage-market appraisal comps
-        \item if \emph{that} is the binding constraint, the reform is a \al{financing} shock, and a price elasticity estimated off a cost shock says nothing about it
-    \end{itemize}
-
-    \vspace{0.8em}
-    \pause
-
-    \so\ My results discipline the \al{cost} side of the chassis debate. They do not forecast placements.
-
-\end{frame}
-
-\begin{frame}
-    \frametitle{Three final thoughts}
-
-    \large{
-
-    \begin{enumerate}
-    \item Mandated adaptation \al{worked, structurally}: post-1994 manufactured homes sustain \vBldgDmgPct\% less damage per flood claim, from a standard written for wind.
-
-    \vspace{1.3em}
-
-    \item But it worked on \al{severity only}. Claim frequency, take-up, and floodplain siting did not improve --- which is why the 2017 and 2024 headlines are both right.
-
-    \vspace{1.3em}
-
-    \item The efficiency case for a construction standard rests on \al{unobservable quality} and the \al{fiscal externality}, not on credit constraints or on location moral hazard. Getting that straight matters now that HUD has to write the standard again.
-    \end{enumerate}
-    }
-\end{frame}
-
-\begin{frame}
-    \heading{thank you!}
-
-    \vspace{3em}
-
-    \normalsize{Comments welcome:} \url{chv7bg@virginia.edu}
-\end{frame}
-
-\begin{frame}[allowframebreaks=0.8]
-    \frametitle{References}
-    \tiny{
-    \bibliography{manufactured-code}
-    \bibliographystyle{chicago}
-    }
-\end{frame}
-
-%% ============================================================
-%% APPENDIX
-%% ============================================================
-
-\appendix
-
-\begin{frame}
-    \heading{Appendix}
-\end{frame}
-
-\begin{frame}\label{frame:composition-decomp}
-    \frametitle{Composition is not driving the price effect}
-
-    Three estimates on the \al{same} state-years:
-
-    \vspace{0.8em}
-
-    \begin{center}
-    \begin{tabular}{lc}
-        \toprule
-        \emph{Outcome} & \emph{Post-1994 $\times$ Treated} \\
-        \midrule
-        Fixed-weight index \gc{(baseline)}                  & \al{\$\vPriceEff} \\
-        All-homes average sales price                       & \$\vPriceEffRawCmn \\
-        Mix only \gc{(actual mix, fixed national prices)}   & \$\vPriceEffComp \\
-        \bottomrule
-    \end{tabular}
-    \end{center}
-
-    \vspace{1.2em}
-
-    \begin{itemize}
-        \item the treated-control difference in the multi-section share after 1994 is \al{\vShareDoublePP\ pp}
-        \item the mix-only counterfactual is essentially zero \so\ the size mix accounts for almost none of the effect
-    \end{itemize}
-
-    \vfill
-
-    \hfill \hyperlink{frame:robustness}{\beamerbutton{back}}
-\end{frame}
-
-\begin{frame}\label{frame:section-type}
-    \frametitle{Price effects by home size}
-
-    \vspace{-0.5em}
-
-    \scriptsize{
-        \begin{table}
-        \centering
-        \resizebox{.46\linewidth}{!}{\input{output/mhs/mhs-section-type.tex}}
-        \end{table}
-    }
-
-    \vspace{0.3em}
-
-    \footnotesize{The panel is stacked to state $\times$ year $\times$ size, with size-specific state and year FE, so identification is \al{within home size} and the mix cannot enter.}
-
-    \vspace{0.3em}
-
-    \scriptsize{Two readings the data do not separate: compliance requires more material on a larger structure, or multi-section homes are placed disproportionately in the higher wind zones within treated states.}
-
-    \vfill
-
-    \hfill \hyperlink{frame:robustness}{\beamerbutton{back}}
-\end{frame}
-
-\begin{frame}\label{frame:windzone-intensity}
-    \frametitle{Wind-zone intensity by state}
-
-    \vspace{-0.5em}
-
-    \tiny{
-        \begin{table}
-        \centering
-        \resizebox{.50\linewidth}{!}{\input{output/descriptives/windzone-intensity.tex}}
-        \end{table}
-    }
-
-    \vspace{0.2em}
-
-    \scriptsize{Only 3 of 11 treated states have more than half their MH stock in a Zone II/III county. Pooled, about \al{30\%} does.}
-
-    \vfill
-
-    \hfill \hyperlink{frame:robustness}{\beamerbutton{back}}
-\end{frame}
 
 \begin{frame}\label{frame:composition-table}
     \frametitle{Policy composition}
