@@ -249,5 +249,5 @@ fwrite(sc, file.path(out_dir, "census-scalars.csv"))
 fwrite(rbindlist(checks), file.path(out_dir, "census-sanity-checks.csv"))
 
 print(rbindlist(checks), nrows = 100)
-print(stat[ .(sample, column, zone, estimate = round(estimate, 3), se = round(se, 3), counties)], nrows = 100)
+print(stat[, .(sample, column, zone, estimate = round(estimate, 3), se = round(se, 3), counties)], nrows = 100)
 print(dcast(dyn[sample == "all"], column + zone ~ bin, value.var = "estimate"))

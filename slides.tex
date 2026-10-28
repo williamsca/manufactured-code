@@ -94,7 +94,7 @@
     \vspace{0.6em}
 
     \begin{itemize}\setlength{\itemsep}{0.35em}
-        \item \al{Externalities.} Wind-borne debris damages neighbors \gc{\citep{baylis_mandated_2021}}
+        \item \al{Externalities.} Wind-borne debris damages neighbors \gc{\citep{baylis_mandated_2026}}
         \item \al{Fiscal externality.} Losses are partly socialized \emph{ex post} --- FEMA IA, SBA, subsidized NFIP \gc{\citep{deryugina_fiscal_2017, solomon_optimal_2026}}
         \item \al{Unobservable quality.} Buyers cannot inspect strap schedules or fastener spacing
         \item \al{Missing insurance market.} Premiums do not price mitigation \gc{\citep{wagner_adaptation_2022}}
@@ -176,27 +176,10 @@
     \begin{column}{.42\textwidth}
     \small
     \textbf{Buyers value the protection less than its cost: $v<c$}\par\medskip
-    Demand shifts up by less than supply.\par\medskip
     Quantity falls: \al{$Q_1<Q_0$}.\par\medskip
-    \al{A quantity decline indicates that buyers at the margin value the mandated benefit less than its cost.}
     \end{column}
     \end{columns}
     \vfill
-\end{frame}
-
-\begin{frame}
-    \frametitle{did the mandated protection pay for itself?}
-    If buyers value the additional protection less than its cost, the reform should \al{reduce new placements}.
-
-    \vspace{0.8em}
-    I find a large decline in manufactured-home quantities in the highest-wind counties, indicating \al{negative net private benefits at the margin}.
-
-    \vspace{0.8em}
-    Two supporting analyses point toward small benefits:
-    \begin{itemize}
-        \item resale prices provide little evidence of substantial willingness to pay
-        \item flood-damage reductions imply small expected dollar benefits
-    \end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -204,20 +187,21 @@
 
     \footnotesize
 
-    \textbf{Returns to building codes for disaster resilience}
+    \textbf{Effects of building codes on housing markets}
     \begin{itemize}
-        \item Florida hurricane codes, conflicting results \gc{\citep{simmons_economic_2018, dehring_coastal_2013}}
-        \item descriptive work on the 1994 HUD reform \gc{\citep{simmons_manufactured_2008, kevin_r_grosskopf_manufactured_2005}}
-        \item wildfire codes in California \gc{\citep{baylis_mandated_2021}}
+        \item energy usage \gc{\citep{jacobsen_are_2013, levinson_how_2016}}
+        \item hurricane wind standards \gc{\citep{simmons_economic_2018, dehring_coastal_2013}}
+        \item descriptive work on the 1994 HUD MH reform \gc{\citep{simmons_manufactured_2008, kevin_r_grosskopf_manufactured_2005}}
+        \item wildfire codes in California, accounting for risk misperception and spillovers \gc{\citep{baylis_mandated_2026}}
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} MH are regulated \al{federally}, so code exposure separates from vintage
+    \hspace{1em} \so \textbf{New:} quasi-experimental evidence on \al{WTP} and \al{$\Delta Q$} from the 1994 HUD reform leveraging 
 
     \vspace{0.7em}
 
-    \textbf{Identifying code effects}
+    \textbf{Welfare analysis of building codes}
     \begin{itemize}
-        \item designs relying on across-vintage or across-location comparisons \gc{\citep{jacobsen_are_2013, levinson_how_2016}}
+        \item designs relying on across-vintage or across-location comparisons 
     \end{itemize}
 
     \hspace{1em} \so \textbf{New:} compare vintages across wind zones, with site-built homes as an additional comparison
@@ -227,7 +211,7 @@
     \textbf{Adaptation, insurance, and the fiscal cost of disasters}
     \begin{itemize}
         \item risk misperception \gc{\citep{bakkensen_going_2022, gallagher_learning_2014}}; premiums and mitigation \gc{\citep{wagner_adaptation_2022}}
-        \item fiscal spillovers of disasters and relief \gc{\citep{deryugina_fiscal_2017, baylis_moral_2019, solomon_optimal_2026}}
+        \item fiscal spillovers of regulation \gc{\citep{deryugina_fiscal_2017, baylis_moral_2019, solomon_optimal_2026}}
     \end{itemize}
 
     \hspace{1em} \so \textbf{New:} \al{private returns} to mandated adaptation in inexpensive housing
@@ -311,27 +295,40 @@
 
 \begin{frame}
     \frametitle{A vintage design across wind zones}
-    \small
+    For county $c$ and construction year $\nu$:
     \[
     \mathrm{E}[N_{c\nu}] = \exp\!\left(\alpha_c + \lambda_{s(c),\nu}
-      + \sum_{k\ne1993}\left(\beta^{II}_k Z^{II}_c + \beta^{III}_k Z^{III}_c\right)
+      + \sum_{k\neq 1991}\left(\beta^{II}_k Z^{II}_c + \beta^{III}_k Z^{III}_c\right)
       \mathbf{1}[\nu=k]\right)
     \]
+    where
     \begin{itemize}
-        \item $N_{c\nu}$: surviving MH in county $c$, construction year $\nu$
-        \item county effects and state $\times$ construction-year effects
-        \item Zone I comparison; 1993 reference (the omitted vintage in the exported estimates)
-        \item PPML retains zero counts; standard errors clustered by county
+        \item $N_{c\nu}$ is the number of surviving manufactured homes,
+        \item $\alpha_c$ absorbs size differences across counties,
+        \item $\lambda_{s(c),\nu}$ absorbs secular trends in housing investment by state $s(c)$, and
+        \item $Z_c^{II}$ and $Z_c^{III}$ are wind-zone indicators.
     \end{itemize}
     \vspace{0.5em}
-    \textbf{Identification:} absent the reform, vintage profiles would evolve similarly across wind zones within a state.
+    \textbf{Identification:} absent the reform, vintage profiles would evolve similarly across wind zones \al{within a state}.
 
-    \gc{Greater survival of resilient post-reform homes would work against finding a decline.}
+    \vfill
+    \gc{PPML keeps zero counts; standard errors clustered by county}
 \end{frame}
 
 \begin{frame}
     \frametitle{Manufactured-home quantities fall in the highest-wind counties}
     \includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf}
+\end{frame}
+
+\begin{frame}
+    \frametitle{$\mathrm{E}[N_{c\nu}] = \exp\!\left(\alpha_c + \lambda_{s(c),\nu} + \beta^{II} Z^{II}_c \cdot \mathrm{Post}_\nu + \beta^{III} Z^{III}_c \cdot \mathrm{Post}_\nu\right)$}
+
+    \vspace{-0.5em}
+
+    \begin{table}
+    \centering
+    \resizebox*{!}{0.95\textheight}{\input{output/corelogic/quantities/mh_static_ladder.tex}}
+    \end{table}
 \end{frame}
 
 \begin{frame}

@@ -8,8 +8,8 @@
 # Workflow: edit, commit and `git push`, then run this. It resets the Rivanna
 # checkout (~/manufactured-code, cloned on first use) to origin/main, submits
 # the job, waits, checks the final Slurm state, and rsyncs
-# results/RESULTS/<name>/ on Rivanna into output/RESULTS/<name>/ here, where
-# RESULTS is ANALYSIS without its "estimate-" prefix (estimate-corelogic ->
+# output/OUTPUT/<name>/ on Rivanna into output/OUTPUT/<name>/ here, where
+# OUTPUT is ANALYSIS without its "estimate-" prefix (estimate-corelogic ->
 # corelogic),
 # replacing what was there. The job decides what is exported; for CoreLogic
 # that is aggregate CSV/PDF/PNG/JSON only, never licensed records.
@@ -27,8 +27,8 @@ REPO_URL="https://github.com/williamsca/manufactured-code.git"
 LOCAL_DIR_NAME=$(basename "$PWD")
 REMOTE_DIR="\$HOME/${LOCAL_DIR_NAME}"
 REMOTE_RSYNC_DIR="~/${LOCAL_DIR_NAME}"
-RESULTS="${ANALYSIS#estimate-}"
-LOCAL_RESULTS="./output/${RESULTS}"
+OUTPUT="${ANALYSIS#estimate-}"
+LOCAL_OUTPUT="./output/${OUTPUT}"
 FORWARD_VARS=(CORELOGIC_BUILD CORELOGIC_REFERENCE CORELOGIC_PB_SOURCE)
 
 if [ ! -f "program/${ANALYSIS}/${ANALYSIS}.slurm" ]; then
@@ -161,8 +161,8 @@ ssh "$REMOTE" "cd ${REMOTE_DIR} && git fetch -q origin main && git reset -q --ha
 # 2. Clear old exports on remote to avoid stale exhibits (only if running all
 # scripts; a single-script run replaces only its own subfolder).
 if [ -z "$SCRIPT" ]; then
-  echo "Clearing old exported results on remote..."
-  ssh "$REMOTE" "rm -rf ${REMOTE_DIR}/results/${RESULTS}"
+  echo "Clearing old exported output on remote..."
+  ssh "$REMOTE" "rm -rf ${REMOTE_DIR}/output/${OUTPUT}"
 fi
 
 # 3. Submit the job and capture the job ID.
@@ -185,23 +185,23 @@ check_job_status "$JOB_ID"
 
 # 5. Download each exported result folder, replacing the local copy.
 if [ -n "$SCRIPT" ]; then
-  NAMES=$(basename "$SCRIPT" .R | sed -E "s/^(estimate-)?${RESULTS}-//")
+  NAMES=$(basename "$SCRIPT" .R | sed -E "s/^(estimate-)?${OUTPUT}-//")
 else
-  NAMES=$(ssh "$REMOTE" "ls ${REMOTE_DIR}/results/${RESULTS} 2>/dev/null" || true)
+  NAMES=$(ssh "$REMOTE" "ls ${REMOTE_DIR}/output/${OUTPUT} 2>/dev/null" || true)
 fi
 if [ -z "$NAMES" ]; then
-  echo "Warning: nothing exported under results/${RESULTS}/ on remote"
+  echo "Warning: nothing exported under output/${OUTPUT}/ on remote"
   exit 1
 fi
 for name in $NAMES; do
-  if ! ssh "$REMOTE" "[ -d ${REMOTE_DIR}/results/${RESULTS}/${name} ]"; then
-    echo "Warning: results/${RESULTS}/${name}/ not found on remote"
+  if ! ssh "$REMOTE" "[ -d ${REMOTE_DIR}/output/${OUTPUT}/${name} ]"; then
+    echo "Warning: output/${OUTPUT}/${name}/ not found on remote"
     exit 1
   fi
-  mkdir -p "${LOCAL_RESULTS}/${name}"
-  rsync -avz --delete "${REMOTE}:${REMOTE_RSYNC_DIR}/results/${RESULTS}/${name}/" "${LOCAL_RESULTS}/${name}/"
-  echo "Results downloaded to ${LOCAL_RESULTS}/${name}"
+  mkdir -p "${LOCAL_OUTPUT}/${name}"
+  rsync -avz --delete "${REMOTE}:${REMOTE_RSYNC_DIR}/output/${OUTPUT}/${name}/" "${LOCAL_OUTPUT}/${name}/"
+  echo "Output downloaded to ${LOCAL_OUTPUT}/${name}"
 done
 
 # 6. Desktop notification
-notify-send "HPC Job Complete" "${ANALYSIS} job ${JOB_ID} finished. Results in ${LOCAL_RESULTS}" 2>/dev/null || true
+notify-send "HPC Job Complete" "${ANALYSIS} job ${JOB_ID} finished. Results in ${LOCAL_OUTPUT}" 2>/dev/null || true
