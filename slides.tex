@@ -70,10 +70,10 @@
     \begin{columns}[c]
     \begin{column}{.40\textwidth}
         \small
-        HUD revises the federal code for MH after Hurricane Andrew (1992) destroyed \al{97\%} of MH in its path in Dade County. \gc{Florida MH Ass'n v.\ Cisneros (\citeyear{noauthor_florida_1995})}
+        HUD revises the federal code for MH after Hurricane Andrew (1992) destroyed \al{97\%} of MH in its path in Dade County \gc{Florida MH Ass'n v.\ Cisneros (\citeyear{noauthor_florida_1995})}
 
         \vspace{2em}
-        Additional wind standards applied to \al{Zone II (100 mph winds)} and \al{Zone III (110 mph)}.
+        Additional wind standards applied to \al{Zone II (100 mph winds)} and \al{Zone III (110 mph)}
 
         \vspace{2em}
         Standards ``set to increase marginal production costs by amounts close to expected private benefits'' \gc{\citep{dacquisto_housing_2006}}
@@ -139,53 +139,49 @@
     \begin{column}{.42\textwidth}
     \small
     \only<1>{\textbf{Before the reform}\par\medskip
-    Buyers and producers choose quantity $Q_0$ at price $P_0$.}
-    \only<2>{\textbf{The mandate raises costs}\par\medskip
-    Compliance costs $c$ per home shift supply up. Holding demand fixed, quantity falls.}
-    \only<3>{\textbf{Buyers also value the protection}\par\medskip
-    Private willingness to pay $v$ shifts demand up.\par\medskip
-    If $v=c$, both curves shift by the same amount: \al{$Q_1=Q_0$}. The price rises by $c$.}
-    \only<4>{\textbf{The HUD benchmark: $v\approx c$}\par\medskip
+    Equilibrium $Q_0$ at price $P_0$.}
+    \only<2>{\textbf{The mandate raises costs by $c$}}
+    \only<3>{\textbf{Buyers value the protection by $v$}\par\medskip
+    Demand shifts up.\par\medskip
+    If $v=c$, no change in quantities: \al{$Q_1=Q_0$}.\par\medskip
+    The price rises by $c$.}
+    \only<4>{\textbf{HUD benchmark: $v\approx c$}\par\medskip
     ``set to increase marginal production costs by amounts close to expected private benefits'' \gc{\citep{dacquisto_housing_2006}}\par\medskip
     \al{Prediction: approximately no quantity change.}}
     \end{column}
     \end{columns}
     \vfill
-    \gc{Stylized competitive market; parallel per-home cost and valuation shifts. Mandated-benefit logic: \citep{summers_simple_1989}.}
 \end{frame}
 
-% Same supply shift in all three panels; only private valuation varies.
-\newcommand{\mandatecase}[3]{%
-    \begin{tikzpicture}[x=.40cm,y=.38cm,>=stealth,font=\scriptsize]
-        \draw[->] (0,0) -- (8.4,0) node[below] {$Q$};
-        \draw[->] (0,0) -- (0,7.4) node[left] {$P$};
-        \draw[gray,thin] (.3,1.15) -- (7.5,4.75);
-        \draw[gray,thin] (.3,4.85) -- (7.5,1.25);
-        \draw[very thick,mandateCost] (.3,2.35) -- (7.5,5.95) node[right] {$S_1$};
-        \draw[very thick,RoyalBlue] (.3,{4.85+#1}) -- (7.5,{1.25+#1}) node[right] {$D_1$};
+\begin{frame}
+    \frametitle{Quantities can fall even with $v>0$}
+    \begin{columns}[T]
+    \begin{column}{.56\textwidth}
+    \centering
+    \begin{tikzpicture}[x=.73cm,y=.66cm,>=stealth,font=\small]
+        \draw[->] (0,0) -- (8.1,0) node[below] {$Q$};
+        \draw[->] (0,0) -- (0,7.2) node[left] {$P$};
+        \draw[thick,gray] (.3,1.15) -- (7.5,4.75) node[right] {$S_0$};
+        \draw[thick,gray] (.3,4.85) -- (7.5,1.25) node[right] {$D_0$};
         \draw[densely dotted,gray] (4,0) node[below] {$Q_0$} -- (4,3);
         \fill[gray] (4,3) circle (2pt);
-        \draw[densely dotted,RoyalBlue] ({2.8+#1},0) -- ({2.8+#1},{3.6+.5*#1});
-        \fill[RoyalBlue] ({2.8+#1},{3.6+.5*#1}) circle (2.5pt);
-        \node[anchor=north] at (4,-1.1) {\normalsize #2};
-        \node[anchor=north] at (4,-2.1) {\small #3};
-    \end{tikzpicture}%
-}
-
-\begin{frame}
-    \frametitle{The quantity response reveals private value relative to cost}
-    \centering
-    \mandatecase{.4}{$v<c$}{$Q_1<Q_0$}
-    \hfill
-    \mandatecase{1.2}{$v=c$}{$Q_1=Q_0$}
-    \hfill
-    \mandatecase{2}{$v>c$}{$Q_1>Q_0$}
-
-    \vspace{1em}
-    \small Gray: original curves and equilibrium. \textcolor{mandateCost}{Orange: supply including compliance cost.} \textcolor{RoyalBlue}{Blue: demand including private value.}
-
-    \vspace{1em}
+        \draw[very thick,mandateCost] (.3,2.35) -- (7.5,5.95) node[right] {$S_1$};
+        \draw[->,mandateCost,thick] (6,4) -- (6,5.2) node[midway,right] {$c$};
+        \draw[very thick,RoyalBlue] (.3,5.25) -- (7.5,1.65) node[right] {$D_1$};
+        \draw[->,RoyalBlue,thick] (6,2) -- (6,2.4) node[above right] {$v$};
+        \draw[densely dotted,RoyalBlue] (3.2,0) node[below] {$Q_1$} -- (3.2,3.8);
+        \fill[RoyalBlue] (3.2,3.8) circle (2.5pt);
+    \end{tikzpicture}
+    \end{column}
+    \begin{column}{.42\textwidth}
+    \small
+    \textbf{Buyers value the protection less than its cost: $v<c$}\par\medskip
+    Demand shifts up by less than supply.\par\medskip
+    Quantity falls: \al{$Q_1<Q_0$}.\par\medskip
     \al{A quantity decline indicates that buyers at the margin value the mandated benefit less than its cost.}
+    \end{column}
+    \end{columns}
+    \vfill
 \end{frame}
 
 \begin{frame}
