@@ -162,13 +162,17 @@ cl_mh_static_fits <- function(x, quantity = FALSE) {
 # Three price variants per design: common vintage, state x vintage, and
 # state x vintage plus size. Keep full samples for unadjusted columns.
 # `outcome` is log_price for the main table or price_level_w for the levels table.
-cl_price_static_fits <- function(x, outcome = "log_price") {
-    original <- c(1L, 2L, 2L, 3L, 4L, 4L)
-    fits <- list(); counties <- integer(6)
+# size_columns = FALSE drops the size-adjusted columns (four columns), for size outcomes;
+# `valid` names a logical column restricting every column to the outcome's valid sample.
+cl_price_static_fits <- function(x, outcome = "log_price", size_columns = TRUE, valid = NULL) {
+    original <- if (size_columns) c(1L, 2L, 2L, 3L, 4L, 4L) else 1:4
+    n_col <- length(original)
+    fits <- list(); counties <- integer(n_col)
     common <- list()
-    for (k in 1:6) {
-        d <- if (k <= 3) x[mh == 1] else x
-        adjusted <- k %in% c(3L, 6L)
+    for (k in seq_len(n_col)) {
+        d <- if (k <= n_col / 2) x[mh == 1] else x
+        if (!is.null(valid)) d <- d[get(valid) == TRUE]
+        adjusted <- size_columns && k %in% c(3L, 6L)
         if (adjusted) d <- d[valid_size == TRUE]
         m <- feols(cl_mh_static_formula(original[k], size = adjusted, outcome = outcome), d,
             vcov = ~countyfp, mem.clean = TRUE)

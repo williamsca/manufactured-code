@@ -70,6 +70,13 @@ cl_mh_static_table(ladder_level, file.path(out_dir, "mh_static_ladder_level.tex"
 fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder_level$fits[[k]], paste0("ladder_level_", k))[,
     counties := ladder_level$counties[k]])), file.path(out_dir, "mh_static_ladder_level.csv"))
 models[paste0("mh_static_ladder_level_", 1:6)] <- ladder_level$fits
+# Alchian-Allen: log living area as the outcome, on sales with positive living area.
+# Four columns (MH DiD, MH/SB DDD); size controls are omitted because size is the outcome.
+ladder_area <- cl_price_static_fits(dt, outcome = "log_living_area", size_columns = FALSE, valid = "valid_living")
+cl_mh_static_table(ladder_area, file.path(out_dir, "mh_static_ladder_area.tex"))
+fwrite(rbindlist(lapply(1:4, function(k) cl_coeftable(ladder_area$fits[[k]], paste0("ladder_area_", k))[,
+    counties := ladder_area$counties[k]])), file.path(out_dir, "mh_static_ladder_area.csv"))
+models[paste0("mh_static_ladder_area_", 1:4)] <- ladder_area$fits
 # Event studies with state x vintage FE: winsorized levels for the MH DiD (static
 # column 2) and the DDD (column 5), and log price for the DDD.
 dt[, `:=`(mh_z2 = mh * z2, mh_z3 = mh * z3)]
@@ -102,6 +109,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values only, no upper trimming or imputation; adjusted columns only",
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
     mh_static_ladder_level = "Same six columns as mh_static_ladder with the 2000-dollar sale price in levels, winsorized at the 1st and 99th percentiles within housing type on the matched sale sample",
+    mh_static_ladder_area = "Same specifications as columns (1), (2), (4), (5) of mh_static_ladder with log dedicated living area (2023 snapshot) as the outcome, on sales with positive finite living area; no size controls",
     sale_window = range(CL_SALE_YEARS), construction_window = range(CL_VINTAGES), reference_vintage = 1993L,
     existing_homes_only = all(dt$year_sale > dt$year_constr),
     vintage_1994 = sprintf("Own annual coefficient; included in static post (1994-%d)", max(CL_VINTAGES)),

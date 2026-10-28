@@ -58,6 +58,7 @@ cl_price_size_controls <- function(dt) {
     x[, `:=`(log_living_area = log(fifelse(is.finite(living_area) & living_area > 0,
         living_area, NA_real_)), log_lot_size = log(fifelse(is.finite(lot_size) & lot_size > 0,
         lot_size, NA_real_)))]
-    x[, valid_size := is.finite(log_living_area) & is.finite(log_lot_size)]
+    x[, valid_living := is.finite(log_living_area)]
+    x[, valid_size := valid_living & is.finite(log_lot_size)]
     x
 }
