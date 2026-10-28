@@ -43,6 +43,7 @@ quantity_state_tab <- cl_mh_only_coefficients(quantity_state_model, "mh_only_qua
 fwrite(quantity_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 models[["mh_only_quantity_dynamic_state_vintage_fe"]] <- quantity_state_model
 cl_mh_only_paper_plot(quantity_state_tab, out_dir, quantity = TRUE)
+cl_mh_only_paper_plot(quantity_state_tab, out_dir, quantity = TRUE, slides = TRUE)
 cl_mh_only_compare_plot(quantity_tab, quantity_state_tab, out_dir, quantity = TRUE)
 # Static counts: (1)-(2) MH, (3)-(4) site-built on the same MH-support county universe.
 # SB is an outcome, not a comparison type: substitution can change its cohort counts.

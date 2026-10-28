@@ -13,14 +13,12 @@ CL_PAPER_INPUTS = $(wildcard $(CL_PAPER)/prices/*.csv $(CL_PAPER)/quantities/*.c
 
 paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
 	$(CL_PAPER_INPUTS) \
-	program/estimate-corelogic/replot-corelogic.R program/estimate-corelogic/corelogic-mh-only.R \
 	output/descriptives/sumstats-corelogic.tex \
 	$(wildcard output/nfip/*.csv output/nfip/*.tex output/nfip/*.pdf) \
 	output/descriptives/sumstats-nfip-scalars.csv output/descriptives/sumstats-nfip.tex \
 	output/cost-benefit/hud-benefit-forecast.csv \
 	output/census/census-scalars.csv output/census/census-static-paper.tex \
 	output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex
-	Rscript program/estimate-corelogic/replot-corelogic.R
 	Rscript -e "rmarkdown::render('$<')"
 
 output/descriptives/sumstats-corelogic.tex: program/descriptives/sumstats-corelogic.R \
@@ -53,11 +51,6 @@ slides.pdf: slides.tex manufactured-code.bib output/slide-numbers.tex \
 	bibtex slides
 	pdflatex slides
 	pdflatex slides
-
-output/corelogic/prices/mh_only_vintage_prices_slides.pdf output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf &: \
-	program/estimate-corelogic/replot-corelogic.R program/estimate-corelogic/corelogic-mh-only.R \
-	$(CL_PAPER_INPUTS) output/cost-benefit/hud-benefit-forecast.csv
-	Rscript program/estimate-corelogic/replot-corelogic.R --slides-only
 
 output/descriptives/map-mhs-windzone-counties.pdf: program/descriptives/map.R \
 	program/import/project-params.R program/import/rd-client.R \
@@ -149,7 +142,6 @@ estimates:
 	Rscript program/cost-benefit/estimate-hud-comparison.R
 	Rscript program/cost-benefit/estimate-corelogic-comparison.R
 	Rscript program/cost-benefit/hud-benefit-forecast.R
-	Rscript program/estimate-corelogic/replot-corelogic.R
 
 # Work in progress, not in the paper.
 .PHONY: nfip-mh-only

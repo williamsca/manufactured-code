@@ -49,6 +49,8 @@ models[["mh_only_dynamic_state_vintage_fe"]] <- mh_state_model
 forecast_file <- here("output", "cost-benefit", "hud-benefit-forecast.csv")
 cl_mh_only_paper_plot(mh_state_tab, out_dir,
     forecast = if (file.exists(forecast_file)) fread(forecast_file) else NULL)
+cl_mh_only_paper_plot(mh_state_tab, out_dir, slides = TRUE,
+    forecast = if (file.exists(forecast_file)) fread(forecast_file) else NULL)
 cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
 # Size-adjusted static variants use positive dedicated living area and lot area.
 dt <- cl_price_size_controls(dt)
