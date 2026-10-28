@@ -70,6 +70,19 @@ fwrite(count_ddd_tab, file.path(out_dir, "type_es_coefficients.csv"))
 cl_type_es_plot(count_ddd_tab, out_dir, "count_es_ddd", "homes",
     keep = c("MH minus site-built", "Site-built", "MH"))
 models[["count_es_ddd"]] <- summary(count_ddd, lean = TRUE)
+# Robustness: drop Florida (see estimate-corelogic-prices.R).
+out_nofl <- file.path(out_dir, "no-florida"); dir.create(out_nofl)
+quantity_nofl_tab <- cl_mh_only_coefficients(
+    fepois(cl_mh_only_formula(quantity = TRUE, state = TRUE, reference = reference), quantity[statefp != "12"],
+        vcov = ~countyfp, mem.clean = TRUE, lean = TRUE),
+    "mh_only_quantity_dynamic_state_vintage_fe_no_florida", dynamic_years, reference)
+fwrite(quantity_nofl_tab, file.path(out_nofl, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
+cl_mh_only_paper_plot(quantity_nofl_tab, out_nofl, quantity = TRUE)
+ladder_nofl <- cl_mh_static_fits(type_counts[statefp != "12"], quantity = TRUE)
+cl_mh_static_table(ladder_nofl, file.path(out_nofl, "mh_static_ladder.tex"), quantity = TRUE)
+fwrite(rbindlist(lapply(1:4, function(k) cl_coeftable(ladder_nofl$fits[[k]], paste0("ladder_no_florida_", k))[,
+    `:=`(counties = ladder_nofl$counties[k], housing_type = if (k <= 2) "MH" else "SB")])),
+    file.path(out_nofl, "mh_static_ladder.csv"))
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
 files <- file.path(cl_dir, c("estimate-corelogic-quantities.R", "corelogic-setup.R",

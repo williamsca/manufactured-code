@@ -95,6 +95,20 @@ type_es_tab <- rbindlist(lapply(names(type_es), function(id) {
     tab
 }))
 fwrite(type_es_tab, file.path(out_dir, "type_es_coefficients.csv"))
+# Robustness: drop Florida, whose 1999 installation rules and 2002 building code
+# may change MH prices independently of the 1994 standard.
+out_nofl <- file.path(out_dir, "no-florida"); dir.create(out_nofl)
+dt_nofl <- dt[statefp != "12"]
+mh_nofl <- dt_nofl[mh == 1]
+mh_nofl_tab <- cl_mh_only_coefficients(
+    feols(cl_mh_only_formula(state = TRUE), mh_nofl, vcov = ~countyfp, mem.clean = TRUE, lean = TRUE),
+    "mh_only_dynamic_state_vintage_fe_no_florida")
+fwrite(mh_nofl_tab, file.path(out_nofl, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
+cl_mh_only_paper_plot(mh_nofl_tab, out_nofl)
+ladder_nofl <- cl_price_static_fits(dt_nofl)
+cl_mh_static_table(ladder_nofl, file.path(out_nofl, "mh_static_ladder.tex"))
+fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder_nofl$fits[[k]], paste0("ladder_no_florida_", k))[,
+    counties := ladder_nofl$counties[k]])), file.path(out_nofl, "mh_static_ladder.csv"))
 saveRDS(models, file.path(out_dir, "models-private.rds"))
 
 files <- file.path(cl_dir, c("estimate-corelogic-prices.R", "corelogic-setup.R",
@@ -103,6 +117,7 @@ dir.create(file.path(out_dir, "source")); file.copy(files, file.path(out_dir, "s
 write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLURM_JOB_ID"),
     sale_rows = nrow(dt), specification_ids = names(models),
     mh_only_sales = nrow(mh_sales), mh_only_specification = "MH sales only; county x sale year and vintage FE; separate zone x vintage DiDs",
+    no_florida_robustness = "State x vintage FE event study and six-column static ladder with Florida (statefp 12) dropped; written to no-florida/",
     mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     paper_figure_specification = "mh_only_dynamic_state_vintage_fe",
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
