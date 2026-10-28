@@ -40,7 +40,7 @@ dt_pol_micro[, period_constr := bin_constr(year_constr, BIN_CONSTR_YEAR)]
 # the policy file (mean 199.9, s.d. 2,269, 99th percentile 997, max 1,371,528 --
 # a single-family home with a $1.37bn replacement cost), so a level fit gave an
 # R2 of 0.001 and an unstable vintage profile (+32, +30, +10, -8, +31, +18, +2
-# across the seven bins) driven by records no fixed effect can explain. PPML
+# across the six bins) driven by records no fixed effect can explain. PPML
 # does not have that problem: it weights an observation by its fitted mean
 # rather than by its squared deviation, so the same extreme records that broke
 # the OLS level fit do not dominate the Poisson one, and the entered outcome is

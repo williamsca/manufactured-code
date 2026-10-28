@@ -1,6 +1,6 @@
-# Match the 1985-1999 NFIP vintage window in prices and surviving counts.
-CL_VINTAGES <- 1985:1999
-CL_QUANTITY_VINTAGES <- 1985:1999
+# Match the 1988-1999 NFIP vintage window in prices and surviving counts.
+CL_VINTAGES <- 1988:1999
+CL_QUANTITY_VINTAGES <- 1988:1999
 cl_years <- function(quantity = FALSE) if (quantity) CL_QUANTITY_VINTAGES else CL_VINTAGES
 cl_breaks <- function(quantity = FALSE) {
     y <- cl_years(quantity)

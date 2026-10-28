@@ -14,9 +14,8 @@ library(ggplot2)
 #     N=2 → ..., 1990-1991, 1992-1993, 1994-1995, ...;  ref period = 1992
 #     N=3 → ..., 1988-1990, 1991-1993, 1994-1996, ...;  ref period = 1991
 # A script sets BIN_CONSTR_DEFAULT before sourcing this file; the default is
-# three-year bins. The take-up design keeps two-year bins (see
-# estimate-nfip-takeup.R).
-BIN_CONSTR_YEAR <- if (exists("BIN_CONSTR_DEFAULT")) BIN_CONSTR_DEFAULT else 3L
+# two-year bins.
+BIN_CONSTR_YEAR <- if (exists("BIN_CONSTR_DEFAULT")) BIN_CONSTR_DEFAULT else 2L
 # Location fixed effects are county x period throughout.
 agg_geo <- "countyfp"
 

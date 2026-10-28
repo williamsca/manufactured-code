@@ -20,7 +20,7 @@
 # fitted models, to a new private directory
 #   $CORELOGIC_RESULTS_ROOT/<name>/<job id>/
 # and `current` in that folder is repointed to it on success. Only aggregate
-# tables, figures and manifests are copied to results/corelogic/<name>/ in the
+# tables, figures and manifests are copied to output/corelogic/<name>/ in the
 # checkout, which is the only thing run_remote.sh downloads.
 
 set -euo pipefail
@@ -76,7 +76,7 @@ for script in "${SCRIPTS[@]}"; do
     name="$(result_name "$script")"
     check="$(check_for "$name")"
     private_dir="${CORELOGIC_RESULTS_ROOT}/${name}/${SLURM_JOB_ID}"
-    export_dir="${REPO}/results/corelogic/${name}"
+    export_dir="${REPO}/output/corelogic/${name}"
 
     echo ""
     echo "== ${script} -> ${private_dir}  ($(date))"
@@ -98,7 +98,7 @@ for script in "${SCRIPTS[@]}"; do
     printf 'job: %s\ncommit: %s\nprivate_results: %s\n' "$SLURM_JOB_ID" \
         "$(git rev-parse HEAD 2>/dev/null || echo unknown)" "$private_dir" \
         > "$export_dir/remote-run.txt"
-    echo "Exported $(find "$export_dir" -type f | wc -l) files to results/corelogic/${name}/"
+    echo "Exported $(find "$export_dir" -type f | wc -l) files to output/corelogic/${name}/"
 done
 
 echo ""

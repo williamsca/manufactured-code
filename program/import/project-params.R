@@ -20,12 +20,12 @@ MIN_YEAR_CONSTR <- 1984L
 MAX_YEAR_CONSTR <- 1999L
 
 # Construction-vintage window for the claim-level and policy-composition event
-# studies, which bin construction years in threes anchored on 1993: 1985-1987,
-# 1988-1990, 1991-1993 (reference), 1994-1996, 1997-1999. The endpoint
+# studies, which bin construction years in twos anchored on 1993: 1988-1989,
+# 1990-1991, 1992-1993 (reference), 1994-1995, 1996-1997, 1998-1999. The endpoint
 # excludes the 2002 Florida Building Code,
 # though it does not fully exclude Florida installation changes in 1999.
 # Unlike take-up, these designs do not require the Census stock denominator.
-MIN_YEAR_CONSTR_NFIP <- 1985L
+MIN_YEAR_CONSTR_NFIP <- 1988L
 MAX_YEAR_CONSTR_NFIP <- 1999L
 
 # Baseline NFIP results use the counties subject to the 1994 wind reform.
@@ -33,7 +33,8 @@ MAX_YEAR_CONSTR_NFIP <- 1999L
 NFIP_BASELINE_ZONES <- c(2L, 3L)
 
 # Construction-vintage window for the CoreLogic transfer build. The estimators'
-# CL_VINTAGES (program/estimate-corelogic/corelogic-mh-only.R) must lie inside it.
+# CL_VINTAGES (program/estimate-corelogic/corelogic-mh-only.R) must lie inside it;
+# the pinned build predates the 1988 estimation start and still spans 1985-1999.
 MIN_YEAR_CONSTR_CL <- 1985L
 MAX_YEAR_CONSTR_CL <- 1999L
 

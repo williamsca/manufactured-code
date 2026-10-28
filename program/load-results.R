@@ -85,7 +85,7 @@ plc_ci_hi  <- fmt_lp(get_mhs("placements_effect_static") +
                      1.96 * get_mhs("placements_effect_static_se"))
 n_plc      <- format(as.integer(get_mhs("n_placements")), big.mark = ",")
 # Headline ATT: static post_mh coefficient (single precisely-estimated
-# number), not the average of the event study's seven noisy period_constr
+# number), not the average of the event study's six noisy period_constr
 # x mh coefficients. The event study (bldg_dmg_evt_avg) is retained for
 # describing pre-trends and the post-1994 ramp, not as the headline figure.
 #
