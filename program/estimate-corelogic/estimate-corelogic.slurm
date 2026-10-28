@@ -95,6 +95,13 @@ for script in "${SCRIPTS[@]}"; do
     find "$private_dir" -maxdepth 1 -type f \
         \( -name '*.csv' -o -name '*.pdf' -o -name '*.png' -o -name '*.json' -o -name '*.tex' \) \
         -exec cp {} "$export_dir/" \;
+    # Robustness subfolder (Florida excluded), same aggregate-only filter.
+    if [ -d "$private_dir/no-florida" ]; then
+        mkdir -p "$export_dir/no-florida"
+        find "$private_dir/no-florida" -maxdepth 1 -type f \
+            \( -name '*.csv' -o -name '*.pdf' -o -name '*.png' -o -name '*.json' -o -name '*.tex' \) \
+            -exec cp {} "$export_dir/no-florida/" \;
+    fi
     printf 'job: %s\ncommit: %s\nprivate_results: %s\n' "$SLURM_JOB_ID" \
         "$(git rev-parse HEAD 2>/dev/null || echo unknown)" "$private_dir" \
         > "$export_dir/remote-run.txt"
