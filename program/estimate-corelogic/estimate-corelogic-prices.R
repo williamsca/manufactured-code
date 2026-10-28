@@ -102,7 +102,7 @@ dt_nofl <- dt[statefp != "12"]
 mh_nofl <- dt_nofl[mh == 1]
 mh_nofl_tab <- cl_mh_only_coefficients(
     feols(cl_mh_only_formula(state = TRUE), mh_nofl, vcov = ~countyfp, mem.clean = TRUE, lean = TRUE),
-    "mh_only_dynamic_state_vintage_fe_no_florida")
+    "mh_only_dynamic_no_florida_state_vintage_fe")
 fwrite(mh_nofl_tab, file.path(out_nofl, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_mh_only_paper_plot(mh_nofl_tab, out_nofl)
 ladder_nofl <- cl_price_static_fits(dt_nofl)

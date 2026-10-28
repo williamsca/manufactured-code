@@ -75,7 +75,7 @@ out_nofl <- file.path(out_dir, "no-florida"); dir.create(out_nofl)
 quantity_nofl_tab <- cl_mh_only_coefficients(
     fepois(cl_mh_only_formula(quantity = TRUE, state = TRUE, reference = reference), quantity[statefp != "12"],
         vcov = ~countyfp, mem.clean = TRUE, lean = TRUE),
-    "mh_only_quantity_dynamic_state_vintage_fe_no_florida", dynamic_years, reference)
+    "mh_only_quantity_dynamic_no_florida_state_vintage_fe", dynamic_years, reference)
 fwrite(quantity_nofl_tab, file.path(out_nofl, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 cl_mh_only_paper_plot(quantity_nofl_tab, out_nofl, quantity = TRUE)
 ladder_nofl <- cl_mh_static_fits(type_counts[statefp != "12"], quantity = TRUE)
