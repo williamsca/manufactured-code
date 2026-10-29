@@ -264,9 +264,11 @@ cl_mh_only_compare_plot <- function(tab, tab_state, out_dir, quantity = FALSE,
 # (winsorized dollars), log_price, or homes (PPML counts). ddd = FALSE is the MH-only
 # DiD (dynamic static column 2); ddd = TRUE adds site-built homes with mh_z terms and
 # type-specific FE (dynamic price column 5; for counts, the analogous count DDD).
-cl_type_es_formula <- function(outcome, ddd = FALSE, reference = 1993L) {
+cl_type_es_formula <- function(outcome, ddd = FALSE, reference = 1993L, size = FALSE) {
+    stopifnot(!size || ddd)
     terms <- c("z2", "z3", if (ddd) c("mh_z2", "mh_z3"))
     rhs <- paste(sprintf("i(year_constr, %s, ref = %d)", terms, reference), collapse = " + ")
+    if (size) rhs <- paste(rhs, "+ log_living_area + log_lot_size + mh:log_living_area + mh:log_lot_size")
     place <- if (outcome == "homes") "countyfp" else "countyfp^year_sale"
     fe <- if (ddd) paste0(place, "^mh + statefp^year_constr^mh") else paste(place, "+ statefp^year_constr")
     as.formula(paste(outcome, "~", rhs, "|", fe))

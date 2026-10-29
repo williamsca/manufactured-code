@@ -90,17 +90,24 @@ dt[, `:=`(mh_z2 = mh * z2, mh_z3 = mh * z3)]
 ddd_series <- c("MH minus site-built", "Site-built", "MH")
 type_es <- list(
     level_es_did = list(outcome = "price_level_w", ddd = FALSE),
-    level_es_ddd = list(outcome = "price_level_w", ddd = TRUE),
-    log_es_ddd = list(outcome = "log_price", ddd = TRUE))
+    level_es_ddd = list(outcome = "price_level_w", ddd = TRUE, keep = "MH minus site-built"),
+    log_es_ddd = list(outcome = "log_price", ddd = TRUE, plot = FALSE),
+    log_es_ddd_size = list(outcome = "log_price", ddd = TRUE, size = TRUE, plot = FALSE))
 type_es_tab <- rbindlist(lapply(names(type_es), function(id) {
     spec <- type_es[[id]]
-    m <- feols(cl_type_es_formula(spec$outcome, spec$ddd), if (spec$ddd) dt else dt[mh == 1],
+    d <- if (isTRUE(spec$size)) dt[valid_size == TRUE] else if (spec$ddd) dt else dt[mh == 1]
+    m <- feols(cl_type_es_formula(spec$outcome, spec$ddd, size = isTRUE(spec$size)), d,
         vcov = ~countyfp, mem.clean = TRUE)
     models[[id]] <<- summary(m, lean = TRUE)
     tab <- cl_type_es_coefficients(m, id, spec$ddd)[, outcome := spec$outcome]
-    cl_type_es_plot(tab, out_dir, id, spec$outcome, keep = if (spec$ddd) ddd_series else "MH")
+    if (!isFALSE(spec$plot)) cl_type_es_plot(tab, out_dir, id, spec$outcome,
+        keep = if (!is.null(spec$keep)) spec$keep else if (spec$ddd) ddd_series else "MH")
     tab
 }))
+# Log DDD figure: the triple interaction without and with lot size and living area controls.
+size_labels <- c(log_es_ddd = "Baseline", log_es_ddd_size = "Controls for lot size and living area")
+cl_type_es_plot(type_es_tab[series == "MH minus site-built" & specification %in% names(size_labels)][,
+    series := size_labels[specification]], out_dir, "log_es_ddd", "log_price", keep = unname(size_labels))
 fwrite(type_es_tab, file.path(out_dir, "type_es_coefficients.csv"))
 # Robustness: drop Florida, whose 1999 installation rules and 2002 building code
 # may change MH prices independently of the 1994 standard.
