@@ -1,5 +1,17 @@
 # CoreLogic vintage prices
 
+## County-by-vintage DDD and linked event study (October 29, 2026)
+
+The fourth slide column adds county x construction-vintage fixed effects to
+county x sale-year x type and state x vintage x type effects, without size
+controls. The site-built zone x post terms are absorbed. The estimator exports
+this fit as `mh_county_vintage.csv` and includes it in all four boxed slide
+tables. DDD static columns use the observations retained under this stricter
+FE specification so comparisons preserve N. The original six-column paper
+ladder remains available. The appendix DDD event study uses `log_es_ddd.pdf`
+(baseline and size-adjusted curves), with links in both directions from the
+static slide.
+
 ## Common size-valid sample and slide exports (October 29, 2026)
 
 Every price, area-outcome, event-study and no-Florida model now requires

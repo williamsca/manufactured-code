@@ -164,9 +164,18 @@ stopifnot(any(grepl("Size controls", size_lines, fixed = TRUE)),
     sum(grepl("^ *Zone II \\$\\\\times\\$ post *&", size_lines)) == 1L,
     sum(grepl("^ *Zone III \\$\\\\times\\$ post \\$\\\\times\\$ MH *&", size_lines)) == 1L,
     !any(grepl("County $\\times$ vintage", size_lines, fixed = TRUE)))
+# A shared county-vintage quality shock is absorbed by the saturated DDD.
+saturated_fixture <- copy(size_fixture)
+saturated_fixture[, log_price := 10 + county / 10 + .2 * mh + .03 * year_sale +
+    .02 * year_constr * (1 + mh) + .2 * post_mh_z2 - .1 * post_mh_z3 +
+    .07 * county * wind_zone * post]
+saturated_fit <- cl_price_static_fits(saturated_fixture)$county_vintage
+stopifnot(max(abs(coef(saturated_fit)[c("post_mh_z2", "post_mh_z3")] - c(.2, -.1))) < 1e-7,
+    !any(c("post_z2", "post_z3") %in% names(coef(saturated_fit))),
+    nobs(size_fits$county_vintage) == nobs(size_fits$fits[[5]]))
 slide_dir <- tempfile(); dir.create(slide_dir)
 cl_price_slide_tables(size_fits, slide_dir)
-for (j in 1:3) {
+for (j in 1:4) {
     slide_lines <- readLines(file.path(slide_dir, sprintf("mh_static_ladder_slides_%d.tex", j)))
     stopifnot(any(grepl("Fit statistics", slide_lines, fixed = TRUE)),
         any(grepl("R$^2$", slide_lines, fixed = TRUE)),

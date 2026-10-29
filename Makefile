@@ -42,6 +42,8 @@ slides.pdf: slides.tex manufactured-code.bib output/slide-numbers.tex \
 	output/corelogic/prices/mh_static_ladder_slides_1.tex \
 	output/corelogic/prices/mh_static_ladder_slides_2.tex \
 	output/corelogic/prices/mh_static_ladder_slides_3.tex \
+	output/corelogic/prices/mh_static_ladder_slides_4.tex \
+	output/corelogic/prices/log_es_ddd.pdf \
 	output/corelogic/prices/mh_only_vintage_prices_slides.pdf \
 	output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf
 	pdflatex slides

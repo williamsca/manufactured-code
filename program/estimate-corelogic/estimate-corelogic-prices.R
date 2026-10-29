@@ -66,6 +66,9 @@ cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
 ladder <- cl_price_static_fits(dt)
 cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"))
 cl_price_slide_tables(ladder, out_dir)
+fwrite(cl_coeftable(ladder$county_vintage, "county_vintage_ddd")[,
+    counties := ladder$county_vintage_counties], file.path(out_dir, "mh_county_vintage.csv"))
+models[["county_vintage_ddd"]] <- ladder$county_vintage
 fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder$fits[[k]], paste0("ladder_", k))[,
     counties := ladder$counties[k]])), file.path(out_dir, "mh_static_ladder.csv"))
 fwrite(rbindlist(lapply(names(ladder$common_sample), function(id)
@@ -136,6 +139,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     no_florida_robustness = "State x vintage FE event study and six-column static ladder with Florida (statefp 12) dropped; written to no-florida/",
     mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     paper_figure_specification = "mh_only_dynamic_state_vintage_fe",
+    county_vintage_ddd = "No size controls; county x sale year x type, county x construction vintage, and state x vintage x type FE; DDD columns share retained observations",
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
     size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values required in every model, no upper trimming or imputation; static columns share retained observations within housing-type sample",
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
