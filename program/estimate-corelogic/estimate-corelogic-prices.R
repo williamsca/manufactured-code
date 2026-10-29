@@ -16,6 +16,11 @@ dt <- cl_price_sample()
 dt <- merge(dt, wz[, .(countyfp, wind_zone)], by = "countyfp", all.x = TRUE, sort = FALSE)
 fwrite(dt[is.na(wind_zone), .(sales = .N), by = .(countyfp, mh)], file.path(out_dir, "unmatched_counties.csv"))
 dt <- dt[!is.na(wind_zone)]
+# Every price, area and robustness model uses valid dedicated living and lot area.
+dt <- cl_price_size_controls(dt)
+fwrite(dt[, .(sales = .N, size_valid_sales = sum(valid_size)),
+    by = .(wind_zone, mh, year_constr)], file.path(out_dir, "size_sample_coverage.csv"))
+dt <- dt[valid_size == TRUE]
 dt[, post := as.integer(year_constr >= 1994)]
 # Transaction-weighted dollar bases for interpreting the log-price estimates.
 # Keep these on the matched sale sample, before fixed-effect singleton removal.
@@ -57,13 +62,10 @@ models[["mh_only_dynamic_state_vintage_fe"]] <- mh_state_model
 cl_mh_only_paper_plot(mh_state_tab, out_dir, forecast = forecast)
 cl_mh_only_paper_plot(mh_state_tab, out_dir, slides = TRUE, forecast = forecast)
 cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
-# Size-adjusted static variants use positive dedicated living area and lot area.
-dt <- cl_price_size_controls(dt)
-fwrite(dt[, .(sales = .N, size_valid_sales = sum(valid_size)),
-    by = .(wind_zone, mh, post)], file.path(out_dir, "size_sample_coverage.csv"))
 # Three MH DiDs followed by three housing-type DDDs; the third of each adds size.
 ladder <- cl_price_static_fits(dt)
 cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"))
+cl_price_slide_tables(ladder, out_dir)
 fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder$fits[[k]], paste0("ladder_", k))[,
     counties := ladder$counties[k]])), file.path(out_dir, "mh_static_ladder.csv"))
 fwrite(rbindlist(lapply(names(ladder$common_sample), function(id)
@@ -77,7 +79,7 @@ cl_mh_static_table(ladder_level, file.path(out_dir, "mh_static_ladder_level.tex"
 fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder_level$fits[[k]], paste0("ladder_level_", k))[,
     counties := ladder_level$counties[k]])), file.path(out_dir, "mh_static_ladder_level.csv"))
 models[paste0("mh_static_ladder_level_", 1:6)] <- ladder_level$fits
-# Alchian-Allen: log living area as the outcome, on sales with positive living area.
+# Alchian-Allen: log living area as the outcome, on the common valid-size sale sample.
 # Four columns (MH DiD, MH/SB DDD); size controls are omitted because size is the outcome.
 ladder_area <- cl_price_static_fits(dt, outcome = "log_living_area", size_columns = FALSE, valid = "valid_living")
 cl_mh_static_table(ladder_area, file.path(out_dir, "mh_static_ladder_area.tex"))
@@ -135,10 +137,10 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     paper_figure_specification = "mh_only_dynamic_state_vintage_fe",
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
-    size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values only, no upper trimming or imputation; adjusted columns only",
+    size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values required in every model, no upper trimming or imputation; static columns share retained observations within housing-type sample",
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
     mh_static_ladder_level = "Same six columns as mh_static_ladder with the 2000-dollar sale price in levels, winsorized at the 1st and 99th percentiles within housing type on the matched sale sample",
-    mh_static_ladder_area = "Same specifications as columns (1), (2), (4), (5) of mh_static_ladder with log dedicated living area (2023 snapshot) as the outcome, on sales with positive finite living area; no size controls",
+    mh_static_ladder_area = "Same specifications as columns (1), (2), (4), (5) of mh_static_ladder with log dedicated living area (2023 snapshot) as the outcome, on the common valid living-area and lot-size sample; no size controls",
     sale_window = range(CL_SALE_YEARS), construction_window = range(CL_VINTAGES), reference_vintage = 1993L,
     existing_homes_only = all(dt$year_sale > dt$year_constr),
     vintage_1994 = sprintf("Own annual coefficient; included in static post (1994-%d)", max(CL_VINTAGES)),

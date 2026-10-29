@@ -217,7 +217,7 @@ Table \ref{tab:cost-static} reports the static price estimates under various spe
 
 The last three columns report the triple-difference estimates. These models suggest that site-built home prices also changed after 1994 in treated counties. The additional change for MH in Zone III is positive but not generally significant at conventional levels.
 
-Columns (3) and (6) use fewer observations because they require non-missing living area and lot size.
+All price specifications require positive, finite living area and lot size. Columns (1)--(3) use the same retained MH observations, and columns (4)--(6) use the same retained MH and site-built observations; adding size controls therefore does not change the sample.
 
 Let $\hat b^{III}$ denote the Zone III coefficient for manufactured homes in each specification. To express these log-price estimates in dollars, I multiply $\exp(\hat b^{III})-1$ by the mean transaction price of Zone III manufactured homes built in `r cl_p_y0`--1993, which is `r cl_price_base` in 2000 dollars. The baseline estimate, column (2), implies a premium of `r cl_premium`; across the four specifications without size controls, the dollar equivalents range from `r cl_premium_lo` to `r cl_premium_hi`.
 

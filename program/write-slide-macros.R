@@ -288,6 +288,15 @@ mac("vClaimRateSbPct", fmt_f(get_ss("claim_rate_sb") * 100, 1))
 cl_sc <- fread(here("output", "cost-benefit", "corelogic-comparison-scalars.csv"))
 mac("vClFloodPV", fmt_draw(get_one(cl_sc, "gross_pv")))
 
+# Resale valuation: use the same land-inclusive reference price as the paper.
+price_sc <- fread(here("output", "corelogic", "prices", "mh_static_ladder.csv"))
+adjusted <- price_sc[specification == "ladder_6" & term == "post_mh_z3"]
+stopifnot(nrow(adjusted) == 1L)
+cl_price_base <- get_one(cl_sc, "price_base")
+mac("vClPriceBase", fmt_draw(cl_price_base))
+mac("vClPriceAdjustedPct", fmt_f(100 * expm1(adjusted$estimate), 1))
+mac("vClPriceAdjustedDollars", fmt_draw(cl_price_base * expm1(adjusted$estimate)))
+
 out_path <- here("output", "slide-numbers.tex")
 
 header <- c(

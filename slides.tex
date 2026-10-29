@@ -8,7 +8,7 @@
 
 \documentclass[11pt,xcolor={dvipsnames},hyperref={pdftex,pdfpagemode=UseNone,hidelinks,pdfdisplaydoctitle=true},usepdftitle=false,aspectratio=169]{beamer}
 \usepackage{tikz}
-\usetikzlibrary{positioning}
+\usetikzlibrary{positioning,matrix,shapes,arrows,fit,tikzmark}
 \definecolor{mandateCost}{HTML}{D55E00}
 
 \usepackage{presentation}
@@ -195,7 +195,7 @@
         \item wildfire codes in California, accounting for risk misperception and spillovers \gc{\citep{baylis_mandated_2026}}
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} quasi-experimental evidence on \al{WTP} and \al{$\Delta Q$} from the 1994 HUD reform leveraging 
+    \hspace{1em} \so \textbf{New:} quasi-experimental evidence on \al{WTP} and \al{$\Delta Q$} from the 1994 HUD reform
 
     \vspace{0.7em}
 
@@ -204,7 +204,7 @@
         \item designs relying on across-vintage or across-location comparisons 
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} compare vintages across wind zones, with site-built homes as an additional comparison
+    \hspace{1em} \so \textbf{New:} estimate capitalized \al{WTP} by comparing vintage price gaps across wind zones and housing types
 
     \vspace{0.7em}
 
@@ -255,7 +255,7 @@
 
     \textbf{The institutional feature that makes this work:} the HUD Code is a \al{federal} standard that \al{preempts} state and local regulation.
 
-    \gc{Site-built homes in the same county remain under state and local codes \so\ a clean comparison group.}
+    \gc{Site-built homes in the same county remain under state and local codes, providing an additional comparison group.}
 
 \end{frame}
 
@@ -289,10 +289,52 @@
 \begin{frame}
     \frametitle{Roadmap}
     \begin{enumerate}\setlength{\itemsep}{2.5em}
-        \item Quantities ($\Delta Q > 0$ \iff\ $\text{WTP} > \text{Cost}$)
-        \item Willingness to Pay
+        \item Willingness to pay: capitalization in resale prices
+        \item Does willingness to pay cover the cost? Quantities
         \item Reductions in flood damage
     \end{enumerate}
+\end{frame}
+
+\begin{frame}[t]
+    \frametitle{How much do buyers value the additional protection?}
+    \textbf{Estimate capitalized willingness to pay using three comparisons:}
+
+    \vspace{0.8em}
+    \begin{enumerate}\setlength{\itemsep}{1em}
+        \item<1-> Compare pre- and post-1994 manufactured homes sold in the \al{same county and year}.
+        \item<2-> Compare that vintage price gap \al{across wind zones}.
+        \item<3-> Subtract the corresponding vintage price gap for \al{site-built homes}.
+    \end{enumerate}
+
+    \vspace{0.8em}
+    \uncover<3->{Site-built homes help separate mandated protection from local changes in construction quality across vintages.}
+
+    \vfill
+    \gc{Post refers to construction vintage. Under capitalization and parallel counterfactual vintage profiles, the premium measures proportional WTP. Framework in the \href{paper.pdf}{paper}, Section 3.1.}
+\end{frame}
+
+\begin{frame}[t]
+    \frametitle{Post-1994 manufactured homes command a premium in Zone III}
+    \centering
+    \only<1>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_1.tex}}}
+    \only<2>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_2.tex}}}
+    \only<3>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_3.tex}}}
+
+    \vspace{0.2em}
+    \begin{overlayarea}{\linewidth}{0.12\textheight}
+    \small
+    \only<1>{\textbf{MH comparison:} account for county housing markets and state-specific vintage profiles.}
+    \only<2>{\textbf{Add site-built homes:} account for the local vintage gap in a second housing type.}
+    \only<3>{\textbf{Add size controls:} the Zone III premium is \al{\vClPriceAdjustedPct\%}, or about \al{\$\vClPriceAdjustedDollars} at the reference price.}
+    \end{overlayarea}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Does willingness to pay cover the cost?}
+    The resale premium suggests buyers value the mandated protection.
+
+    \vspace{1.5em}
+    The quantity response helps assess whether that value \al{exceeds its cost}.
 \end{frame}
 
 \begin{frame}
@@ -336,7 +378,7 @@
 
     \begin{table}
     \centering
-    \resizebox*{!}{0.95\textheight}{\input{output/corelogic/quantities/mh_static_ladder.tex}}
+    \resizebox{\linewidth}{!}{\input{output/corelogic/quantities/mh_static_ladder.tex}}
     \end{table}
 \end{frame}
 
@@ -348,15 +390,9 @@
     Under the identifying assumptions, buyers at the margin valued the additional resilience \al{less than its cost}.
 
     \vspace{1em}
-    \textbf{Two supporting checks:} willingness to pay in resale prices, and expected flood-damage reductions.
+    \textbf{Next:} flood-damage reductions quantify one source of the protection buyers value.
 \end{frame}
 
-\begin{frame}
-    \frametitle{Resale prices: little evidence of substantial willingness to pay}
-    \includegraphics[width=\linewidth,height=0.74\textheight,keepaspectratio]{output/corelogic/prices/mh_only_vintage_prices_slides.pdf}
-
-    \gc{Capitalized private valuation across benefit channels; estimates are imprecise and sensitive to specification.}
-\end{frame}
 
 %% ============================================================
 %% EMPIRICAL STRATEGY
@@ -520,7 +556,7 @@
     \frametitle{Private returns to mandated adaptation}
     \begin{enumerate}\setlength{\itemsep}{1em}
         \item The quantity decline indicates \al{negative net private benefits at the margin} from the 1994 wind standard.
-        \item Resale valuations and expected flood-damage reductions point toward \al{small private benefits}.
+        \item Positive resale premiums suggest buyers \al{value the protection}; quantity declines suggest that valuation \al{falls short of its cost}.
         \item The social case also depends on disaster assistance and spillovers to others. Private returns alone do not settle that question.
     \end{enumerate}
 \end{frame}
@@ -549,6 +585,19 @@
 
 \begin{frame}
     \heading{Appendix}
+\end{frame}
+
+\begin{frame}[t]
+    \frametitle{Resale prices: all static specifications}
+    \centering
+    \resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder.tex}}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Resale prices: construction-vintage event study}
+    \includegraphics[width=\linewidth,height=0.74\textheight,keepaspectratio]{output/corelogic/prices/mh_only_vintage_prices_slides.pdf}
+
+    \gc{MH-only comparison across wind zones, with state $\times$ construction-year fixed effects. Reference vintage: 1993.}
 \end{frame}
 
 \begin{frame}[t]

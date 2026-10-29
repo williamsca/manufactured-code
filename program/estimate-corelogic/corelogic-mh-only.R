@@ -180,18 +180,27 @@ cl_mh_static_fits <- function(x, quantity = FALSE) {
 }
 
 # Three price variants per design: common vintage, state x vintage, and
-# state x vintage plus size. Keep full samples for unadjusted columns.
+# state x vintage plus size. Use the same retained observations within each design.
 # `outcome` is log_price for the main table or price_level_w for the levels table.
 # size_columns = FALSE drops the size-adjusted columns (four columns), for size outcomes;
 # `valid` names a logical column restricting every column to the outcome's valid sample.
 cl_price_static_fits <- function(x, outcome = "log_price", size_columns = TRUE, valid = NULL) {
+    x <- x[valid_size == TRUE & is.finite(log_living_area) & is.finite(log_lot_size)]
+    if (!is.null(valid)) x <- x[get(valid) == TRUE]
+    # Remove singletons under the most demanding FE specification first, so
+    # changing FE or adding controls cannot change N within either design.
+    samples <- lapply(c(FALSE, TRUE), function(ddd) {
+        d <- if (ddd) x else x[mh == 1]
+        support <- feols(cl_mh_static_formula(if (ddd) 4L else 2L, outcome = outcome),
+            d, vcov = ~countyfp, mem.clean = TRUE)
+        d[obs(support)]
+    })
     original <- if (size_columns) c(1L, 2L, 2L, 3L, 4L, 4L) else 1:4
     n_col <- length(original)
     fits <- list(); counties <- integer(n_col)
     common <- list()
     for (k in seq_len(n_col)) {
-        d <- if (k <= n_col / 2) x[mh == 1] else x
-        if (!is.null(valid)) d <- d[get(valid) == TRUE]
+        d <- samples[[if (k <= n_col / 2) 1L else 2L]]
         adjusted <- size_columns && k %in% c(3L, 6L)
         if (adjusted) d <- d[valid_size == TRUE]
         m <- feols(cl_mh_static_formula(original[k], size = adjusted, outcome = outcome), d,
@@ -205,17 +214,31 @@ cl_price_static_fits <- function(x, outcome = "log_price", size_columns = TRUE, 
         }
         fits[[k]] <- summary(m, lean = TRUE)
     }
+    n <- vapply(fits, nobs, integer(1))
+    stopifnot(uniqueN(n[seq_len(n_col / 2)]) == 1L,
+        uniqueN(n[(n_col / 2 + 1L):n_col]) == 1L)
     list(fits = fits, counties = counties, common_sample = common)
 }
 
-cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3") {
+cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3", slides = FALSE, highlight_column = NULL) {
     n_models <- length(res$fits)
     stopifnot(n_models == 4L || (!quantity && n_models == 6L))
     place <- if (quantity) "County" else "County $\\times$ sale year"
+    if (slides) {
+        stopifnot(!quantity, n_models == 6L)
+        selected <- c(2L, 5L, 6L)
+        res$fits <- res$fits[selected]
+        res$counties <- res$counties[selected]
+    }
+    highlight <- if (!is.null(highlight_column)) {
+        setNames(list(sprintf("%%post_z2@%d; %%post_mh_z3@%d", highlight_column, highlight_column)),
+            "square,thick3,orange,se")
+    } else NULL
     etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = digits,
+        se.below = FALSE, highlight = highlight,
         fitstat = c("n", if (quantity) "pr2" else "r2"),
         keep = "%post_", style.tex = style.tex(tablefoot = FALSE), depvar = FALSE,
-        headers = if (quantity) list("Outcome:" = list("MH" = 2, "Site-built" = 2)) else
+        headers = if (slides) list("Sample:" = c("MH", "MH and site-built", "MH and site-built")) else if (quantity) list("Outcome:" = list("MH" = 2, "Site-built" = 2)) else
             list("Sample:" = list("MH" = n_models / 2, "MH and site-built" = n_models / 2)),
         dict = c(post_z2 = "Zone II $\\times$ post", post_z3 = "Zone III $\\times$ post",
             post_mh_z2 = "Zone II $\\times$ post $\\times$ MH", post_mh_z3 = "Zone III $\\times$ post $\\times$ MH",
@@ -225,8 +248,16 @@ cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3") {
             "mh^year_constr" = "Type $\\times$ vintage",
             "statefp^year_constr^mh" = "State $\\times$ vintage $\\times$ type"),
         extralines = c(list("Counties" = format(res$counties, big.mark = ",")),
-            if (n_models == 6L) list("Size controls" = c("No", "No", "Yes", "No", "No", "Yes"))),
+            if (slides) list("Size controls" = c("No", "No", "Yes")) else
+                if (n_models == 6L) list("Size controls" = c("No", "No", "Yes", "No", "No", "Yes"))),
         notes = NULL)
+}
+
+# Export directly from fitted models; all columns stay visible and fixed in place.
+cl_price_slide_tables <- function(res, out_dir) {
+    for (j in 1:3) cl_mh_static_table(res,
+        file.path(out_dir, sprintf("mh_static_ladder_slides_%d.tex", j)),
+        slides = TRUE, highlight_column = j)
 }
 
 # Overlay vintage and state x vintage specifications, both in log points.

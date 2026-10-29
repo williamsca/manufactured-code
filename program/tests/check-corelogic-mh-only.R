@@ -152,8 +152,10 @@ for (k in c(3L, 6L)) {
     stopifnot(max(abs(target - c(.2, -.1))) < 1e-7,
         nobs(size_fits$fits[[k]]) == nobs(size_fits$common_sample[[paste0("common_sample_", k)]]))
 }
-stopifnot(nobs(size_fits$fits[[2]]) > nobs(size_fits$fits[[3]]),
-    nobs(size_fits$fits[[5]]) > nobs(size_fits$fits[[6]]),
+stopifnot(nobs(size_fits$fits[[1]]) == nobs(size_fits$fits[[2]]),
+    nobs(size_fits$fits[[2]]) == nobs(size_fits$fits[[3]]),
+    nobs(size_fits$fits[[4]]) == nobs(size_fits$fits[[5]]),
+    nobs(size_fits$fits[[5]]) == nobs(size_fits$fits[[6]]),
     abs(coef(size_fits$fits[[2]])[["post_z3"]] + .1) > .05)
 size_tex <- tempfile(fileext = ".tex")
 cl_mh_static_table(size_fits, size_tex)
@@ -162,6 +164,15 @@ stopifnot(any(grepl("Size controls", size_lines, fixed = TRUE)),
     sum(grepl("^ *Zone II \\$\\\\times\\$ post *&", size_lines)) == 1L,
     sum(grepl("^ *Zone III \\$\\\\times\\$ post \\$\\\\times\\$ MH *&", size_lines)) == 1L,
     !any(grepl("County $\\times$ vintage", size_lines, fixed = TRUE)))
+slide_dir <- tempfile(); dir.create(slide_dir)
+cl_price_slide_tables(size_fits, slide_dir)
+for (j in 1:3) {
+    slide_lines <- readLines(file.path(slide_dir, sprintf("mh_static_ladder_slides_%d.tex", j)))
+    stopifnot(any(grepl("Fit statistics", slide_lines, fixed = TRUE)),
+        any(grepl("R$^2$", slide_lines, fixed = TRUE)),
+        !any(grepl("^ *Vintage +&|^ *Type ", slide_lines)),
+        any(grepl("marker-", slide_lines, fixed = TRUE)))
+}
 cat("Six-column price table recovers size-adjusted premiums and compares identical retained samples.\n")
 
 # Levels table: caps are type-specific percentiles, and the ladder recovers

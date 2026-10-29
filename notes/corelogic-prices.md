@@ -1,5 +1,21 @@
 # CoreLogic vintage prices
 
+## Common size-valid sample and slide exports (October 29, 2026)
+
+Every price, area-outcome, event-study and no-Florida model now requires
+positive, finite dedicated living area and lot size. The static ladders also
+remove singletons under their most demanding fixed effects before fitting
+any column: columns 1--3 share retained MH sales and columns 4--6 share
+retained MH/site-built sales. Quantity estimates continue to count the full
+stock, rather than conditioning that population on sale-size coverage.
+
+The price estimator exports `mh_static_ladder_slides_1.tex` through `_3.tex`
+directly from fitted models. These show models 2, 5 and 6, all visible on
+every overlay, with a native `etable` box highlighting successive columns.
+SEs appear beside estimates; unused FE rows disappear automatically. The
+slide macro generator only handles quoted numbers, not table construction.
+
+
 ## Paper dollar conversion and benefit comparison (October 16, 2026)
 
 The price table now has three variants per design: common vintage effects,
