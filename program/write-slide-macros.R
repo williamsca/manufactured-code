@@ -292,7 +292,9 @@ mac("vClFloodPV", fmt_draw(get_one(cl_sc, "gross_pv")))
 price_sc <- fread(here("output", "corelogic", "prices", "mh_static_ladder.csv"))
 adjusted <- price_sc[specification == "ladder_6" & term == "post_mh_z3"]
 stopifnot(nrow(adjusted) == 1L)
-cl_price_base <- get_one(cl_sc, "price_base")
+price_summary <- fread(here("output", "corelogic", "prices", "mh_price_summary.csv"))
+cl_price_base <- price_summary[wind_zone == 3 & post == 0, mean_2000]
+stopifnot(length(cl_price_base) == 1L, is.finite(cl_price_base), cl_price_base > 0)
 mac("vClPriceBase", fmt_draw(cl_price_base))
 mac("vClPriceAdjustedPct", fmt_f(100 * expm1(adjusted$estimate), 1))
 mac("vClPriceAdjustedDollars", fmt_draw(cl_price_base * expm1(adjusted$estimate)))

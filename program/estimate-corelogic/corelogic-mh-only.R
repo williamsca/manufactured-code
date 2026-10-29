@@ -231,7 +231,8 @@ cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3", slide
         res$counties <- res$counties[selected]
     }
     highlight <- if (!is.null(highlight_column)) {
-        setNames(list(sprintf("%%post_z2@%d; %%post_mh_z3@%d", highlight_column, highlight_column)),
+        last_term <- if (highlight_column == 1L) "post_z3" else "post_mh_z3"
+        setNames(list(sprintf("%%post_z2@%d; %%%s@%d", highlight_column, last_term, highlight_column)),
             "square,thick3,orange,se")
     } else NULL
     etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = digits,

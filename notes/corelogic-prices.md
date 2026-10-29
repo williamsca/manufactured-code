@@ -16,6 +16,14 @@ SEs appear beside estimates; unused FE rows disappear automatically. The
 slide macro generator only handles quoted numbers, not table construction.
 
 
+Rivanna job 22157275 completed both price and quantity estimation successfully.
+The six-column log-price table has 294,529 retained MH sales in columns 1--3
+and 8,709,195 retained MH/site-built sales in columns 4--6. The selected
+Zone III premiums (columns 2, 5, 6) are 5.07%, 8.98%, and 7.33%. The revised
+reference mean is $87,844.08; the adjusted premium converts to $6,437.57 in
+2000 dollars. Table highlights were subsequently re-exported from this run's
+saved fits to correct the first box's endpoint; estimates are unchanged.
+
 ## Paper dollar conversion and benefit comparison (October 16, 2026)
 
 The price table now has three variants per design: common vintage effects,
