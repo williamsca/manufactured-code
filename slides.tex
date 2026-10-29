@@ -313,14 +313,14 @@
     \gc{Post refers to construction vintage. Under capitalization and parallel counterfactual vintage profiles, the premium measures proportional WTP. Framework in the \href{paper.pdf}{paper}, Section 3.1.}
 \end{frame}
 
-\begin{frame}[t,label=frame:price-static]
+\begin{frame}[t]\label{frame:price-static}
     \frametitle{Post-1994 manufactured homes command a premium in Zone III}
     \centering
     \vspace{-1em}
-    \only<1>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_1.tex}}}%
-    \only<2>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_2.tex}}}%
-    \only<3>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_3.tex}}}%
-    \only<4>{\resizebox{\linewidth}{!}{\input{output/corelogic/prices/mh_static_ladder_slides_4.tex}}}%
+    \only<1>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_1.tex}}}%
+    \only<2>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_2.tex}}}%
+    \only<3>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_3.tex}}}%
+    \only<4>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_4.tex}}}%
 
     \vspace{-.5em}
     \begin{overlayarea}{\linewidth}{0.12\textheight}
@@ -329,8 +329,8 @@
     \only<2>{\textbf{Add site-built homes:} account for the local vintage gap in a second housing type.}
     \only<3>{\textbf{Add size controls:} the Zone III premium is \al{\vClPriceAdjustedPct\%}, or about \al{\$\vClPriceAdjustedDollars} at the reference price.}
     \only<4>{\textbf{County-specific vintage profiles:} absorb local quality changes shared across housing types.}
+    \par\hfill \hyperlink{frame:price-ddd-es}{\beamerbutton{event study}}
     \end{overlayarea}
-    \hfill \hyperlink{frame:price-ddd-es}{\beamerbutton{event study}}
 \end{frame}
 
 \begin{frame}
@@ -597,7 +597,7 @@
     \resizebox*{!}{0.78\textheight}{\input{output/corelogic/prices/mh_static_ladder.tex}}
 \end{frame}
 
-\begin{frame}[label=frame:price-ddd-es]
+\begin{frame}\label{frame:price-ddd-es}
     \frametitle{Resale prices: triple-difference event study}
     \includegraphics[width=\linewidth,height=0.74\textheight,keepaspectratio]{output/corelogic/prices/log_es_ddd.pdf}
 
