@@ -34,6 +34,7 @@ fwrite(quantity_tab, file.path(out_dir, "mh_only_vintage_coefficients.csv"))
 fwrite(quantity, file.path(out_dir, "mh_counts_by_county_vintage.csv"))
 fwrite(quantity[, .(mh_homes = sum(mh_homes), counties = .N, zero_cells = sum(mh_homes == 0)),
     by = .(wind_zone, year_constr)], file.path(out_dir, "mh_counts_by_vintage.csv"))
+cl_raw_count_plot(fread(file.path(out_dir, "mh_counts_by_vintage.csv")), out_dir)
 models[["mh_only_quantity_dynamic"]] <- quantity_model
 # Main paper figure: state x vintage FE, so zone contrasts use within-state variation.
 # Florida has no Zone I county, so it informs III minus II but not either contrast with Zone I.

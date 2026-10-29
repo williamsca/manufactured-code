@@ -1674,4 +1674,6 @@ when redrawing existing exports. No re-normalization or estimation is performed.
 The price benchmark is `log1p(HUD_private_benefit_2000 / zone_pre_price_mean)`,
 where HUD private benefits combine the single-/multi-section weighted private
 loss-benefit PV and mortality/injury-benefit PV. Production costs and fiscal
-benefits are excluded. See `program/cost-benefit/hud-benefit-forecast.R`.
+benefits are excluded. The benefit in 2000 dollars is built by `program/import/databuild-hud-benefit.R`
+(`derived/hud-benefit-2000.csv`, copied to the Rivanna public-reference directory);
+the log gap is computed in `estimate-corelogic-prices.R` from the job'"'"'s own prices.

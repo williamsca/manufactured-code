@@ -58,5 +58,10 @@ synthetic check, then writes all output to a new private directory
 repoints `<name>/current` to it. Only CSV, PDF, PNG, JSON, and LaTeX files are
 exported; parquet files and fitted models stay on Rivanna.
 
+The price job also reads `hud-benefit-2000.csv` from the public reference
+directory. Build it with `Rscript program/import/databuild-hud-benefit.R` and copy
+it once (again after any change to its inputs):
+`rsync derived/hud-benefit-2000.csv chv7bg@login.hpc.virginia.edu:/scratch/chv7bg/manufactured-code/public-reference/`
+
 `Rscript program/estimate-corelogic/replot-corelogic.R` redraws the CoreLogic
 figures locally from the exported coefficient files.

@@ -19,7 +19,7 @@ for (analysis in c("prices", "quantities")) {
     years <- sort(unique(c(reference,
         as.integer(sub("year_constr::([0-9]+):.*", "\\1", tab_state$term)))))
     if (quantity) CL_QUANTITY_VINTAGES <- years else CL_VINTAGES <- years
-    forecast <- if (quantity) NULL else fread(here("output", "cost-benefit", "hud-benefit-forecast.csv"))
+    forecast <- if (quantity) NULL else fread(here("output", "corelogic", "prices", "hud-benefit-forecast.csv"))
     cl_mh_only_paper_plot(tab_state, out_dir, quantity = quantity,
                           forecast = forecast, slides = TRUE, reference = reference)
     if (!slides_only) {

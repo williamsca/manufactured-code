@@ -108,6 +108,26 @@ cl_mh_only_paper_plot <- function(tab, out_dir, quantity = FALSE, forecast = NUL
     invisible(p)
 }
 
+# Raw surviving MH counts by construction year, one panel per wind zone.
+cl_raw_count_plot <- function(counts, out_dir) {
+    x <- copy(counts)
+    stopifnot(!anyDuplicated(x, by = c("wind_zone", "year_constr")),
+        all(is.finite(x$mh_homes)), all(x$mh_homes >= 0))
+    x[, zone := factor(wind_zone, levels = 1:3, labels = c("Zone I", "Zone II", "Zone III"))]
+    p <- ggplot(x, aes(year_constr, mh_homes)) +
+        geom_vline(xintercept = 1994.5, linetype = "dashed", color = "gray45") +
+        geom_line(color = "#0072B2", linewidth = 0.7) +
+        geom_point(color = "#0072B2", size = 1.7) +
+        facet_wrap(~zone, nrow = 1, scales = "free_y") +
+        scale_y_continuous(labels = scales::label_comma()) +
+        scale_x_continuous(breaks = seq(1990, 1998, 2)) +
+        labs(x = "Construction year", y = "Surviving manufactured homes") +
+        theme_classic(base_size = 14) +
+        theme(panel.grid.major.y = element_line(color = "gray90"))
+    ggsave(file.path(out_dir, "mh_raw_counts_by_zone.pdf"), p, width = 10, height = 4)
+    invisible(p)
+}
+
 # MH and site-built counts by county x vintage over the MH-support counties of cl_mh_count_panel.
 cl_type_count_panel <- function(cells, years = CL_VINTAGES) {
     mh <- cl_mh_count_panel(cells, years)

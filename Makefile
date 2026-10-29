@@ -16,7 +16,6 @@ paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
 	output/descriptives/sumstats-corelogic.tex \
 	$(wildcard output/nfip/*.csv output/nfip/*.tex output/nfip/*.pdf) \
 	output/descriptives/sumstats-nfip-scalars.csv output/descriptives/sumstats-nfip.tex \
-	output/cost-benefit/hud-benefit-forecast.csv \
 	output/census/census-scalars.csv output/census/census-static-paper.tex \
 	output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex
 	Rscript -e "rmarkdown::render('$<')"
@@ -24,12 +23,6 @@ paper.pdf: paper.Rmd program/load-results.R manufactured-code.bib \
 output/descriptives/sumstats-corelogic.tex: program/descriptives/sumstats-corelogic.R \
 	$(CL_PAPER_INPUTS)
 	Rscript program/descriptives/sumstats-corelogic.R
-
-output/cost-benefit/hud-benefit-forecast.csv: program/cost-benefit/hud-benefit-forecast.R \
-	notes/hud-wind-forecasts.csv output/mhs/mhs-scalars.csv \
-	$(CL_PAPER_INPUTS) \
-	output/cost-benefit/hud-comparison-scalars.csv
-	Rscript program/cost-benefit/hud-benefit-forecast.R
 
 output/cost-benefit/corelogic-comparison-scalars.csv output/cost-benefit/corelogic-comparison.tex &: \
 	program/cost-benefit/estimate-corelogic-comparison.R $(CL_PAPER_INPUTS) \
@@ -56,10 +49,6 @@ output/descriptives/map-mhs-windzone-counties.pdf: program/descriptives/map.R \
 	program/import/project-params.R program/import/rd-client.R \
 	derived/mhs-state-treatment.Rds
 	Rscript program/descriptives/map.R
-
-output/corelogic/quantities/mh_raw_counts_by_zone.pdf: program/descriptives/plot-corelogic-quantity-counts.R \
-	output/corelogic/quantities/mh_counts_by_vintage.csv
-	Rscript program/descriptives/plot-corelogic-quantity-counts.R
 
 .PHONY: output/slide-numbers.tex
 output/slide-numbers.tex:
@@ -126,6 +115,7 @@ data:
 	Rscript program/import/databuild-nfip.R
 	Rscript program/import/databuild-nfip-policy.R
 	Rscript program/import/databuild-welfare.R
+	Rscript program/import/databuild-hud-benefit.R
 
 estimates:
 	Rscript program/descriptives/map.R
@@ -141,7 +131,6 @@ estimates:
 	Rscript program/cost-benefit/estimate-welfare.R
 	Rscript program/cost-benefit/estimate-hud-comparison.R
 	Rscript program/cost-benefit/estimate-corelogic-comparison.R
-	Rscript program/cost-benefit/hud-benefit-forecast.R
 
 # Work in progress, not in the paper.
 .PHONY: nfip-mh-only

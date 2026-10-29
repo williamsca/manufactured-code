@@ -366,8 +366,8 @@ cl_q_z3_lo <- formatC(cl_q_z3_late[1], format = "f", digits = 2)
 cl_q_z3_hi <- formatC(cl_q_z3_late[2], format = "f", digits = 2)
 
 # HUD's private benefit forecast as a log vintage price gap by wind zone
-# (program/cost-benefit/hud-benefit-forecast.R), drawn on the price event study.
-hud_fc <- fread(here("output", "cost-benefit", "hud-benefit-forecast.csv"))
+# (program/estimate-corelogic/estimate-corelogic-prices.R), drawn on the price event study.
+hud_fc <- fread(here("output", "corelogic", "prices", "hud-benefit-forecast.csv"))
 stopifnot(setequal(hud_fc$wind_zone, 2:3))
 hud_fc_z2 <- formatC(hud_fc[wind_zone == 2, forecast], format = "f", digits = 3)
 hud_fc_z3 <- formatC(hud_fc[wind_zone == 3, forecast], format = "f", digits = 3)

@@ -19,9 +19,18 @@ dt <- dt[!is.na(wind_zone)]
 dt[, post := as.integer(year_constr >= 1994)]
 # Transaction-weighted dollar bases for interpreting the log-price estimates.
 # Keep these on the matched sale sample, before fixed-effect singleton removal.
-fwrite(dt[mh == 1, .(sales = .N, mean_2000 = mean(sale_price_2000),
-    median_2000 = as.numeric(median(sale_price_2000))), by = .(wind_zone, post)],
-    file.path(out_dir, "mh_price_summary.csv"))
+price_summary <- dt[mh == 1, .(sales = .N, mean_2000 = mean(sale_price_2000),
+    median_2000 = as.numeric(median(sale_price_2000))), by = .(wind_zone, post)]
+fwrite(price_summary, file.path(out_dir, "mh_price_summary.csv"))
+# HUD forecast of the post- minus pre-reform log price gap, log(1 + b_z / P_z):
+# b_z is HUD's private benefit in 2000 dollars (program/import/databuild-hud-benefit.R),
+# P_z the mean 1989-1993 MH sale price in zone-z counties, land included.
+hud_b <- fread(file.path(ref, "hud-benefit-2000.csv"))
+forecast <- merge(hud_b, price_summary[post == 0, .(wind_zone, price_base = mean_2000)], by = "wind_zone")
+forecast[, forecast := log1p(benefit_2000 / price_base)]
+forecast[, comparison := fifelse(wind_zone == 2L, "Zone II minus Zone I", "Zone III minus Zone I")]
+stopifnot(nrow(forecast) == 2L, !anyNA(forecast), all(forecast$forecast > 0 & forecast$forecast < 0.5))
+fwrite(forecast, file.path(out_dir, "hud-benefit-forecast.csv"))
 fwrite(dt[, .(sales = .N, parcels = uniqueN(clip), counties = uniqueN(countyfp)),
     by = .(mh, year_constr)], file.path(out_dir, "sample_by_vintage.csv"))
 fwrite(dt[, .(sales = .N), by = .(mh, year_sale)], file.path(out_dir, "sample_by_sale_year.csv"))
@@ -45,12 +54,8 @@ mh_state_model <- feols(cl_mh_only_formula(state = TRUE), mh_sales, vcov = ~coun
 mh_state_tab <- cl_mh_only_coefficients(mh_state_model, "mh_only_dynamic_state_vintage_fe")
 fwrite(mh_state_tab, file.path(out_dir, "mh_only_vintage_coefficients_state_vintage_fe.csv"))
 models[["mh_only_dynamic_state_vintage_fe"]] <- mh_state_model
-# HUD forecast overlay (program/cost-benefit/hud-benefit-forecast.R), if synced.
-forecast_file <- here("output", "cost-benefit", "hud-benefit-forecast.csv")
-cl_mh_only_paper_plot(mh_state_tab, out_dir,
-    forecast = if (file.exists(forecast_file)) fread(forecast_file) else NULL)
-cl_mh_only_paper_plot(mh_state_tab, out_dir, slides = TRUE,
-    forecast = if (file.exists(forecast_file)) fread(forecast_file) else NULL)
+cl_mh_only_paper_plot(mh_state_tab, out_dir, forecast = forecast)
+cl_mh_only_paper_plot(mh_state_tab, out_dir, slides = TRUE, forecast = forecast)
 cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
 # Size-adjusted static variants use positive dedicated living area and lot area.
 dt <- cl_price_size_controls(dt)
