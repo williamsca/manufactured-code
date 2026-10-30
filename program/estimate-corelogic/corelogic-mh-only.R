@@ -185,12 +185,22 @@ cl_price_county_vintage_formula <- function(outcome = "log_price") {
         "countyfp^year_sale^mh + countyfp^year_constr + statefp^year_constr^mh"))
 }
 
+# DDD with county x sale-year effects common to both housing types; only the
+# vintage profile (state x vintage) differs by type.
+cl_price_county_year_formula <- function(outcome = "log_price") {
+    as.formula(paste(outcome, "~ post_z2 + post_z3 + post_mh_z2 + post_mh_z3 |",
+        "countyfp^year_sale + statefp^year_constr^mh"))
+}
+
 # Three price variants per design: common vintage, state x vintage, and
 # state x vintage plus size. Use the same retained observations within each design.
 # `outcome` is log_price for the main table or price_level_w for the levels table.
 # size_columns = FALSE drops the size-adjusted columns (four columns), for size outcomes;
 # `valid` names a logical column restricting every column to the outcome's valid sample.
-cl_price_static_fits <- function(x, outcome = "log_price", size_columns = TRUE, valid = NULL) {
+# county_year = TRUE also fits the DDD with county x sale-year effects not interacted with type,
+# on the same retained observations as the other DDD columns.
+cl_price_static_fits <- function(x, outcome = "log_price", size_columns = TRUE, valid = NULL,
+                                 county_year = FALSE) {
     x <- x[valid_size == TRUE & is.finite(log_living_area) & is.finite(log_lot_size)]
     if (!is.null(valid)) x <- x[get(valid) == TRUE]
     # Remove singletons under the most demanding FE specification first, so
@@ -225,9 +235,14 @@ cl_price_static_fits <- function(x, outcome = "log_price", size_columns = TRUE, 
     n <- vapply(fits, nobs, integer(1))
     stopifnot(uniqueN(n[seq_len(n_col / 2)]) == 1L,
         uniqueN(n[(n_col / 2 + 1L):n_col]) == 1L)
-    list(fits = fits, counties = counties, common_sample = common,
+    cy <- if (county_year) {
+        m <- feols(cl_price_county_year_formula(outcome), samples[[2]], vcov = ~countyfp, mem.clean = TRUE)
+        stopifnot(nobs(m) == n[n_col])
+        list(county_year = summary(m, lean = TRUE), county_year_counties = uniqueN(samples[[2]]$countyfp[obs(m)]))
+    }
+    c(list(fits = fits, counties = counties, common_sample = common,
         county_vintage = support_fits[[2]]$fit,
-        county_vintage_counties = uniqueN(samples[[2]]$countyfp))
+        county_vintage_counties = uniqueN(samples[[2]]$countyfp)), cy)
 }
 
 cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3", slides = FALSE, highlight_column = NULL) {
@@ -236,14 +251,13 @@ cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3", slide
     place <- if (quantity) "County" else "County $\\times$ sale year"
     if (slides) {
         stopifnot(!quantity, n_models == 6L)
-        selected <- c(2L, 5L, 6L)
-        res$fits <- c(res$fits[selected], list(res$county_vintage))
-        res$counties <- c(res$counties[selected], res$county_vintage_counties)
+        stopifnot(!is.null(res$county_year))
+        res$fits <- c(res$fits[2L], list(res$county_year), res$fits[5:6])
+        res$counties <- c(res$counties[2L], res$county_year_counties, res$counties[5:6])
     }
     highlight <- if (!is.null(highlight_column)) {
         last_term <- if (highlight_column == 1L) "post_z3" else "post_mh_z3"
-        first_term <- if (highlight_column == 4L) "post_mh_z2" else "post_z2"
-        setNames(list(sprintf("%%%s@%d; %%%s@%d", first_term, highlight_column, last_term, highlight_column)),
+        setNames(list(sprintf("%%post_z2@%d; %%%s@%d", highlight_column, last_term, highlight_column)),
             "square,thick3,orange,se")
     } else NULL
     etable(res$fits, tex = TRUE, file = file, replace = TRUE, digits = digits,
@@ -261,7 +275,7 @@ cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3", slide
             "mh^year_constr" = "Type $\\times$ vintage",
             "statefp^year_constr^mh" = "State $\\times$ vintage $\\times$ type"),
         extralines = c(list("Counties" = format(res$counties, big.mark = ",")),
-            if (slides) list("Size controls" = c("No", "No", "Yes", "No")) else
+            if (slides) list("Size controls" = c("No", "No", "No", "Yes")) else
                 if (n_models == 6L) list("Size controls" = c("No", "No", "Yes", "No", "No", "Yes"))),
         notes = NULL)
 }

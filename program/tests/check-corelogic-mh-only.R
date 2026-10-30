@@ -145,7 +145,7 @@ size_fixture[, log_price := 10 + county / 10 + .2 * mh + .03 * year_sale +
     (.4 + .2 * mh) * log_living_area + (.3 - .1 * mh) * log_lot_size]
 size_fixture[, valid_size := TRUE]
 size_fixture[seq_len(10), `:=`(valid_size = FALSE, log_lot_size = NA_real_)]
-size_fits <- cl_price_static_fits(size_fixture)
+size_fits <- cl_price_static_fits(size_fixture, county_year = TRUE)
 for (k in c(3L, 6L)) {
     b <- coef(size_fits$fits[[k]])
     target <- b[if (k == 3L) c("post_z2", "post_z3") else c("post_mh_z2", "post_mh_z3")]
@@ -172,7 +172,9 @@ saturated_fixture[, log_price := 10 + county / 10 + .2 * mh + .03 * year_sale +
 saturated_fit <- cl_price_static_fits(saturated_fixture)$county_vintage
 stopifnot(max(abs(coef(saturated_fit)[c("post_mh_z2", "post_mh_z3")] - c(.2, -.1))) < 1e-7,
     !any(c("post_z2", "post_z3") %in% names(coef(saturated_fit))),
-    nobs(size_fits$county_vintage) == nobs(size_fits$fits[[5]]))
+    nobs(size_fits$county_vintage) == nobs(size_fits$fits[[5]]),
+    nobs(size_fits$county_year) == nobs(size_fits$fits[[5]]),
+    identical(names(coef(size_fits$county_year)), c("post_z2", "post_z3", "post_mh_z2", "post_mh_z3")))
 slide_dir <- tempfile(); dir.create(slide_dir)
 cl_price_slide_tables(size_fits, slide_dir)
 for (j in 1:4) {
