@@ -114,6 +114,54 @@ size_labels <- c(log_es_ddd = "Baseline", log_es_ddd_size = "Controls for lot si
 cl_type_es_plot(type_es_tab[series == "MH minus site-built" & specification %in% names(size_labels)][,
     series := size_labels[specification]], out_dir, "log_es_ddd", "log_price", keep = unname(size_labels))
 fwrite(type_es_tab, file.path(out_dir, "type_es_coefficients.csv"))
+# Level DDD: county x sale year x vintage FE common to both types, so the MH x zone
+# level is identified rather than absorbed. With elastic new-MH supply, the pre-1994
+# coefficient is c - v, the post-1994 coefficient is c, and post minus pre is v.
+# Identification is cross-sectional (within state); there is no pre-reform sale period.
+dt[, `:=`(pre_mh_z2 = mh_z2 * (1L - post), pre_mh_z3 = mh_z3 * (1L - post))]
+level_fe <- "countyfp^year_sale^year_constr + statefp^year_constr^mh"
+level_specs <- list(
+    level_ddd_static = "log_price ~ pre_mh_z2 + post_mh_z2 + pre_mh_z3 + post_mh_z3",
+    level_ddd_static_size = paste("log_price ~ pre_mh_z2 + post_mh_z2 + pre_mh_z3 + post_mh_z3",
+        "+ log_living_area + log_lot_size + mh:log_living_area + mh:log_lot_size"),
+    level_ddd_dynamic = "log_price ~ i(year_constr, mh_z2) + i(year_constr, mh_z3)")
+level_fits <- lapply(level_specs, function(f)
+    feols(as.formula(paste(f, "|", level_fe)), dt, vcov = ~countyfp, mem.clean = TRUE))
+level_tab <- rbindlist(lapply(names(level_fits), function(id) cl_coeftable(level_fits[[id]], id)[,
+    counties := uniqueN(dt$countyfp[obs(level_fits[[id]])])]))
+# Post minus pre within each zone: the vintage gap v under this design.
+level_diff <- rbindlist(lapply(names(level_fits)[1:2], function(id) {
+    b <- coef(level_fits[[id]]); V <- vcov(level_fits[[id]])
+    rbindlist(lapply(c("z2", "z3"), function(z) {
+        k <- paste0(c("post_mh_", "pre_mh_"), z)
+        est <- b[k[1]] - b[k[2]]; se <- sqrt(V[k[1], k[1]] + V[k[2], k[2]] - 2 * V[k[1], k[2]])
+        data.table(term = paste0("post_minus_pre_mh_", z), estimate = est, se = se, t = est / se,
+            p = 2 * pnorm(-abs(est / se)), ci_low = est - 1.96 * se, ci_high = est + 1.96 * se,
+            specification = id, n = nobs(level_fits[[id]]))
+    }))
+}))[, `:=`(pct = 100 * expm1(estimate), pct_low = 100 * expm1(ci_low), pct_high = 100 * expm1(ci_high))]
+level_tab <- rbind(level_tab, level_diff, fill = TRUE)
+fwrite(level_tab, file.path(out_dir, "level_ddd_coefficients.csv"))
+# Only county x sale year x vintage cells with both housing types identify the MH x zone terms.
+level_cells <- dt[, .(both = uniqueN(mh) == 2L, mh_sales = sum(mh), sb_sales = sum(1L - mh)),
+    by = .(wind_zone, countyfp, year_sale, year_constr)]
+fwrite(level_cells[, .(cells = .N, cells_both_types = sum(both), mh_sales = sum(mh_sales),
+    mh_sales_in_both = sum(mh_sales[both]), counties_with_both = uniqueN(countyfp[both])), by = wind_zone],
+    file.path(out_dir, "level_ddd_support.csv"))
+models[names(level_fits)] <- lapply(level_fits, summary, lean = TRUE)
+level_es <- level_tab[specification == "level_ddd_dynamic"][, `:=`(
+    vintage = as.integer(sub("year_constr::([0-9]+):.*", "\\1", term)),
+    comparison = fifelse(grepl("z2$", term), "Zone II minus Zone I", "Zone III minus Zone I"))]
+p_level <- ggplot(level_es, aes(vintage, estimate)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + cl_mh_timing_lines() +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = .15, fill = "#0072B2") +
+    geom_line(color = "#0072B2") + geom_point(color = "#0072B2", size = 2) +
+    facet_wrap(~comparison, ncol = 2) + scale_x_continuous(breaks = cl_breaks()) +
+    labs(x = "Construction year", y = "Log MH minus site-built price gap") +
+    theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
+        panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
+for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0("level_ddd_es.", ext)),
+    p_level, width = 9, height = 5, dpi = 150)
 # Robustness: drop Florida, whose 1999 installation rules and 2002 building code
 # may change MH prices independently of the 1994 standard.
 out_nofl <- file.path(out_dir, "no-florida"); dir.create(out_nofl)
@@ -140,7 +188,8 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     paper_figure_specification = "mh_only_dynamic_state_vintage_fe",
     county_vintage_ddd = "No size controls; county x sale year x type, county x construction vintage, and state x vintage x type FE; DDD columns share retained observations",
-    slide_table = "Columns: (1) MH DiD with state x vintage FE; (2) DDD with county x sale year x type and state x vintage x type FE; (3) column 2 plus type-specific size slopes",
+    level_ddd = "Log price on pre/post x MH x zone II/III with county x sale year x vintage FE common to both types and state x vintage x type FE; MH x zone level identified cross-sectionally; static, static with type-specific size slopes, and annual-vintage event study with no reference vintage",
+    slide_table ="Columns: (1) MH DiD with state x vintage FE; (2) DDD with county x sale year x type and state x vintage x type FE; (3) column 2 plus type-specific size slopes",
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
     size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values required in every model, no upper trimming or imputation; static columns share retained observations within housing-type sample",
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
