@@ -120,7 +120,7 @@ cl_raw_count_plot <- function(counts, out_dir) {
         geom_point(color = "#0072B2", size = 1.7) +
         facet_wrap(~zone, nrow = 1, scales = "free_y") +
         scale_y_continuous(labels = scales::label_comma()) +
-        scale_x_continuous(breaks = seq(1990, 1998, 2)) +
+        scale_x_continuous(breaks = cl_breaks(quantity = TRUE)) +
         labs(x = "Construction year", y = "Surviving manufactured homes") +
         theme_classic(base_size = 14) +
         theme(panel.grid.major.y = element_line(color = "gray90"))

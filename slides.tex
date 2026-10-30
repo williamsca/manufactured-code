@@ -288,48 +288,18 @@
 
 \begin{frame}
     \frametitle{Roadmap}
-    \begin{enumerate}\setlength{\itemsep}{2.5em}
-        \item Willingness to pay: capitalization in resale prices
-        \item Does willingness to pay cover the cost? Quantities
-        \item Reductions in flood damage
-    \end{enumerate}
-\end{frame}
+    Quantities: did the reform reduce purchases of manufactured homes?
+    \begin{itemize}
+        \item $\Delta Q > 0 \Longleftrightarrow WTP > c$
+    \end{itemize}
 
-\begin{frame}[t]
+    \vspace{2em}
 
-    \frametitle{How much do buyers value the additional protection?}
-    \textbf{Estimate capitalized willingness to pay using three comparisons:}
+    Willingness to pay: capitalization in resale prices
+    \begin{itemize}
+        \item One mechanism: reductions in flood damage
+    \end{itemize}
 
-    % Only MH in treated wind zones built after 1994 are exposed to the reform.
-
-    \vspace{0.8em}
-    \begin{enumerate}\setlength{\itemsep}{1em}
-        \item<1-> Construction vintage (pre- and post-1994)
-        \item<2-> Wind zones
-        \item<3-> Home type (MH or site-built)
-    \end{enumerate}
-
-    For homes sold in the same \al{county} and \al{year}.
-
-
-\end{frame}
-
-\begin{frame}[t]\label{frame:price-static}
-    \frametitle{Post-1994 manufactured homes command a premium in Zone III}
-    \centering
-    \vspace{-1em}
-    \only<1>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_1.tex}}}%
-    \only<2>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_2.tex}}}%
-    \only<3>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_3.tex}}}%
-
-    \vspace{-.5em}
-    \begin{overlayarea}{\linewidth}{0.12\textheight}
-    \small
-    \only<1>{\textbf{MH comparison:} account for county housing markets and state-specific vintage profiles.}
-    \only<2>{\textbf{Add site-built homes:} account for the vintage gap in a second housing type.}
-    \only<3>{\textbf{Add size controls:} the Zone III premium is \al{\vClPriceAdjustedPct\%}, or about \al{\$\vClPriceAdjustedDollars} at the reference price.}
-    \par\hfill \hyperlink{frame:price-ddd-es}{\beamerbutton{event study}}
-    \end{overlayarea}
 \end{frame}
 
 \begin{frame}
@@ -385,8 +355,101 @@
     Under the identifying assumptions, buyers at the margin valued the additional resilience \al{less than its cost}.
 
     \vspace{1em}
-    \textbf{Next:} flood-damage reductions quantify one source of the protection buyers value.
+    \textbf{Next:} resale prices measure how much buyers value the additional protection.
 \end{frame}
+
+\begin{frame}[t]
+
+    \frametitle{How much do buyers value the additional protection?}
+    \textbf{Estimate capitalized willingness to pay using three comparisons:}
+
+    % Only MH in treated wind zones built after 1994 are exposed to the reform.
+    \pause
+
+    \vspace{0.5em}
+    \begin{enumerate}\setlength{\itemsep}{1em}
+        \item Construction vintage (pre- and post-1994)
+        \item Wind zones
+        \item Home type (MH or site-built)
+    \end{enumerate}
+
+    \vspace{0.8em}
+
+    Restrict comparisons to homes sold in the same \al{county} and \al{year}.
+
+    \pause
+
+    \vspace{2em}
+
+    Identification: absent the reform, the difference between MH and site-built vintage price profiles would be the same across wind zones.
+
+\end{frame}
+
+\begin{frame}
+    \frametitle{A vintage design across wind zones: prices}
+    For sale $i$ of a manufactured home, built in year $\nu_i$ in county $c(i)$ and sold in year $t(i)$:
+    \[
+    \ln P_i = \alpha_{c(i),t(i)} + \lambda_{s(c(i)),\nu_i}
+      + \sum_{k\neq 1993}\left(\beta^{II}_k Z^{II}_{c(i)} + \beta^{III}_k Z^{III}_{c(i)}\right)
+      \mathbf{1}[\nu_i=k] + \varepsilon_i
+    \]
+    where
+    \begin{itemize}
+        \item $P_i$ is the real sale price,
+        \item $\alpha_{c,t}$ absorbs local housing-market conditions at the time of sale,
+        \item $\lambda_{s(c),\nu}$ absorbs the vintage price profile of each state $s(c)$, and
+        \item $Z_c^{II}$ and $Z_c^{III}$ are wind-zone indicators.
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Identification:} absent the reform, vintage price profiles would be similar across wind zones \al{within a state}.
+
+    \vfill
+    \gc{Standard errors clustered by county. Reference vintage: 1993.}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Adding site-built homes: a triple difference}
+    Let $m\in\{\text{MH},\text{SB}\}$ be the housing type and $\mathrm{Post}_\nu=\mathbf{1}[\nu\geq 1994]$:
+    \[
+    \begin{split}
+    \ln P_i = {} & \alpha_{c(i),t(i),m(i)} + \lambda_{m(i),\nu_i}
+      + \phi^{II}\,\mathrm{Post}_{\nu_i} Z^{II}_{c(i)} + \phi^{III}\,\mathrm{Post}_{\nu_i} Z^{III}_{c(i)} \\
+    & + \theta^{II}\,\mathrm{Post}_{\nu_i}\text{MH}_i Z^{II}_{c(i)}
+      + \theta^{III}\,\mathrm{Post}_{\nu_i}\text{MH}_i Z^{III}_{c(i)} + \varepsilon_i
+    \end{split}
+    \]
+    where
+    \begin{itemize}
+        \item $\alpha_{c,t,m}$ absorbs local housing-market conditions at the time of sale, separately by housing type,
+        \item $\lambda_{m,\nu}$ absorbs the vintage price profile of each housing type,
+        \item $\phi^{III}$ is the post-1994 price change of site-built homes in Zone III relative to Zone I, and
+        \item $\theta^{III}$ is the \al{additional} post-1994 change for manufactured homes.
+    \end{itemize}
+    \vspace{0.5em}
+    \textbf{Identification:} absent the reform, the difference between MH and site-built vintage price profiles would be the same across wind zones.
+
+    \vfill
+    \gc{Standard errors clustered by county.}
+\end{frame}
+
+\begin{frame}[t]\label{frame:price-static}
+    \frametitle{Post-1994 manufactured homes command a premium in Zone III}
+    \centering
+    \vspace{-1em}
+    \only<1>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_1.tex}}}%
+    \only<2>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_2.tex}}}%
+    \only<3>{\resizebox*{!}{0.82\textheight}{\input{output/corelogic/prices/mh_static_ladder_slides_3.tex}}}%
+
+    \vspace{-.5em}
+    \begin{overlayarea}{\linewidth}{0.12\textheight}
+    \small
+    \only<1>{\textbf{MH comparison:} account for county housing markets and state-specific vintage profiles.}
+    \only<2>{\textbf{Add site-built homes:} account for the vintage gap in a second housing type.}
+    \only<3>{\textbf{Add size controls:} the Zone III premium is \al{\vClPriceAdjustedPct\%}, or about \al{\$\vClPriceAdjustedDollars} at the reference price.}
+    \par\hfill \hyperlink{frame:price-ddd-es}{\beamerbutton{event study}}
+    \end{overlayarea}
+\end{frame}
+
 
 
 %% ============================================================
