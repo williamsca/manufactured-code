@@ -124,7 +124,12 @@ level_specs <- list(
     level_ddd_static = "log_price ~ pre_mh_z2 + post_mh_z2 + pre_mh_z3 + post_mh_z3",
     level_ddd_static_size = paste("log_price ~ pre_mh_z2 + post_mh_z2 + pre_mh_z3 + post_mh_z3",
         "+ log_living_area + log_lot_size + mh:log_living_area + mh:log_lot_size"),
-    level_ddd_dynamic = "log_price ~ i(year_constr, mh_z2) + i(year_constr, mh_z3)")
+    level_ddd_dynamic = "log_price ~ i(year_constr, mh_z2) + i(year_constr, mh_z3)",
+    # Same model normalized to 1993: the MH x zone level enters separately, so
+    # each vintage coefficient is its gap relative to 1993 with a joint SE.
+    level_ddd_es = "log_price ~ mh_z2 + mh_z3 + i(year_constr, mh_z2, ref = 1993) + i(year_constr, mh_z3, ref = 1993)",
+    level_ddd_es_size = paste("log_price ~ mh_z2 + mh_z3 + i(year_constr, mh_z2, ref = 1993) + i(year_constr, mh_z3, ref = 1993)",
+        "+ log_living_area + log_lot_size + mh:log_living_area + mh:log_lot_size"))
 level_fits <- lapply(level_specs, function(f)
     feols(as.formula(paste(f, "|", level_fe)), dt, vcov = ~countyfp, mem.clean = TRUE))
 level_tab <- rbindlist(lapply(names(level_fits), function(id) cl_coeftable(level_fits[[id]], id)[,
@@ -162,6 +167,27 @@ p_level <- ggplot(level_es, aes(vintage, estimate)) +
         panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
 for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0("level_ddd_es.", ext)),
     p_level, width = 9, height = 5, dpi = 150)
+# Normalized event study, without and with size controls, in the style of log_es_ddd.
+es_labels <- c(level_ddd_es = "Baseline", level_ddd_es_size = "Controls for lot size and living area")
+level_es_ref <- level_tab[specification %in% names(es_labels) & grepl("^year_constr::", term)][, `:=`(
+    vintage = as.integer(sub("year_constr::([0-9]+):.*", "\\1", term)), zone = sub(".*:mh_", "", term))]
+level_es_ref <- rbind(level_es_ref, CJ(specification = names(es_labels), zone = c("z2", "z3"))[,
+    `:=`(vintage = 1993L, estimate = 0, ci_low = 0, ci_high = 0)], fill = TRUE)
+level_es_ref[, `:=`(series = factor(es_labels[specification], levels = es_labels),
+    comparison = fifelse(zone == "z2", "Zone II minus Zone I", "Zone III minus Zone I"))]
+stopifnot(level_es_ref[, .N, by = .(series, zone)]$N == length(CL_VINTAGES))
+p_level_ref <- ggplot(level_es_ref, aes(vintage, estimate, color = series, fill = series)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + cl_mh_timing_lines() +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = .15, color = NA) +
+    geom_line() + geom_point(size = 2) + facet_wrap(~comparison, ncol = 2) +
+    scale_color_manual(values = c("#0072B2", "#D55E00"), name = NULL) +
+    scale_fill_manual(values = c("#0072B2", "#D55E00"), name = NULL) +
+    scale_x_continuous(breaks = cl_breaks()) +
+    labs(x = "Construction year", y = "Log MH minus site-built gap, rel. to 1993") +
+    theme_classic(base_size = 14) + theme(text = element_text(family = "serif"),
+        legend.position = "bottom", panel.grid.major.y = element_line(color = "gray85", linewidth = .4))
+for (ext in c("pdf", "png")) ggsave(file.path(out_dir, paste0("level_ddd_es_ref1993.", ext)),
+    p_level_ref, width = 9, height = 5, dpi = 150)
 # Robustness: drop Florida, whose 1999 installation rules and 2002 building code
 # may change MH prices independently of the 1994 standard.
 out_nofl <- file.path(out_dir, "no-florida"); dir.create(out_nofl)
@@ -188,7 +214,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     paper_figure_specification = "mh_only_dynamic_state_vintage_fe",
     county_vintage_ddd = "No size controls; county x sale year x type, county x construction vintage, and state x vintage x type FE; DDD columns share retained observations",
-    level_ddd = "Log price on pre/post x MH x zone II/III with county x sale year x vintage FE common to both types and state x vintage x type FE; MH x zone level identified cross-sectionally; static, static with type-specific size slopes, and annual-vintage event study with no reference vintage",
+    level_ddd = "Log price on pre/post x MH x zone II/III with county x sale year x vintage FE common to both types and state x vintage x type FE; MH x zone level identified cross-sectionally; static, static with type-specific size slopes, annual-vintage event study with no reference vintage, and event studies normalized to 1993 without and with size slopes (level_ddd_es_ref1993)",
     slide_table ="Columns: (1) MH DiD with state x vintage FE; (2) DDD with county x sale year x type and state x vintage x type FE; (3) column 2 plus type-specific size slopes",
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
     size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values required in every model, no upper trimming or imputation; static columns share retained observations within housing-type sample",
