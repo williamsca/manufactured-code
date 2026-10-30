@@ -63,16 +63,12 @@ cl_mh_only_paper_plot(mh_state_tab, out_dir, forecast = forecast)
 cl_mh_only_paper_plot(mh_state_tab, out_dir, slides = TRUE, forecast = forecast)
 cl_mh_only_compare_plot(mh_tab, mh_state_tab, out_dir)
 # Three MH DiDs followed by three housing-type DDDs; the third of each adds size.
-# The slide table also uses a DDD whose county x sale-year effects are common to both types.
-ladder <- cl_price_static_fits(dt, county_year = TRUE)
+ladder <- cl_price_static_fits(dt)
 cl_mh_static_table(ladder, file.path(out_dir, "mh_static_ladder.tex"))
 cl_price_slide_tables(ladder, out_dir)
 fwrite(cl_coeftable(ladder$county_vintage, "county_vintage_ddd")[,
     counties := ladder$county_vintage_counties], file.path(out_dir, "mh_county_vintage.csv"))
 models[["county_vintage_ddd"]] <- ladder$county_vintage
-fwrite(cl_coeftable(ladder$county_year, "county_year_ddd")[,
-    counties := ladder$county_year_counties], file.path(out_dir, "mh_county_year.csv"))
-models[["county_year_ddd"]] <- ladder$county_year
 fwrite(rbindlist(lapply(1:6, function(k) cl_coeftable(ladder$fits[[k]], paste0("ladder_", k))[,
     counties := ladder$counties[k]])), file.path(out_dir, "mh_static_ladder.csv"))
 fwrite(rbindlist(lapply(names(ladder$common_sample), function(id)
@@ -144,8 +140,7 @@ write_json(list(status = "complete", build = input, slurm_job = Sys.getenv("SLUR
     mh_only_robustness = "Same MH-only price DiD with state x vintage FE in place of vintage FE",
     paper_figure_specification = "mh_only_dynamic_state_vintage_fe",
     county_vintage_ddd = "No size controls; county x sale year x type, county x construction vintage, and state x vintage x type FE; DDD columns share retained observations",
-    county_year_ddd = "No size controls; county x sale year (not interacted with type) and state x vintage x type FE; slide column 2; same retained observations as the other DDD columns",
-    slide_table = "Columns: (1) MH DiD with state x vintage FE; (2) DDD with county x sale year FE; (3) DDD with county x sale year x type FE; (4) column 3 plus type-specific size slopes",
+    slide_table = "Columns: (1) MH DiD with state x vintage FE; (2) DDD with county x sale year x type and state x vintage x type FE; (3) column 2 plus type-specific size slopes",
     mh_static_ladder = "Static post x zone II/III: (1)-(3) MH DiD, common vintage FE then state x vintage FE then size controls; (4)-(6) MH/SB DDD with both post x zone (site-built) and post x zone x MH terms and no county x vintage FE, type x vintage FE then state x type x vintage FE then type-specific size slopes",
     size_controls = "Log living_square_feet_all_buildings and log land_square_footage, pinned 2023 PB, clip and county matched; positive finite values required in every model, no upper trimming or imputation; static columns share retained observations within housing-type sample",
     outcome = "Log land-inclusive sale price, annual CPI-U in 2000 dollars",
