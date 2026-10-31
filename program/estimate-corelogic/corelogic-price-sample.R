@@ -1,7 +1,11 @@
-# Shared sale sample: existing homes only, sold after the vintage window ends.
-CL_SALE_YEARS <- 2000L:2023L
+# Shared sale sample: existing homes only, every eligible sale in a year after
+# the parcel's own construction year. Sale years overlap the vintage window, so
+# early sale years contain only older vintages.
+CL_SALE_YEARS <- 1990L:2023L
 cl_price_sample <- function() {
-    stopifnot(min(CL_SALE_YEARS) > max(CL_VINTAGES))
+    if (manifest$min_sale_year > min(CL_SALE_YEARS) || manifest$max_sale_year < max(CL_SALE_YEARS))
+        stop("Build sale years ", manifest$min_sale_year, "-", manifest$max_sale_year,
+             " do not cover CL_SALE_YEARS")
     if (manifest$min_vintage > min(CL_VINTAGES) || manifest$max_vintage < max(CL_VINTAGES))
         stop("Build vintages ", manifest$min_vintage, "-", manifest$max_vintage,
              " do not cover CL_VINTAGES")
@@ -9,7 +13,7 @@ cl_price_sample <- function() {
     dt <- read_corelogic(sprintf("SELECT s.countyfp, s.clip, s.mh, s.year_constr, s.year_sale,
         s.sale_price_2000 FROM read_parquet(%s) s
         WHERE s.eligible_sale AND s.countyfp IS NOT NULL AND s.year_sale BETWEEN %d AND %d
-        AND s.year_constr BETWEEN %d AND %d AND s.date_sale >= MAKE_DATE(s.year_constr,1,1)",
+        AND s.year_constr BETWEEN %d AND %d AND s.year_sale > s.year_constr",
         sales, min(CL_SALE_YEARS), max(CL_SALE_YEARS), min(CL_VINTAGES), max(CL_VINTAGES)))
     stopifnot(setequal(unique(dt$year_constr), CL_VINTAGES))
     stopifnot(!anyNA(dt$mh), !anyNA(dt$sale_price_2000), all(dt$sale_price_2000 > 0))
