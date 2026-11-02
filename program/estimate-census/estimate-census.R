@@ -202,6 +202,14 @@ etable(six_fits, tex = TRUE, file = file.path(out_dir, "census-static-paper.tex"
     dict = c(post_z2 = "Zone II $\\times$ post", post_z3 = "Zone III $\\times$ post",
         countyfp = "County", bin = "Vintage", "statefp^bin" = "State $\\times$ vintage"),
     extralines = list("Counties" = format(six_counties, big.mark = ",")), notes = NULL)
+# Slide version: no county counts, standard errors to the right of the estimates.
+etable(six_fits, tex = TRUE, file = file.path(out_dir, "census-static-slides.tex"), replace = TRUE,
+    digits = "r3", fitstat = c("n", "pr2"), keep = "%post_", style.tex = style.tex(tablefoot = FALSE),
+    depvar = FALSE, se.below = FALSE,
+    headers = list("Outcome:" = list("MH" = 2, "Site-built" = 2, "MH" = 2),
+                   "Occupants:" = list("All" = 4, "Owner" = 1, "Renter" = 1)),
+    dict = c(post_z2 = "Zone II $\\times$ post", post_z3 = "Zone III $\\times$ post",
+        countyfp = "County", bin = "Vintage", "statefp^bin" = "State $\\times$ vintage"), notes = NULL)
 six_tab <- rbindlist(lapply(1:6, function(j) {
     tab <- as.data.table(coeftable(six_fits[[j]]), keep.rownames = "term")
     setnames(tab, names(tab)[2:5], c("estimate", "se", "t", "p"))
