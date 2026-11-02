@@ -128,6 +128,29 @@ cl_raw_count_plot <- function(counts, out_dir) {
     invisible(p)
 }
 
+# MH share of surviving MH plus site-built homes by construction year, one panel per wind zone.
+cl_share_plot <- function(type_counts, out_dir) {
+    x <- dcast(type_counts, wind_zone + year_constr ~ mh, value.var = "homes")
+    setnames(x, c("0", "1"), c("sb_homes", "mh_homes"))
+    stopifnot(!anyDuplicated(x, by = c("wind_zone", "year_constr")),
+        all(is.finite(x$mh_homes)), all(is.finite(x$sb_homes)),
+        all(x$mh_homes >= 0), all(x$sb_homes >= 0), all(x$mh_homes + x$sb_homes > 0))
+    x[, share := 100 * mh_homes / (mh_homes + sb_homes)]
+    x[, zone := factor(wind_zone, levels = 1:3, labels = c("Zone I", "Zone II", "Zone III"))]
+    p <- ggplot(x, aes(year_constr, share)) +
+        geom_vline(xintercept = 1994.5, linetype = "dashed", color = "gray45") +
+        geom_line(color = "#0072B2", linewidth = 0.7) +
+        geom_point(color = "#0072B2", size = 1.7) +
+        facet_wrap(~zone, nrow = 1, scales = "free_y") +
+        scale_y_continuous(labels = function(v) paste0(v, "%")) +
+        scale_x_continuous(breaks = cl_breaks(quantity = TRUE)) +
+        labs(x = "Construction year", y = "Manufactured share of surviving homes") +
+        theme_classic(base_size = 14) +
+        theme(panel.grid.major.y = element_line(color = "gray90"))
+    ggsave(file.path(out_dir, "mh_share_by_zone.pdf"), p, width = 10, height = 4)
+    invisible(p)
+}
+
 # MH and site-built counts by county x vintage over the MH-support counties of cl_mh_count_panel.
 cl_type_count_panel <- function(cells, years = CL_VINTAGES) {
     mh <- cl_mh_count_panel(cells, years)

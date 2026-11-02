@@ -57,6 +57,7 @@ fwrite(rbindlist(lapply(1:4, function(k) cl_coeftable(ladder$fits[[k]], paste0("
 # Aggregate cohort counts retain the separate outcomes for descriptive checks.
 fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)),
     by = .(wind_zone, mh, year_constr)], file.path(out_dir, "type_counts_by_vintage.csv"))
+cl_share_plot(fread(file.path(out_dir, "type_counts_by_vintage.csv")), out_dir)
 fwrite(type_counts[, .(homes = sum(homes), counties = uniqueN(countyfp)), by = .(wind_zone, mh, post)],
     file.path(out_dir, "mh_static_ladder_support.csv"))
 models[paste0("mh_static_ladder_", 1:4)] <- ladder$fits

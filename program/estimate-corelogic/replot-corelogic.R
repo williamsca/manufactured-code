@@ -27,3 +27,6 @@ for (analysis in c("prices", "quantities")) {
         cl_mh_only_compare_plot(tab, tab_state, out_dir, quantity = quantity, reference = reference)
     }
 }
+
+cl_share_plot(fread(here("output", "corelogic", "quantities", "type_counts_by_vintage.csv")),
+              here("output", "corelogic", "quantities"))
