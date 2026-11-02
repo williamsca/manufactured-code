@@ -194,26 +194,22 @@
 
     \small
 
-    \textbf{1. A new policy in an understudied segment of the housing market}
+    \textbf{1. Policy evaluation in understudied segment of the housing market}
     \begin{itemize}
-        \item building codes and energy use \gc{\citep{jacobsen_are_2013, levinson_how_2016}}
-        \item wind codes for site-built homes \gc{\citep{simmons_economic_2018, dehring_coastal_2013}}; wildfire codes \gc{\citep{baylis_mandated_2026}}
-        \item prior work on the 1994 HUD reform is descriptive \gc{\citep{simmons_manufactured_2008, kevin_r_grosskopf_manufactured_2005}}
+        \item building codes and energy use \gc{\citep{jacobsen_are_2013, levinson_how_2016}}; mandatory disaster mitigation \gc{\citep{simmons_economic_2018, dehring_coastal_2013, baylis_mandated_2026}}; descriptive studies for MH \gc{\citep{simmons_manufactured_2008, kevin_r_grosskopf_manufactured_2005}}
     \end{itemize}
 
     \hspace{1em} \so \textbf{New:} effects of a federal wind standard on \al{quantities} and \al{prices} of manufactured homes
 
     \vspace{1.2em}
 
-    \textbf{2. Separating the code from everything else that changes with vintage}
+    \textbf{2. Novel empirical strategy to vintage designs}
     \begin{itemize}
-        \item existing designs compare vintages within a location, or locations within a vintage
-        \item the code change coincides with other vintage effects: depreciation, construction trends, survival
+        \item before: compare outcomes across construction vintages and locations
+        \item concern: building code changes may coincide with updated beliefs about climate risk or insurance rates
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} compare \al{MH vs.\ site-built} vintage price profiles within county $\times$ sale year, across wind zones
-
-    \hspace{1em} \phantom{\so} \gc{Federal preemption: the 1994 code applies to manufactured homes only.}
+    \hspace{1em} \so \textbf{New:} difference out site-built homes \al{in the same county $\times$ year} to isolate MH-specific effects
 
 \end{frame}
 
@@ -249,9 +245,7 @@
     \vspace{0.8em}
     \pause
 
-    \textbf{The institutional feature that makes this work:} the HUD Code is a \al{federal} standard that \al{preempts} state and local regulation.
-
-    \gc{Site-built homes in the same county remain under state and local codes, providing an additional comparison group.}
+    \textbf{NB:} the HUD Code is a \al{federal} standard that \al{preempts} state and local regulation.
 
 \end{frame}
 
@@ -261,19 +255,19 @@
 
 \begin{frame}
     \frametitle{Data}
-    \textbf{Primary analysis: CoreLogic property and transaction records}
+    \textbf{CoreLogic property and transaction records}
     \begin{itemize}
-        \item surviving manufactured homes by county and construction year, observed in 2023
-        \item resale transactions for the willingness-to-pay analysis
-        \item property records may omit homes on rented sites; Census 2000 provides a quantity check
+        \item surviving manufactured homes by county and construction year (2023)
+        \item arm's-length transactions (1990-2023)
+        \item supplement w/ Census 2000
     \end{itemize}
 
     \vspace{0.8em}
-    \textbf{Supporting analysis: OpenFEMA flood claims and policies}
+    \textbf{OpenFEMA flood claims and policies}
     \begin{itemize}
         \item construction vintage, housing type, flood damage, and insurance coverage
         \item compare manufactured and site-built homes exposed to floods in the same county and period
-        \item estimates describe insured homes
+        \item limitation: few insured MH
     \end{itemize}
 \end{frame}
 
@@ -316,7 +310,7 @@
     \includegraphics[width=\linewidth,height=0.78\textheight,keepaspectratio]{output/corelogic/quantities/mh_only_vintage_quantities_slides.pdf}
 \end{frame}
 
-\begin{frame}
+\begin{frame}\label{frame:quantity-static}
     \frametitle{$\mathrm{E}[N_{c\nu}] = \exp\!\left(\alpha_c + \lambda_{s(c),\nu} + \beta^{II} Z^{II}_c \cdot \mathrm{Post}_\nu + \beta^{III} Z^{III}_c \cdot \mathrm{Post}_\nu\right)$}
 
     \vspace{-0.5em}
@@ -325,6 +319,8 @@
     \centering
     \resizebox*{!}{0.80\textheight}{\input{output/corelogic/quantities/mh_static_ladder.tex}}
     \end{table}
+
+    \par \gc{Standard errors clustered by county in parenthesis. Column (2) estimates represent a \vClQtyZoneTwoPct\% and \vClQtyZoneThreePct\% decline in MH in Zones II and III, respectively.} \hfill \hyperlink{frame:census-quantity}{\beamerbutton{Census sample}}
 \end{frame}
 
 \begin{frame}
@@ -623,6 +619,17 @@
 
 \begin{frame}
     \heading{Appendix}
+\end{frame}
+
+\begin{frame}\label{frame:census-quantity}
+    \frametitle{Quantities: Census 2000 counts of occupied housing units}
+    \begin{table}
+    \centering
+    \resizebox*{!}{0.72\textheight}{\input{output/census/census-static-slides.tex}}
+    \end{table}
+
+    \gc{Poisson; county $\times$ vintage-bin counts (1980--89, 1990--94, 1995--98, 1999--2000); post = 1995--2000; reference bin 1990--94. SEs clustered by county.}
+    \hfill \hyperlink{frame:quantity-static}{\beamerbutton{back}}
 \end{frame}
 
 \begin{frame}[t]

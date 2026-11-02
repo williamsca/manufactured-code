@@ -299,6 +299,19 @@ mac("vClPriceBase", fmt_draw(cl_price_base))
 mac("vClPriceAdjustedPct", fmt_f(100 * expm1(adjusted$estimate), 1))
 mac("vClPriceAdjustedDollars", fmt_draw(cl_price_base * expm1(adjusted$estimate)))
 
+# CoreLogic quantities: Poisson MH counts, state x vintage FE (ladder column 2),
+# expressed as the proportional decline 100 * (1 - exp(b)).
+qty_sc <- fread(here("output", "corelogic", "quantities", "mh_static_ladder.csv"))
+qty <- qty_sc[specification == "ladder_2" & housing_type == "MH" & term %in% c("post_z2", "post_z3")]
+stopifnot(nrow(qty) == 2L)
+for (z in c(2, 3)) {
+    q <- qty[term == paste0("post_z", z)]
+    nm <- c("2" = "Two", "3" = "Three")[[as.character(z)]]
+    mac(paste0("vClQtyZone", nm, "Pct"),   fmt_f(abs(q$pct), 0))
+    mac(paste0("vClQtyZone", nm, "PctLo"), fmt_f(abs(q$pct_high), 0))
+    mac(paste0("vClQtyZone", nm, "PctHi"), fmt_f(abs(q$pct_low), 0))
+}
+
 out_path <- here("output", "slide-numbers.tex")
 
 header <- c(
