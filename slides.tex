@@ -106,7 +106,7 @@
 \end{comment}
 
 % Stylized competitive market: S_0(Q)=1+Q/2, D_0(Q)=5-Q/2.
-% Compliance cost c=1.2 and private WTP v shift the curves vertically.
+% Compliance cost c=1.2 and private v shift the curves vertically.
 % These are illustrative diagram coordinates, not empirical estimates.
 \begin{frame}
     \frametitle{``Simple Economics of Mandated Benefits'' \citep{summers_simple_1989}}
@@ -137,11 +137,10 @@
     \end{tikzpicture}
     \end{column}
     \begin{column}{.42\textwidth}
-    \small
     \only<1>{\textbf{Before the reform}\par\medskip
     Equilibrium $Q_0$ at price $P_0$.}
     \only<2>{\textbf{The mandate raises costs by $c$}}
-    \only<3>{\textbf{Buyers value the protection by $v$}\par\medskip
+    \only<3>{\textbf{Buyers value the protection}\par\medskip
     Demand shifts up.\par\medskip
     If $v=c$, no change in quantities: \al{$Q_1=Q_0$}.\par\medskip
     The price rises by $c$.}
@@ -154,7 +153,7 @@
 \end{frame}
 
 \begin{frame}
-    \frametitle{Quantities can fall even with $v>0$}
+    \frametitle{Results preview}
     \begin{columns}[T]
     \begin{column}{.56\textwidth}
     \centering
@@ -174,50 +173,47 @@
     \end{tikzpicture}
     \end{column}
     \begin{column}{.42\textwidth}
-    \small
-    \textbf{Buyers value the protection less than its cost: $v<c$}\par\medskip
-    Quantity falls: \al{$Q_1<Q_0$}.\par\medskip
+    Quantities: did the reform reduce construction of manufactured homes?
+    \begin{itemize}
+        \item $\Delta Q < 0 \implies v < c$
+    \end{itemize}
+
+    \vspace{2em}
+
+    Willingness to pay ($v$): capitalization in resale prices
+    \begin{itemize}
+        \item + quantify one mechanism: reductions in flood damage
+    \end{itemize}
     \end{column}
     \end{columns}
     \vfill
 \end{frame}
 
 \begin{frame}
-    \frametitle{Literature}
+    \frametitle{Contribution}
 
-    \footnotesize
+    \small
 
-    \textbf{Effects of building codes on housing markets}
+    \textbf{1. A new policy in an understudied segment of the housing market}
     \begin{itemize}
-        \item energy usage \gc{\citep{jacobsen_are_2013, levinson_how_2016}}
-        \item hurricane wind standards \gc{\citep{simmons_economic_2018, dehring_coastal_2013}}
-        \item descriptive work on the 1994 HUD MH reform \gc{\citep{simmons_manufactured_2008, kevin_r_grosskopf_manufactured_2005}}
-        \item wildfire codes in California, accounting for risk misperception and spillovers \gc{\citep{baylis_mandated_2026}}
+        \item building codes and energy use \gc{\citep{jacobsen_are_2013, levinson_how_2016}}
+        \item wind codes for site-built homes \gc{\citep{simmons_economic_2018, dehring_coastal_2013}}; wildfire codes \gc{\citep{baylis_mandated_2026}}
+        \item prior work on the 1994 HUD reform is descriptive \gc{\citep{simmons_manufactured_2008, kevin_r_grosskopf_manufactured_2005}}
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} quasi-experimental evidence on \al{WTP} and \al{$\Delta Q$} from the 1994 HUD reform
+    \hspace{1em} \so \textbf{New:} effects of a federal wind standard on \al{quantities} and \al{prices} of manufactured homes
 
-    \vspace{0.7em}
+    \vspace{1.2em}
 
-    \textbf{Welfare analysis of building codes}
+    \textbf{2. Separating the code from everything else that changes with vintage}
     \begin{itemize}
-        \item designs relying on across-vintage or across-location comparisons 
+        \item existing designs compare vintages within a location, or locations within a vintage
+        \item the code change coincides with other vintage effects: depreciation, construction trends, survival
     \end{itemize}
 
-    \hspace{1em} \so \textbf{New:} estimate capitalized \al{WTP} by comparing vintage price gaps across wind zones and housing types
+    \hspace{1em} \so \textbf{New:} compare \al{MH vs.\ site-built} vintage price profiles within county $\times$ sale year, across wind zones
 
-    \vspace{0.7em}
-
-    \textbf{Adaptation, insurance, and the fiscal cost of disasters}
-    \begin{itemize}
-        \item risk misperception \gc{\citep{bakkensen_going_2022, gallagher_learning_2014}}; premiums and mitigation \gc{\citep{wagner_adaptation_2022}}
-        \item fiscal spillovers of regulation \gc{\citep{deryugina_fiscal_2017, baylis_moral_2019, solomon_optimal_2026}}
-    \end{itemize}
-
-    \hspace{1em} \so \textbf{New:} \al{private returns} to mandated adaptation in inexpensive housing
-
-    \vspace{0.5em}
-    \textbf{Scope:} reduced disaster assistance and spillovers to neighboring properties could justify intervention even when net private benefits are negative.
+    \hspace{1em} \phantom{\so} \gc{Federal preemption: the 1994 code applies to manufactured homes only.}
 
 \end{frame}
 
@@ -283,23 +279,7 @@
 
 
 \begin{frame}
-    \heading{Results}
-\end{frame}
-
-\begin{frame}
-    \frametitle{Roadmap}
-    Quantities: did the reform reduce purchases of manufactured homes?
-    \begin{itemize}
-        \item $\Delta Q > 0 \Longleftrightarrow WTP > c$
-    \end{itemize}
-
-    \vspace{2em}
-
-    Willingness to pay: capitalization in resale prices
-    \begin{itemize}
-        \item One mechanism: reductions in flood damage
-    \end{itemize}
-
+    \heading{Empirical Strategy}
 \end{frame}
 
 \begin{frame}
@@ -412,7 +392,7 @@
     Let $m\in\{\text{MH},\text{SB}\}$ be the housing type and $\mathrm{Post}_\nu=\mathbf{1}[\nu\geq 1994]$:
     \[
     \begin{split}
-    \ln P_i = {} & \alpha_{c(i),t(i),m(i)} + \lambda_{m(i),\nu_i}
+    \ln P_i = {} & \alpha_{c(i),t(i),m(i)} + \lambda_{s(c(i)),m(i),\nu_i}
       + \phi^{II}\,\mathrm{Post}_{\nu_i} Z^{II}_{c(i)} + \phi^{III}\,\mathrm{Post}_{\nu_i} Z^{III}_{c(i)} \\
     & + \theta^{II}\,\mathrm{Post}_{\nu_i}\text{MH}_i Z^{II}_{c(i)}
       + \theta^{III}\,\mathrm{Post}_{\nu_i}\text{MH}_i Z^{III}_{c(i)} + \varepsilon_i
@@ -421,12 +401,12 @@
     where
     \begin{itemize}
         \item $\alpha_{c,t,m}$ absorbs local housing-market conditions at the time of sale, separately by housing type,
-        \item $\lambda_{m,\nu}$ absorbs the vintage price profile of each housing type,
+        \item $\lambda_{s(c),m,\nu}$ absorbs the vintage price profile of each housing type in each state $s(c)$,
         \item $\phi^{III}$ is the post-1994 price change of site-built homes in Zone III relative to Zone I, and
         \item $\theta^{III}$ is the \al{additional} post-1994 change for manufactured homes.
     \end{itemize}
     \vspace{0.5em}
-    \textbf{Identification:} absent the reform, the difference between MH and site-built vintage price profiles would be the same across wind zones.
+    \textbf{Identification:} absent the reform, the difference between MH and site-built vintage price profiles would be the same across wind zones \al{within a state}.
 
     \vfill
     \gc{Standard errors clustered by county.}
