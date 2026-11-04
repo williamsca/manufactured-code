@@ -282,7 +282,7 @@ cl_mh_static_table <- function(res, file, quantity = FALSE, digits = "r3", slide
             "countyfp^mh" = "County $\\times$ type", "countyfp^year_sale^mh" = paste(place, "$\\times$ type"),
             "mh^year_constr" = "Type $\\times$ vintage",
             "statefp^year_constr^mh" = "State $\\times$ vintage $\\times$ type"),
-        extralines = c(list("Counties" = format(res$counties, big.mark = ",")),
+        extralines = c(if (!slides) list("Counties" = format(res$counties, big.mark = ",")),
             if (slides) list("Size controls" = c("No", "No", "Yes")) else
                 if (n_models == 6L) list("Size controls" = c("No", "No", "Yes", "No", "No", "Yes"))),
         notes = NULL)
